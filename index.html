@@ -334,10 +334,6 @@
                             style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
                             <i class="fa-solid fa-clock-rotate-left"></i> Historial
                         </button>
-                        <button id="btn-open-schedule" class="btn btn-primary btn-sm"
-                            style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
-                            <i class="fa-solid fa-calendar-plus"></i> Nuevo Turno
-                        </button>
                     </div>
                 </div>
 
@@ -379,6 +375,11 @@
                         <!-- Turnos cargados dinámicamente -->
                     </div>
                 </div>
+
+                <!-- Botón Flotante para Nuevo Turno -->
+                <button id="btn-open-schedule" class="fab-btn" title="Nuevo Turno">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
             </div>
 
             <!-- PESTAÑA: GASTOS -->
@@ -397,26 +398,25 @@
                 <div class="chart-section">
                     <h4>Registrar Nuevo Gasto</h4>
                     <form id="expense-form" class="cute-form" style="margin-top: 15px;">
-                        <div class="form-row-2">
-                            <div class="form-group">
-                                <label for="expense-concept">Concepto / Descripción</label>
-                                <div class="input-wrapper">
-                                    <i class="fa-solid fa-pen input-icon"></i>
-                                    <input type="text" id="expense-concept" placeholder="Ej: Luz, Esmaltes..." required>
-                                </div>
+                        <div class="form-group">
+                            <label for="expense-concept">Concepto / Descripción</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-pen input-icon"></i>
+                                <input type="text" id="expense-concept" placeholder="Ej: Luz, Esmaltes..." required>
                             </div>
-                            <div class="form-group">
-                                <label for="expense-category">Categoría</label>
-                                <div class="input-wrapper">
-                                    <i class="fa-solid fa-tags input-icon"></i>
-                                    <select id="expense-category" required>
-                                        <option value="Insumos">Insumos</option>
-                                        <option value="Servicios">Servicios</option>
-                                        <option value="Comida">Comida</option>
-                                        <option value="Gasto propio">Gasto propio</option>
-                                        <option value="Otro" selected>Otro</option>
-                                    </select>
-                                </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="expense-category">Categoría</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-tags input-icon"></i>
+                                <select id="expense-category" required>
+                                    <option value="Insumos">Insumos</option>
+                                    <option value="Servicios">Servicios</option>
+                                    <option value="Comida">Comida</option>
+                                    <option value="Gasto propio">Gasto propio</option>
+                                    <option value="Otro" selected>Otro</option>
+                                </select>
                             </div>
                         </div>
 
