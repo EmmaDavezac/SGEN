@@ -273,40 +273,27 @@ function setupEventListeners() {
         renderExpensesHistoryList();
     });
 
-    // Edición de caja inicial (Efectivo y MercadoPago consolidados)
-    const promptEditCajasAll = () => {
-        const currentEfectivo = Number(localStorage.getItem("evolet_initial_caja_efectivo")) || 20300.00;
+    // Edición de caja inicial (Solo MercadoPago)
+    const promptEditCajaMp = () => {
         const currentMp = Number(localStorage.getItem("evolet_initial_caja_mp")) || 67921.85;
-        
-        const newEfectivo = prompt("Ingresa el monto inicial en Efectivo:", currentEfectivo);
-        if (newEfectivo !== null) {
-            const parsedEfectivo = parseFloat(newEfectivo);
-            if (!isNaN(parsedEfectivo)) {
-                localStorage.setItem("evolet_initial_caja_efectivo", parsedEfectivo);
-                
-                // Pedir el segundo monto
-                const newMp = prompt("Ingresa el monto inicial en MercadoPago:", currentMp);
-                if (newMp !== null) {
-                    const parsedMp = parseFloat(newMp);
-                    if (!isNaN(parsedMp)) {
-                        localStorage.setItem("evolet_initial_caja_mp", parsedMp);
-                        calculateAndRenderStats();
-                        showToast("Saldos iniciales actualizados con éxito", "success");
-                    } else {
-                        showToast("Por favor, ingresa un número válido para MercadoPago.", "error");
-                    }
-                }
+        const newMp = prompt("Ingresa el monto inicial en MercadoPago:", currentMp);
+        if (newMp !== null) {
+            const parsedMp = parseFloat(newMp);
+            if (!isNaN(parsedMp)) {
+                localStorage.setItem("evolet_initial_caja_mp", parsedMp);
+                calculateAndRenderStats();
+                showToast("Saldo inicial de MercadoPago actualizado con éxito", "success");
             } else {
-                showToast("Por favor, ingresa un número válido para Efectivo.", "error");
+                showToast("Por favor, ingresa un número válido.", "error");
             }
         }
     };
 
-    const btnEditCajasAll = document.getElementById("btn-edit-cajas-all");
-    const iconEditCajasAll = document.getElementById("icon-edit-cajas-all");
+    const btnEditCajaMp = document.getElementById("btn-edit-caja-mp");
+    const iconEditCajaMp = document.getElementById("icon-edit-caja-mp");
 
-    if (btnEditCajasAll) btnEditCajasAll.addEventListener("click", promptEditCajasAll);
-    if (iconEditCajasAll) iconEditCajasAll.addEventListener("click", (e) => { e.stopPropagation(); promptEditCajasAll(); });
+    if (btnEditCajaMp) btnEditCajaMp.addEventListener("click", promptEditCajaMp);
+    if (iconEditCajaMp) iconEditCajaMp.addEventListener("click", (e) => { e.stopPropagation(); promptEditCajaMp(); });
 }
 
 // =========================================================================
