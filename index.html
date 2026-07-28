@@ -49,14 +49,14 @@
         <div class="login-card">
             <div class="brand-logo-container">
                 <div class="logo-circle">
-                    <img id="logo-img" src="/Contexto/logo.png" alt="Evolet Nails Logo"
+                    <img id="logo-img" src="./public/Contexto/logo.png" alt="Evolet Nails Logo"
                         onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block';">
                     <div id="logo-fallback" class="logo-fallback" style="display:none;"><i class="fa-solid fa-crown"
                             style="font-size: 45px; color: var(--barbie-pink);"></i></div>
                 </div>
             </div>
 
-            <h1>Evolet Nails App</h1>
+            <h1>Evolet Nails</h1>
             <p class="subtitle">Sistema de Contabilidad</p>
 
             <form id="login-form" class="retro-form">
@@ -75,7 +75,6 @@
             </form>
 
             <div class="login-footer">
-                <p>Solo personal autorizado de Evolet Nails.</p>
                 <div class="credits-footer">
                     Desarrollado con <i class="fa-solid fa-heart text-primary"></i> por Emmanuel Davezac
                 </div>
@@ -290,29 +289,34 @@
 
             <!-- PESTAÑA 4: CONFIGURACIÓN (SOLO ADMINS) -->
             <div id="tab-configuracion" class="tab-pane">
-                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                <div class="section-title"
+                    style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                     <div>
                         <h3>Ajustes de Precios <i class="fa-solid fa-gears" style="color: var(--barbie-pink);"></i></h3>
                         <p>Modifica los precios oficiales del catálogo de servicios.</p>
                     </div>
-                    <button id="btn-edit-mode" class="btn btn-secondary btn-sm" style="width: auto; padding: 8px 16px; white-space: nowrap; font-size: 13px;">
+                    <button id="btn-edit-mode" class="btn btn-secondary btn-sm"
+                        style="width: auto; padding: 8px 16px; white-space: nowrap; font-size: 13px;">
                         <i class="fa-solid fa-pen-to-square"></i> Editar
                     </button>
                 </div>
-                
+
                 <div class="chart-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                         <h4 style="margin-bottom: 0;">Lista de Precios Oficiales</h4>
                         <div id="edit-actions-container" class="hidden" style="display: flex; gap: 8px;">
-                            <button id="btn-cancel-prices" class="btn btn-secondary btn-sm" style="width: auto; padding: 6px 12px; font-size: 12px; height: 32px;">
+                            <button id="btn-cancel-prices" class="btn btn-secondary btn-sm"
+                                style="width: auto; padding: 6px 12px; font-size: 12px; height: 32px;">
                                 <i class="fa-solid fa-xmark"></i> Cancelar
                             </button>
-                            <button id="btn-save-prices" class="btn btn-primary btn-sm" style="width: auto; padding: 6px 12px; font-size: 12px; height: 32px;">
+                            <button id="btn-save-prices" class="btn btn-primary btn-sm"
+                                style="width: auto; padding: 6px 12px; font-size: 12px; height: 32px;">
                                 <i class="fa-solid fa-floppy-disk"></i> Guardar
                             </button>
                         </div>
                     </div>
-                    
+
                     <div id="prices-editor-container" class="prices-editor-container">
                         <!-- Cargado dinámicamente con JS -->
                     </div>
@@ -385,8 +389,10 @@
             <h3>¿Eliminar Registro? <i class="fa-solid fa-triangle-exclamation" style="color: #ff4d4d;"></i></h3>
             <p class="modal-sub">Esta acción no se puede deshacer. ¿Segura de borrarlo?</p>
             <div class="modal-actions">
-                <button id="delete-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Cancelar</button>
-                <button id="delete-btn-confirm" class="btn btn-danger"><i class="fa-solid fa-trash-can"></i> Eliminar</button>
+                <button id="delete-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i>
+                    Cancelar</button>
+                <button id="delete-btn-confirm" class="btn btn-danger"><i class="fa-solid fa-trash-can"></i>
+                    Eliminar</button>
             </div>
         </div>
     </div>
@@ -394,11 +400,14 @@
     <!-- VENTANA MODAL DE CONFIRMACIÓN GENÉRICA -->
     <div id="generic-confirm-modal" class="modal-overlay hidden">
         <div class="modal-card">
-            <h3 id="generic-modal-title">¿Estás segura? <i class="fa-solid fa-circle-question" style="color: var(--barbie-pink);"></i></h3>
+            <h3 id="generic-modal-title">¿Estás segura? <i class="fa-solid fa-circle-question"
+                    style="color: var(--barbie-pink);"></i></h3>
             <p id="generic-modal-sub" class="modal-sub"></p>
             <div class="modal-actions">
-                <button id="generic-modal-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Cancelar</button>
-                <button id="generic-modal-btn-confirm" class="btn btn-primary"><i class="fa-solid fa-check"></i> Confirmar</button>
+                <button id="generic-modal-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i>
+                    Cancelar</button>
+                <button id="generic-modal-btn-confirm" class="btn btn-primary"><i class="fa-solid fa-check"></i>
+                    Confirmar</button>
             </div>
         </div>
     </div>

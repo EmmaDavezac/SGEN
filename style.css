@@ -4,20 +4,27 @@
 
 :root {
     /* Paleta de Colores Mágicos */
-    --barbie-pink: #FF69B4;       /* Rosa Chicle */
-    --barbie-dark: #FF1493;       /* Rosa Fucsia Profundo */
-    --barbie-light: #FFC0CB;      /* Rosa Bebé */
-    --barbie-pale: #FFF0F5;       /* Lavanda / Rosa Ultra Claro */
-    --cream-bg: #FCF9F5;          /* Crema Cálido de Fondo */
+    --barbie-pink: #FF69B4;
+    /* Rosa Chicle */
+    --barbie-dark: #FF1493;
+    /* Rosa Fucsia Profundo */
+    --barbie-light: #FFC0CB;
+    /* Rosa Bebé */
+    --barbie-pale: #FFF0F5;
+    /* Lavanda / Rosa Ultra Claro */
+    --cream-bg: #FCF9F5;
+    /* Crema Cálido de Fondo */
     --white: #FFFFFF;
-    --gold: #FFD700;              /* Acento de Brillos */
+    --gold: #FFD700;
+    /* Acento de Brillos */
     --gold-dark: #E6B800;
-    
+
     /* Textos Suaves y Dulces */
-    --text-color: #5A3D46;        /* Marrón Chocolate/Rosa */
+    --text-color: #5A3D46;
+    /* Marrón Chocolate/Rosa */
     --text-muted: #9E7D86;
     --text-light: #CBB2B9;
-    
+
     /* Efectos & Bordes */
     --glass-bg: rgba(255, 255, 255, 0.75);
     --glass-border: rgba(255, 105, 180, 0.25);
@@ -26,16 +33,22 @@
     --radius-lg: 24px;
     --radius-md: 16px;
     --radius-sm: 10px;
-    
+
     /* Transiciones */
     --transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.hidden {
+    display: none !important;
 }
 
 /* =========================================================================
    RESET & CONFIGURACIONES GLOBALES (MÓVIL)
    ========================================================================= */
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -57,18 +70,25 @@ body {
     -webkit-text-size-adjust: 100%;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
     font-family: 'Comfortaa', 'Outfit', sans-serif;
     font-weight: 700;
     color: var(--barbie-dark);
 }
 
 /* Habilitar selección de texto solo en campos de entrada */
-input, textarea {
+input,
+textarea {
     user-select: text;
     -webkit-user-select: text;
     font-family: inherit;
-    font-size: 16px; /* Evita que iOS haga zoom automático al enfocar */
+    font-size: 16px;
+    /* Evita que iOS haga zoom automático al enfocar */
 }
 
 button {
@@ -113,11 +133,25 @@ button {
 }
 
 @keyframes heartBeat {
-    0% { transform: scale(1); }
-    14% { transform: scale(1.2); }
-    28% { transform: scale(1); }
-    42% { transform: scale(1.25); }
-    70% { transform: scale(1); }
+    0% {
+        transform: scale(1);
+    }
+
+    14% {
+        transform: scale(1.2);
+    }
+
+    28% {
+        transform: scale(1);
+    }
+
+    42% {
+        transform: scale(1.25);
+    }
+
+    70% {
+        transform: scale(1);
+    }
 }
 
 .spinner-container p {
@@ -166,7 +200,10 @@ button {
 }
 
 @keyframes slideInToast {
-    to { transform: translateY(0); opacity: 1; }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 /* =========================================================================
@@ -199,7 +236,7 @@ button {
     left: 0;
     width: 100%;
     height: 100%;
-    background-image: 
+    background-image:
         radial-gradient(circle, var(--white) 1px, transparent 1px),
         radial-gradient(circle, var(--gold) 1.5px, transparent 1.5px);
     background-size: 40px 40px, 60px 60px;
@@ -209,8 +246,13 @@ button {
 }
 
 @keyframes sparkleMove {
-    0% { background-position: 0 0, 30px 30px; }
-    100% { background-position: 40px 40px, 90px 90px; }
+    0% {
+        background-position: 0 0, 30px 30px;
+    }
+
+    100% {
+        background-position: 40px 40px, 90px 90px;
+    }
 }
 
 .login-card {
@@ -232,7 +274,10 @@ button {
 }
 
 @keyframes cardZoomIn {
-    to { transform: scale(1); opacity: 1; }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .brand-logo-container {
@@ -256,9 +301,10 @@ button {
 }
 
 .logo-circle img {
-    width: 90%;
-    height: 90%;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
 }
 
 .logo-fallback {
@@ -266,8 +312,15 @@ button {
 }
 
 @keyframes floatLogo {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-8px);
+    }
 }
 
 .login-card h1 {
@@ -289,7 +342,8 @@ button {
    FORMULARIOS RETRO Y PRECIOSOS
    ========================================================================= */
 
-.retro-form, .cute-form {
+.retro-form,
+.cute-form {
     text-align: left;
 }
 
@@ -409,7 +463,8 @@ button {
    ========================================================================= */
 
 .app-screen {
-    display: none; /* Se activa en JS */
+    display: none;
+    /* Se activa en JS */
     flex-direction: column;
     height: 100%;
     width: 100%;
@@ -445,8 +500,15 @@ button {
 }
 
 @keyframes rotateBow {
-    0%, 100% { transform: rotate(0deg); }
-    50% { transform: rotate(15deg); }
+
+    0%,
+    100% {
+        transform: rotate(0deg);
+    }
+
+    50% {
+        transform: rotate(15deg);
+    }
 }
 
 .welcome-text {
@@ -479,7 +541,8 @@ button {
 .app-content {
     flex: 1;
     overflow-y: auto;
-    padding: 20px 20px 90px 20px; /* Margen inferior extra para que no tape el menu */
+    padding: 20px 20px 90px 20px;
+    /* Margen inferior extra para que no tape el menu */
     -webkit-overflow-scrolling: touch;
 }
 
@@ -494,8 +557,15 @@ button {
 }
 
 @keyframes fadeInTab {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .section-title {
@@ -521,11 +591,13 @@ button {
     gap: 8px;
     overflow-x: auto;
     padding: 4px 4px 8px 4px;
-    scrollbar-width: none; /* Ocultar scrollbar Firefox */
+    scrollbar-width: none;
+    /* Ocultar scrollbar Firefox */
 }
 
 .category-grid::-webkit-scrollbar {
-    display: none; /* Ocultar scrollbar Chrome/Safari */
+    display: none;
+    /* Ocultar scrollbar Chrome/Safari */
 }
 
 .btn-cat {
@@ -650,11 +722,11 @@ button {
     transition: var(--transition);
 }
 
-.checkbox-container:hover input ~ .checkmark {
+.checkbox-container:hover input~.checkmark {
     border-color: var(--barbie-pink);
 }
 
-.checkbox-container input:checked ~ .checkmark {
+.checkbox-container input:checked~.checkmark {
     background-color: var(--barbie-pink);
     border-color: var(--barbie-pink);
 }
@@ -665,7 +737,7 @@ button {
     display: none;
 }
 
-.checkbox-container input:checked ~ .checkmark:after {
+.checkbox-container input:checked~.checkmark:after {
     display: block;
 }
 
@@ -715,7 +787,7 @@ button {
     margin-bottom: 2px;
 }
 
-.pay-btn input:checked + .pay-btn-content {
+.pay-btn input:checked+.pay-btn-content {
     background: var(--barbie-pale);
     border-color: var(--barbie-pink);
     color: var(--barbie-dark);
@@ -780,7 +852,8 @@ button {
 }
 
 .history-card.card-pending {
-    border-color: #FFE4B5; /* Borde naranja/seña pendiente */
+    border-color: #FFE4B5;
+    /* Borde naranja/seña pendiente */
     background: linear-gradient(135deg, var(--white) 90%, #FFFDF0 100%);
 }
 
@@ -939,7 +1012,7 @@ button {
     border: 2px solid var(--barbie-pale);
     padding: 18px;
     margin-bottom: 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
 }
 
 .chart-section h4 {
@@ -982,7 +1055,8 @@ button {
     background: linear-gradient(90deg, var(--barbie-light) 0%, var(--barbie-pink) 100%);
     height: 100%;
     border-radius: 50px;
-    width: 0%; /* Manejado en JS */
+    width: 0%;
+    /* Manejado en JS */
     transition: width 1s ease-out;
 }
 
@@ -1116,7 +1190,8 @@ button {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(90, 61, 70, 0.4); /* Fondo semi-transparente marrón-rosado */
+    background: rgba(90, 61, 70, 0.4);
+    /* Fondo semi-transparente marrón-rosado */
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     display: flex;
@@ -1144,8 +1219,15 @@ button {
 }
 
 @keyframes modalPopIn {
-    from { transform: scale(0.9); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .modal-card h3 {
@@ -1285,7 +1367,8 @@ button {
 
 .credits-footer.app-credits {
     margin-top: 30px;
-    margin-bottom: 80px; /* Evita colisión con el menú flotante */
+    margin-bottom: 80px;
+    /* Evita colisión con el menú flotante */
     border-top: 1px dashed var(--barbie-pale);
     width: 100%;
 }
@@ -1380,6 +1463,7 @@ button {
     -webkit-appearance: none;
     margin: 0;
 }
+
 .price-input-field[type=number] {
     -moz-appearance: textfield;
 }
@@ -1403,7 +1487,3 @@ button {
     border-radius: var(--radius-sm);
     border: 2px solid transparent;
 }
-
-
-
-

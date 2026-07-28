@@ -6,7 +6,7 @@
  * CONFIGURACIÓN DE LA NUBE:
  * Pega la URL del Web App de Google (Apps Script) entre las comillas simples de abajo.
  */
-const CONFIG_SHEET_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEET_URL) || 'https://script.google.com/macros/s/AKfycbxZT_wSTPClKAN78_TYAEnxBUj_b7BWPmQz2pwiKm4dkff5CgH_96xOLuj30IFdc0uUVg/exec'; 
+const CONFIG_SHEET_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEET_URL) || 'https://script.google.com/macros/s/AKfycbxZT_wSTPClKAN78_TYAEnxBUj_b7BWPmQz2pwiKm4dkff5CgH_96xOLuj30IFdc0uUVg/exec';
 
 // Catálogo de Servicios oficial extraído del PDF
 let SERVICES_CATALOG = {
@@ -131,10 +131,11 @@ function setupEventListeners() {
     // Ajustes de precios (Admin)
     document.getElementById("btn-edit-mode").addEventListener("click", () => {
         state.isEditingPrices = true;
-        document.getElementById("edit-actions-container").classList.remove("hidden");
         document.getElementById("btn-edit-mode").classList.add("hidden");
+        document.getElementById("edit-actions-container").classList.remove("hidden");
         renderPricesEditor();
     });
+
 
     document.getElementById("btn-cancel-prices").addEventListener("click", () => {
         showGenericConfirmModal(
@@ -196,13 +197,13 @@ function switchTab(tabId) {
             () => {
                 // Desactivar modo edición y proceder
                 state.isEditingPrices = false;
-                
+
                 const actionsContainer = document.getElementById("edit-actions-container");
                 if (actionsContainer) actionsContainer.classList.add("hidden");
-                
+
                 const editBtn = document.getElementById("btn-edit-mode");
                 if (editBtn) editBtn.classList.remove("hidden");
-                
+
                 executeSwitchTab(tabId);
             }
         );
@@ -297,11 +298,11 @@ function handleLogout() {
     localStorage.removeItem("evolet_session_v4");
     state.currentUser = null;
     state.servicesList = [];
-    
+
     // Ocultar botón de configuración al cerrar sesión
     const configBtn = document.getElementById("nav-btn-config");
     if (configBtn) configBtn.classList.add("hidden");
-    
+
     showLoginScreen();
     showToast("Sesión cerrada con éxito. ¡Vuelve pronto!");
 }
@@ -312,7 +313,7 @@ function handleLogout() {
 function renderCategories() {
     const grid = document.querySelector(".category-grid");
     grid.innerHTML = "";
-    
+
     const catLabels = {
         semi: "Semi",
         kapping: "Kapping",
@@ -334,7 +335,7 @@ function renderCategories() {
 
 function selectCategory(catKey) {
     state.selectedCategory = catKey;
-    
+
     const buttons = document.querySelectorAll(".btn-cat");
     buttons.forEach(btn => {
         if (btn.getAttribute("data-cat") === catKey) {
@@ -352,12 +353,12 @@ function renderSubServicesGrid(catKey) {
     grid.innerHTML = "";
 
     const services = SERVICES_CATALOG[catKey];
-    
+
     services.forEach((service, index) => {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btn-service";
-        
+
         if (catKey === "personalizado") {
             btn.innerHTML = `
                 <span>${service.name}</span>
@@ -387,7 +388,7 @@ function selectSubService(service, buttonElement) {
 
     const serviceButtons = document.querySelectorAll(".btn-service");
     serviceButtons.forEach(btn => btn.classList.remove("active"));
-    
+
     buttonElement.classList.add("active");
 
     const nameInput = document.getElementById("service-name-input");
@@ -412,7 +413,7 @@ function selectSubService(service, buttonElement) {
 // =========================================================================
 function handleServiceSubmit(e) {
     e.preventDefault();
-    
+
     if (!state.currentUser) {
         showToast("Debes iniciar sesión para registrar servicios.", "error");
         return;
@@ -421,7 +422,7 @@ function handleServiceSubmit(e) {
     const clientName = document.getElementById("client-name").value.trim();
     const serviceName = document.getElementById("service-name-input").value.trim();
     const price = Number(document.getElementById("service-price").value) || 0;
-    
+
     const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
 
     if (!clientName || !serviceName || price <= 0) {
@@ -462,7 +463,7 @@ function cancelServiceRegistration() {
 
 async function confirmServiceRegistration() {
     document.getElementById("confirm-modal").classList.add("hidden");
-    
+
     if (!state.pendingTransaction) return;
 
     const transaction = state.pendingTransaction;
@@ -537,7 +538,7 @@ async function loadServicesData() {
     try {
         const response = await fetch(`${CONFIG_SHEET_URL}?action=get_services&email=${encodeURIComponent(state.currentUser.email)}`);
         const data = await response.json();
-        
+
         if (data.success) {
             state.servicesList = data.services;
             saveServicesCache();
@@ -597,14 +598,14 @@ function renderHistoryList() {
     filteredList.forEach(item => {
         const card = document.createElement("div");
         card.className = "history-card";
-        
+
         const dateObj = new Date(item.fecha);
-        const formattedDate = dateObj.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' }) + " " + 
-                              dateObj.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
+        const formattedDate = dateObj.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' }) + " " +
+            dateObj.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
 
         // Icono de Método de Pago (FontAwesome)
-        const payIcons = { 
-            Transferencia: '<i class="fa-solid fa-mobile-screen-button"></i>', 
+        const payIcons = {
+            Transferencia: '<i class="fa-solid fa-mobile-screen-button"></i>',
             Efectivo: '<i class="fa-solid fa-money-bill-wave"></i>'
         };
         const payIcon = payIcons[item.metodoPago] || '<i class="fa-solid fa-money-check-dollar"></i>';
@@ -637,26 +638,26 @@ function getFilteredHistory() {
     const filterVal = document.getElementById("history-filter").value;
 
     return state.servicesList.filter(item => {
-        const matchesSearch = item.cliente.toLowerCase().includes(searchVal) || 
-                              item.servicio.toLowerCase().includes(searchVal);
-        
+        const matchesSearch = item.cliente.toLowerCase().includes(searchVal) ||
+            item.servicio.toLowerCase().includes(searchVal);
+
         if (!matchesSearch) return false;
 
         if (filterVal === "todos") return true;
 
         const date = new Date(item.fecha);
         const now = new Date();
-        
+
         if (filterVal === "hoy") {
             return date.toDateString() === now.toDateString();
         }
-        
+
         if (filterVal === "semana") {
             const oneWeekAgo = new Date();
             oneWeekAgo.setDate(now.getDate() - 7);
             return date >= oneWeekAgo;
         }
-        
+
         if (filterVal === "mes") {
             return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         }
@@ -684,7 +685,7 @@ function cancelDeleteServiceRecord() {
 async function confirmDeleteServiceRecord() {
     const id = state.pendingDeleteId;
     document.getElementById("delete-modal").classList.add("hidden");
-    
+
     if (!id) return;
     state.pendingDeleteId = null;
 
@@ -767,7 +768,7 @@ function calculateAndRenderStats() {
 
             // Frecuencia de servicios
             serviceCounts[item.servicio] = (serviceCounts[item.servicio] || 0) + 1;
-            
+
             if (item.metodoPago === "Efectivo") cashSum += precio;
             else if (item.metodoPago === "Transferencia") transfeSum += precio;
         }
@@ -829,7 +830,7 @@ function saveOfflineTransaction(transaction) {
     const offlineQueue = JSON.parse(localStorage.getItem(`evolet_offline_v4_${state.currentUser.email}`) || "[]");
     offlineQueue.push(transaction);
     localStorage.setItem(`evolet_offline_v4_${state.currentUser.email}`, JSON.stringify(offlineQueue));
-    
+
     state.servicesList.unshift(transaction);
     saveServicesCache();
     renderHistoryList();
@@ -841,11 +842,11 @@ async function checkAndSyncOfflineTransactions() {
 
     const queueKey = `evolet_offline_v4_${state.currentUser.email}`;
     const offlineQueue = JSON.parse(localStorage.getItem(queueKey) || "[]");
-    
+
     if (offlineQueue.length === 0) return;
 
     console.log(`Sincronizando ${offlineQueue.length} registros offline...`);
-    
+
     const failedQueue = [];
 
     for (const transaction of offlineQueue) {
@@ -932,9 +933,9 @@ function showToast(message, type = "info") {
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
     toast.textContent = message;
-    
+
     container.appendChild(toast);
-    
+
     setTimeout(() => {
         toast.style.animation = "slideInToast 0.4s reverse forwards";
         setTimeout(() => toast.remove(), 400);
@@ -945,7 +946,7 @@ function showLoader(show, text = "Cargando...") {
     const overlay = document.getElementById("loader-overlay");
     const textEl = overlay.querySelector("p");
     textEl.textContent = text;
-    
+
     if (show) {
         overlay.classList.remove("hidden");
     } else {
@@ -963,7 +964,7 @@ async function loadPricesFromCloud() {
     try {
         const response = await fetch(`${CONFIG_SHEET_URL}?action=get_prices`);
         const data = await response.json();
-        
+
         if (data.success && data.prices && data.prices.length > 0) {
             const newCatalog = {};
             data.prices.forEach(p => {
@@ -972,10 +973,10 @@ async function loadPricesFromCloud() {
                 }
                 newCatalog[p.categoria].push({ name: p.name, price: p.price });
             });
-            
+
             // Reemplazar catálogo global
             SERVICES_CATALOG = newCatalog;
-            
+
             // Re-renderizar formulario
             renderCategories();
             if (state.selectedCategory && SERVICES_CATALOG[state.selectedCategory]) {
@@ -994,7 +995,7 @@ async function loadPricesFromCloud() {
 function checkAdminAccess() {
     const configBtn = document.getElementById("nav-btn-config");
     if (!configBtn) return;
-    
+
     if (state.currentUser && state.currentUser.rol === "admin") {
         configBtn.classList.remove("hidden");
     } else {
@@ -1010,15 +1011,15 @@ function checkAdminAccess() {
 function renderPricesEditor() {
     const container = document.getElementById("prices-editor-container");
     if (!container) return;
-    
+
     container.innerHTML = "";
-    
+
     Object.keys(SERVICES_CATALOG).forEach(catKey => {
         if (catKey === "personalizado") return; // No se edita el manual/otro
-        
+
         const categoryGroup = document.createElement("div");
         categoryGroup.className = "price-category-group";
-        
+
         const catLabels = {
             semi: "Semipermanente",
             kapping: "Kapping",
@@ -1026,34 +1027,34 @@ function renderPricesEditor() {
             esculpidas: "Esculpidas",
             remocion: "Remociones"
         };
-        
+
         const title = document.createElement("div");
         title.className = "price-category-title";
         title.textContent = catLabels[catKey] || catKey;
         categoryGroup.appendChild(title);
-        
+
         const services = SERVICES_CATALOG[catKey];
         services.forEach(service => {
             const row = document.createElement("div");
             row.className = "price-item-row";
-            
+
             const nameLabel = document.createElement("div");
             nameLabel.className = "price-item-name";
             nameLabel.textContent = service.name;
             row.appendChild(nameLabel);
-            
+
             if (state.isEditingPrices) {
                 // Modo Edición: Mostrar inputs y el precio anterior en una etiqueta a la izquierda
                 const rowContent = document.createElement("div");
                 rowContent.style.display = "flex";
                 rowContent.style.alignItems = "center";
                 rowContent.style.gap = "10px";
-                
+
                 const oldPriceSpan = document.createElement("span");
                 oldPriceSpan.className = "old-price-label";
                 oldPriceSpan.textContent = `(Antes: $${service.price.toLocaleString("es-AR")})`;
                 rowContent.appendChild(oldPriceSpan);
-                
+
                 const inputWrapper = document.createElement("div");
                 inputWrapper.className = "price-input-wrapper";
                 inputWrapper.innerHTML = `
@@ -1075,10 +1076,10 @@ function renderPricesEditor() {
                 priceVal.textContent = `$${service.price.toLocaleString("es-AR")}`;
                 row.appendChild(priceVal);
             }
-            
+
             categoryGroup.appendChild(row);
         });
-        
+
         if (services.length > 0) {
             container.appendChild(categoryGroup);
         }
@@ -1091,27 +1092,27 @@ async function savePricesToCloud() {
         showToast("No tienes permisos de administrador", "error");
         return;
     }
-    
+
     if (!CONFIG_SHEET_URL) {
         showToast("URL de Google Sheets no configurada en app.js", "error");
         return;
     }
-    
+
     const inputs = document.querySelectorAll(".price-input-field");
     const updatedPrices = [];
-    
+
     inputs.forEach(input => {
         const category = input.getAttribute("data-category");
         const name = input.getAttribute("data-name");
         const price = Number(input.value) || 0;
-        
+
         updatedPrices.push({
             categoria: category,
             name: name,
             price: price
         });
     });
-    
+
     // Preservar la categoría de personalizado/otro que no tiene inputs editables
     if (SERVICES_CATALOG["personalizado"]) {
         SERVICES_CATALOG["personalizado"].forEach(service => {
@@ -1122,9 +1123,9 @@ async function savePricesToCloud() {
             });
         });
     }
-    
+
     showLoader(true, "Guardando lista de precios en la nube...");
-    
+
     try {
         const response = await fetch(CONFIG_SHEET_URL, {
             method: "POST",
@@ -1138,19 +1139,19 @@ async function savePricesToCloud() {
                 prices: updatedPrices
             })
         });
-        
+
         const data = await response.json();
         showLoader(false);
-        
+
         if (data.success) {
             state.isEditingPrices = false;
-            
+
             const actionsContainer = document.getElementById("edit-actions-container");
             if (actionsContainer) actionsContainer.classList.add("hidden");
-            
+
             const editBtn = document.getElementById("btn-edit-mode");
             if (editBtn) editBtn.classList.remove("hidden");
-            
+
             showToast("¡Lista de precios guardada con éxito!", "success");
             await loadPricesFromCloud();
         } else {
@@ -1169,12 +1170,12 @@ let genericConfirmCallback = null;
 function showGenericConfirmModal(title, subtitle, onConfirm) {
     const titleEl = document.getElementById("generic-modal-title");
     const subEl = document.getElementById("generic-modal-sub");
-    
+
     if (titleEl) titleEl.innerHTML = `${title} <i class="fa-solid fa-circle-question" style="color: var(--barbie-pink);"></i>`;
     if (subEl) subEl.textContent = subtitle;
-    
+
     genericConfirmCallback = onConfirm;
-    
+
     const modal = document.getElementById("generic-confirm-modal");
     if (modal) modal.classList.remove("hidden");
 }
