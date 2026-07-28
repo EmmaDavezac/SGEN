@@ -272,28 +272,6 @@ function setupEventListeners() {
     document.getElementById("expense-filter").addEventListener("change", () => {
         renderExpensesHistoryList();
     });
-
-    // Edición de caja inicial (Solo MercadoPago)
-    const promptEditCajaMp = () => {
-        const currentMp = Number(localStorage.getItem("evolet_initial_caja_mp")) || 67921.85;
-        const newMp = prompt("Ingresa el monto inicial en MercadoPago:", currentMp);
-        if (newMp !== null) {
-            const parsedMp = parseFloat(newMp);
-            if (!isNaN(parsedMp)) {
-                localStorage.setItem("evolet_initial_caja_mp", parsedMp);
-                calculateAndRenderStats();
-                showToast("Saldo inicial de MercadoPago actualizado con éxito", "success");
-            } else {
-                showToast("Por favor, ingresa un número válido.", "error");
-            }
-        }
-    };
-
-    const btnEditCajaMp = document.getElementById("btn-edit-caja-mp");
-    const iconEditCajaMp = document.getElementById("icon-edit-caja-mp");
-
-    if (btnEditCajaMp) btnEditCajaMp.addEventListener("click", promptEditCajaMp);
-    if (iconEditCajaMp) iconEditCajaMp.addEventListener("click", (e) => { e.stopPropagation(); promptEditCajaMp(); });
 }
 
 // =========================================================================
@@ -887,39 +865,45 @@ function calculateAndRenderStats() {
     const localD = String(localDate.getDate()).padStart(2, '0');
     const todayStr = `${localY}-${localM}-${localD}`;
 
-    // Sumar ingresos (servicios) de HOY por método de pago
+    // Sumar ingresos (servicios) a partir de HOY por método de pago
     let todayEfectivoIncome = 0;
     let todayMpIncome = 0;
 
     state.servicesList.forEach(item => {
-        if (item.fecha === todayStr) {
-            const precio = Number(item.precio) || 0;
-            if (item.metodoPago === "Efectivo") {
-                todayEfectivoIncome += precio;
-            } else if (item.metodoPago === "Transferencia") {
-                todayMpIncome += precio;
+        if (item.fecha) {
+            const itemDateStr = item.fecha.substring(0, 10);
+            if (itemDateStr >= todayStr) {
+                const precio = Number(item.precio) || 0;
+                if (item.metodoPago === "Efectivo") {
+                    todayEfectivoIncome += precio;
+                } else if (item.metodoPago === "Transferencia") {
+                    todayMpIncome += precio;
+                }
             }
         }
     });
 
-    // Sumar egresos (gastos) de HOY por método de pago
+    // Sumar egresos (gastos) a partir de HOY por método de pago
     let todayEfectivoExpenses = 0;
     let todayMpExpenses = 0;
 
     state.expensesList.forEach(item => {
-        if (item.fecha === todayStr) {
-            const monto = Number(item.monto) || 0;
-            if (item.metodoPago === "Efectivo") {
-                todayEfectivoExpenses += monto;
-            } else if (item.metodoPago === "Transferencia") {
-                todayMpExpenses += monto;
+        if (item.fecha) {
+            const itemDateStr = item.fecha.substring(0, 10);
+            if (itemDateStr >= todayStr) {
+                const monto = Number(item.monto) || 0;
+                if (item.metodoPago === "Efectivo") {
+                    todayEfectivoExpenses += monto;
+                } else if (item.metodoPago === "Transferencia") {
+                    todayMpExpenses += monto;
+                }
             }
         }
     });
 
-    // Cargar iniciales guardados en localStorage
-    const initialEfectivo = Number(localStorage.getItem("evolet_initial_caja_efectivo")) || 20300.00;
-    const initialMp = Number(localStorage.getItem("evolet_initial_caja_mp")) || 67921.85;
+    // Saldos iniciales fijos (no modificables)
+    const initialEfectivo = 20300.00;
+    const initialMp = 67921.85;
 
     // Calcular montos actuales
     const currentEfectivo = initialEfectivo + todayEfectivoIncome - todayEfectivoExpenses;
