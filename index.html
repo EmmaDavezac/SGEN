@@ -338,7 +338,7 @@
                 </div>
 
                 <!-- EL CALENDARIO MENSUAL -->
-                <div class="calendar-card">
+                <div class="calendar-card" style="position: relative;">
                     <div class="calendar-header">
                         <button id="cal-prev-month" class="btn-cal-nav"><i
                                 class="fa-solid fa-chevron-left"></i></button>
@@ -360,6 +360,11 @@
                     <div id="calendar-days-grid" class="calendar-days-grid">
                         <!-- Generado dinámicamente con JS -->
                     </div>
+
+                    <!-- Botón para Nuevo Turno posicionado en el borde de la tarjeta -->
+                    <button id="btn-open-schedule" class="calendar-add-btn" title="Nuevo Turno">
+                        <i class="fa-solid fa-calendar-plus"></i>
+                    </button>
                 </div>
 
                 <!-- TURNOS DEL DÍA SELECCIONADO -->
@@ -375,11 +380,6 @@
                         <!-- Turnos cargados dinámicamente -->
                     </div>
                 </div>
-
-                <!-- Botón Flotante para Nuevo Turno -->
-                <button id="btn-open-schedule" class="fab-btn" title="Nuevo Turno">
-                    <i class="fa-solid fa-calendar-plus"></i>
-                </button>
             </div>
 
             <!-- PESTAÑA: GASTOS -->

@@ -1514,7 +1514,8 @@ button {
     border-radius: var(--radius-md);
     padding: 18px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
-    margin-bottom: 20px;
+    margin-bottom: 25px;
+    position: relative;
 }
 
 .calendar-header {
@@ -1784,33 +1785,32 @@ button {
     min-height: 48px; /* Altura uniforme */
 }
 
-/* Botón Flotante Y2K Barbie (FAB) */
-.fab-btn {
-    position: fixed;
-    bottom: 95px; /* Arriba de la barra de navegación que está a ~80px de altura */
+/* Botón de Agregar Turno dentro de la Tarjeta del Calendario */
+.calendar-add-btn {
+    position: absolute;
+    bottom: -20px; /* Sobresale por el borde inferior */
     right: 20px;
-    width: 56px;
-    height: 56px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--barbie-pink) 0%, var(--barbie-dark) 100%);
     color: var(--white);
     border: none;
-    box-shadow: 0 6px 16px rgba(255, 20, 147, 0.4);
+    box-shadow: 0 4px 10px rgba(255, 20, 147, 0.3);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
+    font-size: 18px;
     cursor: pointer;
-    z-index: 1000;
+    z-index: 10;
     transition: var(--transition);
 }
 
-.fab-btn:active {
+.calendar-add-btn:active {
     transform: scale(0.9) !important;
-    box-shadow: 0 3px 8px rgba(255, 20, 147, 0.3);
+    box-shadow: 0 2px 5px rgba(255, 20, 147, 0.2);
 }
 
-/* Evitar superposición del botón flotante con el final de la lista de turnos */
 #tab-calendario {
-    padding-bottom: 80px;
+    padding-bottom: 20px; /* Reset de padding */
 }
