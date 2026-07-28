@@ -234,6 +234,38 @@ function setupEventListeners() {
 
     // Envío del formulario de registrar gasto
     document.getElementById("expense-form").addEventListener("submit", handleExpenseSubmit);
+
+    // Navegación desde Agenda a Historial de Ventas
+    document.getElementById("btn-view-history").addEventListener("click", () => {
+        switchTab("historial");
+    });
+
+    // Botones de Volver al Calendario
+    document.querySelectorAll(".btn-back-to-calendar").forEach(btn => {
+        btn.addEventListener("click", () => {
+            switchTab("calendario");
+        });
+    });
+
+    // Navegación desde Gastos a Historial de Gastos
+    document.getElementById("btn-view-expenses-history").addEventListener("click", () => {
+        switchTab("historial-gastos");
+    });
+
+    // Botones de Volver a Gastos
+    document.querySelectorAll(".btn-back-to-expenses").forEach(btn => {
+        btn.addEventListener("click", () => {
+            switchTab("gastos");
+        });
+    });
+
+    // Filtros e input del historial de gastos
+    document.getElementById("expense-search").addEventListener("input", () => {
+        renderExpensesHistoryList();
+    });
+    document.getElementById("expense-filter").addEventListener("change", () => {
+        renderExpensesHistoryList();
+    });
 }
 
 // =========================================================================
@@ -273,10 +305,14 @@ function switchTab(tabId) {
 }
 
 function executeSwitchTab(tabId) {
+    let navTabId = tabId;
+    if (tabId === "historial") navTabId = "calendario";
+    if (tabId === "historial-gastos") navTabId = "gastos";
+
     // Cambiar estado en navegación inferior
     const navItems = document.querySelectorAll(".nav-item");
     navItems.forEach(item => {
-        if (item.getAttribute("data-tab") === tabId) {
+        if (item.getAttribute("data-tab") === navTabId) {
             item.classList.add("active");
         } else {
             item.classList.remove("active");
@@ -310,6 +346,8 @@ function executeSwitchTab(tabId) {
         renderExpensesList();
     } else if (tabId === "configuracion") {
         renderPricesEditor();
+    } else if (tabId === "historial-gastos") {
+        renderExpensesHistoryList();
     }
 }
 
@@ -1922,6 +1960,15 @@ function deleteExpenseRecord(id, concepto) {
                     
                     renderExpensesList();
                     calculateAndRenderStats();
+                    
+                    // Si estamos viendo el historial de gastos, recargar también
+                    const activeTab = document.querySelector(".nav-item.active");
+                    if (activeTab && activeTab.getAttribute("data-tab") === "gastos") {
+                        const histPane = document.getElementById("tab-historial-gastos");
+                        if (histPane && histPane.classList.contains("active")) {
+                            renderExpensesHistoryList();
+                        }
+                    }
                 } else {
                     showToast(data.message || "Error al eliminar gasto", "error");
                 }
@@ -1932,4 +1979,102 @@ function deleteExpenseRecord(id, concepto) {
             }
         }
     );
+}
+
+// Renderizar el listado histórico de gastos con búsqueda y filtros
+function renderExpensesHistoryList() {
+    const listElement = document.getElementById("expenses-history-list");
+    if (!listElement) return;
+    
+    listElement.innerHTML = "";
+    
+    const filteredList = getFilteredExpensesHistory();
+    
+    if (filteredList.length === 0) {
+        listElement.innerHTML = `
+            <div class="card-info-box" style="text-align: center;">
+                <p>No se encontraron registros de gastos</p>
+            </div>
+        `;
+        return;
+    }
+    
+    filteredList.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "history-card";
+        
+        const dateObj = new Date(item.fecha + "T00:00:00");
+        const formattedDate = dateObj.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' });
+        
+        const payIcons = {
+            Transferencia: '<i class="fa-solid fa-mobile-screen-button"></i>',
+            Efectivo: '<i class="fa-solid fa-money-bill-wave"></i>'
+        };
+        const payIcon = payIcons[item.metodoPago] || '<i class="fa-solid fa-receipt"></i>';
+        const totalFormatted = `$${Number(item.monto).toLocaleString("es-AR")}`;
+        
+        card.innerHTML = `
+            <div class="card-details">
+                <div class="card-client">${escapeHtml(item.concepto)}</div>
+                <div class="card-meta">
+                    <span><i class="fa-regular fa-calendar" style="color: var(--barbie-pink); margin-right: 3px;"></i>${formattedDate}</span>
+                    <span class="pay-badge" title="Método de pago">${payIcon} ${item.metodoPago}</span>
+                </div>
+            </div>
+            <div class="card-amount-box">
+                <div class="card-price" style="font-size: 18px; color: var(--barbie-dark);">${totalFormatted}</div>
+            </div>
+            <button class="btn-delete-card" title="Eliminar Gasto">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
+        `;
+        
+        card.querySelector(".btn-delete-card").addEventListener("click", () => {
+            deleteExpenseRecord(item.id, item.concepto);
+        });
+        
+        listElement.appendChild(card);
+    });
+}
+
+// Obtener egresos filtrados por búsqueda y select
+function getFilteredExpensesHistory() {
+    const searchInput = document.getElementById("expense-search");
+    const filterSelect = document.getElementById("expense-filter");
+    if (!searchInput || !filterSelect) return state.expensesList;
+    
+    const searchVal = searchInput.value.toLowerCase().trim();
+    const filterVal = filterSelect.value;
+    
+    // Clonar y ordenar del más nuevo al más viejo
+    const list = [...state.expensesList];
+    list.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    
+    return list.filter(item => {
+        const matchesSearch = item.concepto.toLowerCase().includes(searchVal) ||
+            item.metodoPago.toLowerCase().includes(searchVal);
+            
+        if (!matchesSearch) return false;
+        
+        if (filterVal === "todos") return true;
+        
+        const date = new Date(item.fecha + "T00:00:00");
+        const now = new Date();
+        
+        if (filterVal === "hoy") {
+            return date.toDateString() === now.toDateString();
+        }
+        
+        if (filterVal === "semana") {
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(now.getDate() - 7);
+            return date >= oneWeekAgo;
+        }
+        
+        if (filterVal === "mes") {
+            return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        }
+        
+        return true;
+    });
 }

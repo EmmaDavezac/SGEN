@@ -186,12 +186,15 @@
 
             <!-- PESTAÑA 2: HISTORIAL -->
             <div id="tab-historial" class="tab-pane">
-                <div class="section-title">
+                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                     <div>
                         <h3>Historial de Ventas <i class="fa-solid fa-clock-rotate-left"
                                 style="color: var(--barbie-pink);"></i></h3>
                         <p>Visualiza y administra los servicios cargados.</p>
                     </div>
+                    <button class="btn btn-secondary btn-sm btn-back-to-calendar" style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                        <i class="fa-solid fa-arrow-left"></i> Volver
+                    </button>
                 </div>
 
                 <!-- Buscador e Historial -->
@@ -312,10 +315,14 @@
                                 style="color: var(--barbie-pink);"></i></h3>
                         <p>Visualiza y organiza tus citas sincronizadas en la nube.</p>
                     </div>
-                    <div style="display: flex; gap: 8px;">
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                         <button id="btn-sync-history" class="btn btn-secondary btn-sm hidden"
                             style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
                             <i class="fa-solid fa-rotate"></i> Importar Cobrados
+                        </button>
+                        <button id="btn-view-history" class="btn btn-secondary btn-sm"
+                            style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                            <i class="fa-solid fa-clock-rotate-left"></i> Historial
                         </button>
                         <button id="btn-open-schedule" class="btn btn-primary btn-sm"
                             style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
@@ -366,9 +373,14 @@
 
             <!-- PESTAÑA: GASTOS -->
             <div id="tab-gastos" class="tab-pane">
-                <div class="section-title">
-                    <h3>Registro de Gastos <i class="fa-solid fa-wallet" style="color: var(--barbie-pink);"></i></h3>
-                    <p>Controla tus egresos diarios para optimizar tu negocio.</p>
+                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <div>
+                        <h3>Registro de Gastos <i class="fa-solid fa-wallet" style="color: var(--barbie-pink);"></i></h3>
+                        <p>Controla tus egresos diarios para optimizar tu negocio.</p>
+                    </div>
+                    <button id="btn-view-expenses-history" class="btn btn-secondary btn-sm" style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                        <i class="fa-solid fa-receipt"></i> Historial Gastos
+                    </button>
                 </div>
 
                 <!-- Formulario de nuevo gasto -->
@@ -440,6 +452,36 @@
                 </div>
             </div>
 
+            <!-- PESTAÑA: HISTORIAL DE GASTOS -->
+            <div id="tab-historial-gastos" class="tab-pane">
+                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <div>
+                        <h3>Historial de Gastos <i class="fa-solid fa-receipt" style="color: var(--barbie-pink);"></i></h3>
+                        <p>Visualiza y administra todos los gastos registrados.</p>
+                    </div>
+                    <button class="btn btn-secondary btn-sm btn-back-to-expenses" style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                        <i class="fa-solid fa-arrow-left"></i> Volver
+                    </button>
+                </div>
+
+                <div class="filters-container">
+                    <div class="search-box-container">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="expense-search" placeholder="Buscar gasto..." class="search-input">
+                    </div>
+                    <select id="expense-filter" class="filter-select">
+                        <option value="todos">Todos</option>
+                        <option value="hoy">Hoy</option>
+                        <option value="semana">Esta Semana</option>
+                        <option value="mes">Este Mes</option>
+                    </select>
+                </div>
+
+                <div id="expenses-history-list" class="history-list">
+                    <!-- Los egresos se cargan aquí en formato tarjeta -->
+                </div>
+            </div>
+
             <!-- PESTAÑA 4: CONFIGURACIÓN (SOLO ADMINS) -->
             <div id="tab-configuracion" class="tab-pane">
                 <div class="section-title"
@@ -487,7 +529,7 @@
                 <span class="nav-icon"><i class="fa-solid fa-circle-plus"></i></span>
                 <span class="nav-text">Registrar</span>
             </button>
-            <button class="nav-item" data-tab="historial">
+            <button class="nav-item hidden" data-tab="historial" id="nav-btn-historial">
                 <span class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
                 <span class="nav-text">Historial</span>
             </button>
