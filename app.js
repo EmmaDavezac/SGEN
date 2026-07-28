@@ -43,13 +43,16 @@ let SERVICES_CATALOG = {
 
 // Estado General de la Aplicación
 const state = {
-    currentUser: null,        // { email, nombre, token }
-    servicesList: [],         // Transacciones registradas
-    selectedCategory: "semi", // Categoría activa
-    selectedService: null,    // Servicio específico activo
-    pendingTransaction: null, // Transacción en espera de confirmación
-    pendingDeleteId: null,    // ID de registro en espera de eliminación
-    isEditingPrices: false    // Control del modo edición de precios
+    currentUser: null,          // { email, nombre, token }
+    servicesList: [],           // Transacciones registradas
+    selectedCategory: "semi",   // Categoría activa
+    selectedService: null,      // Servicio específico activo
+    pendingTransaction: null,   // Transacción en espera de confirmación
+    pendingDeleteId: null,      // ID de registro en espera de eliminación
+    isEditingPrices: false,     // Control del modo edición de precios
+    appointmentsList: [],       // Lista de turnos agendados en la nube
+    calendarDate: new Date(),   // Mes visible en el calendario
+    selectedCalendarDay: new Date() // Día seleccionado en el calendario
 };
 
 // =========================================================================
@@ -76,6 +79,7 @@ function initApp() {
         showAppScreen();
         loadServicesData();
         loadPricesFromCloud(); // Cargar precios dinámicos
+        loadAppointments(); // Cargar turnos agendados en la nube
         checkAdminAccess(); // Verificar si es admin para la pestaña Ajustes
     } else {
         showLoginScreen();
@@ -174,6 +178,84 @@ function setupEventListeners() {
         document.getElementById("generic-confirm-modal").classList.add("hidden");
         genericConfirmCallback = null;
     });
+
+    // Navegación del Calendario
+    document.getElementById("cal-prev-month").addEventListener("click", () => {
+        state.calendarDate.setMonth(state.calendarDate.getMonth() - 1);
+        renderCalendar();
+    });
+
+    document.getElementById("cal-next-month").addEventListener("click", () => {
+        state.calendarDate.setMonth(state.calendarDate.getMonth() + 1);
+        renderCalendar();
+    });
+
+    // Abrir Modal de Agendar Turno
+    document.getElementById("btn-open-schedule").addEventListener("click", () => {
+        // Inicializar fecha por defecto en el selector
+        const dateInput = document.getElementById("schedule-date");
+        const yyyy = state.selectedCalendarDay.getFullYear();
+        const mm = String(state.selectedCalendarDay.getMonth() + 1).padStart(2, '0');
+        const dd = String(state.selectedCalendarDay.getDate()).padStart(2, '0');
+        dateInput.value = `${yyyy}-${mm}-${dd}`;
+        
+        // Resetear campos del formulario
+        document.getElementById("schedule-client-name").value = "";
+        document.getElementById("schedule-category").value = "";
+        
+        const serviceSelect = document.getElementById("schedule-service");
+        serviceSelect.innerHTML = '<option value="" disabled selected>Primero selecciona categoría</option>';
+        serviceSelect.disabled = true;
+        
+        document.getElementById("schedule-price").value = "";
+        document.getElementById("schedule-time").value = "14:00"; // Hora por defecto
+        
+        document.getElementById("schedule-modal").classList.remove("hidden");
+    });
+
+    // Cerrar Modal de Agendar Turno
+    document.getElementById("schedule-btn-cancel").addEventListener("click", () => {
+        document.getElementById("schedule-modal").classList.add("hidden");
+    });
+
+    // Cambio de Categoría en el formulario de turnos
+    document.getElementById("schedule-category").addEventListener("change", (e) => {
+        const catKey = e.target.value;
+        const serviceSelect = document.getElementById("schedule-service");
+        serviceSelect.innerHTML = '<option value="" disabled selected>Selecciona servicio</option>';
+        
+        const services = SERVICES_CATALOG[catKey];
+        if (services && services.length > 0) {
+            services.forEach((s) => {
+                const opt = document.createElement("option");
+                opt.value = s.name;
+                opt.textContent = s.name;
+                serviceSelect.appendChild(opt);
+            });
+            serviceSelect.disabled = false;
+        } else {
+            serviceSelect.disabled = true;
+        }
+        document.getElementById("schedule-price").value = "";
+    });
+
+    // Cambio de Servicio en el formulario de turnos
+    document.getElementById("schedule-service").addEventListener("change", (e) => {
+        const serviceName = e.target.value;
+        const catKey = document.getElementById("schedule-category").value;
+        const priceInput = document.getElementById("schedule-price");
+        
+        const services = SERVICES_CATALOG[catKey];
+        if (services) {
+            const found = services.find(s => s.name === serviceName);
+            if (found) {
+                priceInput.value = found.price;
+            }
+        }
+    });
+
+    // Envío del formulario de agendar turno
+    document.getElementById("schedule-form").addEventListener("submit", handleScheduleSubmit);
 }
 
 // =========================================================================
@@ -238,6 +320,9 @@ function executeSwitchTab(tabId) {
         renderHistoryList();
     } else if (tabId === "estadisticas") {
         calculateAndRenderStats();
+    } else if (tabId === "calendario") {
+        renderCalendar();
+        renderDayAppointments();
     } else if (tabId === "configuracion") {
         renderPricesEditor();
     }
@@ -1178,4 +1263,320 @@ function showGenericConfirmModal(title, subtitle, onConfirm) {
 
     const modal = document.getElementById("generic-confirm-modal");
     if (modal) modal.classList.remove("hidden");
+}
+
+// =========================================================================
+//                   GESTIÓN DE TURNOS Y CALENDARIO
+// =========================================================================
+
+// Cargar turnos de la nube
+async function loadAppointments() {
+    if (!state.currentUser) return;
+    
+    // Carga inicial del caché local (PWA Offline)
+    const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+        state.appointmentsList = JSON.parse(cached);
+        // Si estamos en la pestaña calendario, re-renderizar
+        const activeTab = document.querySelector(".nav-item.active");
+        if (activeTab && activeTab.getAttribute("data-tab") === "calendario") {
+            renderCalendar();
+            renderDayAppointments();
+        }
+    }
+    
+    if (!CONFIG_SHEET_URL) return;
+    
+    try {
+        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_appointments`);
+        const data = await response.json();
+        
+        if (data.success) {
+            state.appointmentsList = data.appointments;
+            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+            
+            // Re-renderizar si estamos en la pestaña del calendario
+            const activeTab = document.querySelector(".nav-item.active");
+            if (activeTab && activeTab.getAttribute("data-tab") === "calendario") {
+                renderCalendar();
+                renderDayAppointments();
+            }
+        }
+    } catch (error) {
+        console.warn("No se pudieron cargar los turnos de la nube, usando caché local.", error);
+    }
+}
+
+// Renderizar la cuadrícula del calendario
+function renderCalendar() {
+    const monthYearEl = document.getElementById("calendar-month-year");
+    const gridEl = document.getElementById("calendar-days-grid");
+    if (!monthYearEl || !gridEl) return;
+    
+    const date = state.calendarDate;
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    
+    // Mostrar título del mes
+    const monthNames = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+    ];
+    monthYearEl.textContent = `${monthNames[month]} ${year}`;
+    
+    gridEl.innerHTML = "";
+    
+    // Primer día del mes
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    // Ajustar para empezar en Lunes (JS: 0=Domingo, 1=Lunes...) -> Nuevo: 0=Lunes, 6=Domingo
+    const startPadding = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+    
+    // Días del mes anterior (padding)
+    const prevLastDay = new Date(year, month, 0).getDate();
+    for (let i = startPadding; i > 0; i--) {
+        const dayDiv = document.createElement("div");
+        dayDiv.className = "calendar-day empty";
+        dayDiv.textContent = prevLastDay - i + 1;
+        gridEl.appendChild(dayDiv);
+    }
+    
+    // Días del mes actual
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    
+    for (let day = 1; day <= lastDay; day++) {
+        const dayBtn = document.createElement("div");
+        dayBtn.className = "calendar-day";
+        dayBtn.textContent = day;
+        
+        const thisDate = new Date(year, month, day);
+        
+        // Es hoy?
+        if (thisDate.toDateString() === today.toDateString()) {
+            dayBtn.classList.add("today");
+        }
+        
+        // Es seleccionado?
+        if (thisDate.toDateString() === state.selectedCalendarDay.toDateString()) {
+            dayBtn.classList.add("selected");
+        }
+        
+        // Tiene turnos agendados?
+        const hasApts = state.appointmentsList.some(apt => {
+            const aptDate = new Date(apt.horaInicio);
+            return aptDate.getFullYear() === year && aptDate.getMonth() === month && aptDate.getDate() === day;
+        });
+        if (hasApts) {
+            dayBtn.classList.add("has-appointments");
+        }
+        
+        // Click en el día
+        dayBtn.addEventListener("click", () => {
+            state.selectedCalendarDay = thisDate;
+            renderCalendar();
+            renderDayAppointments();
+        });
+        
+        gridEl.appendChild(dayBtn);
+    }
+}
+
+// Renderizar turnos del día seleccionado
+function renderDayAppointments() {
+    const container = document.getElementById("day-appointments-container");
+    const dateTitle = document.getElementById("selected-day-date");
+    const title = document.getElementById("selected-day-title");
+    if (!container || !dateTitle || !title) return;
+    
+    const selDate = state.selectedCalendarDay;
+    const yyyy = selDate.getFullYear();
+    const mm = String(selDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(selDate.getDate()).padStart(2, '0');
+    dateTitle.textContent = `${dd}/${mm}/${yyyy}`;
+    
+    title.textContent = `Turnos del ${selDate.toLocaleDateString("es-AR", { day: 'numeric', month: 'long' })}`;
+    
+    container.innerHTML = "";
+    
+    // Filtrar citas del día
+    const dayApts = state.appointmentsList.filter(apt => {
+        const aptDate = new Date(apt.horaInicio);
+        return aptDate.getFullYear() === yyyy && aptDate.getMonth() === selDate.getMonth() && aptDate.getDate() === selDate.getDate();
+    });
+    
+    if (dayApts.length === 0) {
+        container.innerHTML = `
+            <div class="no-appointments-placeholder">
+                <i class="fa-solid fa-calendar-xmark" style="font-size: 20px; color: var(--text-light); margin-bottom: 5px; display: block;"></i>
+                No hay turnos agendados para este día
+            </div>
+        `;
+        return;
+    }
+    
+    dayApts.forEach(apt => {
+        const card = document.createElement("div");
+        card.className = "appointment-card";
+        
+        const start = new Date(apt.horaInicio);
+        const end = new Date(apt.horaFin);
+        const timeStr = start.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
+        
+        // Calcular duración
+        const diffMs = end - start;
+        const diffMins = Math.round(diffMs / 60000);
+        const durationStr = diffMins >= 60 
+            ? `${(diffMins / 60).toFixed(1).replace(".0", "")} h` 
+            : `${diffMins} min`;
+            
+        card.innerHTML = `
+            <div class="appointment-time-col">
+                <span class="appointment-time-start">${timeStr}</span>
+                <span class="appointment-time-duration"><i class="fa-regular fa-clock"></i> ${durationStr}</span>
+            </div>
+            <div class="appointment-info-col">
+                <div class="appointment-client-name">${escapeHtml(apt.cliente)}</div>
+                <div class="appointment-service-name">
+                    <i class="fa-solid fa-sparkles" style="color: var(--barbie-pink); font-size: 9px;"></i> 
+                    ${escapeHtml(apt.servicio)} — <strong>$${apt.precio.toLocaleString("es-AR")}</strong>
+                </div>
+            </div>
+            <div class="appointment-actions-col">
+                <button class="btn-delete-appointment" title="Cancelar Turno" data-id="${apt.id}">
+                    <i class="fa-regular fa-trash-can"></i>
+                </button>
+            </div>
+        `;
+        
+        // Evento de eliminar
+        card.querySelector(".btn-delete-appointment").addEventListener("click", () => {
+            cancelAppointment(apt.id, apt.cliente);
+        });
+        
+        container.appendChild(card);
+    });
+}
+
+// Agendar Turno (Submit del formulario)
+async function handleScheduleSubmit(e) {
+    e.preventDefault();
+    
+    if (!state.currentUser) {
+        showToast("Debes iniciar sesión para agendar turnos.", "error");
+        return;
+    }
+    
+    const cliente = document.getElementById("schedule-client-name").value.trim();
+    const category = document.getElementById("schedule-category").value;
+    const servicio = document.getElementById("schedule-service").value;
+    const dateVal = document.getElementById("schedule-date").value;
+    const timeVal = document.getElementById("schedule-time").value;
+    const duration = Number(document.getElementById("schedule-duration").value);
+    const precio = Number(document.getElementById("schedule-price").value) || 0;
+    
+    if (!cliente || !category || !servicio || !dateVal || !timeVal) {
+        showToast("Por favor, completa todos los campos obligatorios.", "error");
+        return;
+    }
+    
+    // Calcular horas ISO
+    const start = new Date(`${dateVal}T${timeVal}`);
+    const end = new Date(start.getTime() + duration * 60000);
+    
+    const appointmentData = {
+        action: "add_appointment",
+        id: "app_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000),
+        fecha: dateVal,
+        horaInicio: start.toISOString(),
+        horaFin: end.toISOString(),
+        cliente: cliente,
+        servicio: servicio,
+        precio: precio,
+        usuario: state.currentUser.email
+    };
+    
+    document.getElementById("schedule-modal").classList.add("hidden");
+    showLoader(true, "Agendando turno y sincronizando con Google Calendar...");
+    
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            body: JSON.stringify(appointmentData)
+        });
+        
+        const data = await response.json();
+        showLoader(false);
+        
+        if (data.success) {
+            showToast("¡Turno agendado y sincronizado con éxito!", "success");
+            
+            // Añadir localmente, ordenar y recargar
+            state.appointmentsList.push(data.appointment || appointmentData);
+            state.appointmentsList.sort((a, b) => new Date(a.horaInicio) - new Date(b.horaInicio));
+            
+            const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+            
+            renderCalendar();
+            renderDayAppointments();
+        } else {
+            showToast(data.message || "Error al agendar turno", "error");
+        }
+    } catch (error) {
+        showLoader(false);
+        console.error("Error al agendar turno:", error);
+        showToast("Error de conexión al agendar. Verifica tu internet.", "error");
+    }
+}
+
+// Cancelar Turno
+function cancelAppointment(id, clientName) {
+    showGenericConfirmModal(
+        "Cancelar Turno",
+        `¿Segura de que deseas cancelar el turno de ${clientName}? Se eliminará también de tu Google Calendar.`,
+        async () => {
+            showLoader(true, "Cancelando turno...");
+            try {
+                const response = await fetch(CONFIG_SHEET_URL, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: JSON.stringify({
+                        action: "delete_appointment",
+                        id: id,
+                        email: state.currentUser.email
+                    })
+                });
+                
+                const data = await response.json();
+                showLoader(false);
+                
+                if (data.success) {
+                    showToast("Turno cancelado correctamente.", "success");
+                    
+                    // Remover de la lista local
+                    state.appointmentsList = state.appointmentsList.filter(apt => apt.id !== id);
+                    
+                    const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+                    localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+                    
+                    renderCalendar();
+                    renderDayAppointments();
+                } else {
+                    showToast(data.message || "Error al cancelar turno", "error");
+                }
+            } catch (error) {
+                showLoader(false);
+                console.error("Error al cancelar turno:", error);
+                showToast("Error de conexión al cancelar turno.", "error");
+            }
+        }
+    );
 }

@@ -80,6 +80,10 @@ function doGet(e) {
     if (action === "get_prices") {
       return getPrices();
     }
+
+    if (action === "get_appointments") {
+      return getAppointments();
+    }
   } catch (error) {
     return jsonResponse({ success: false, message: "Error en el servidor: " + error.toString() });
   }
@@ -127,6 +131,18 @@ function doPost(e) {
         return jsonResponse({ success: false, message: "No tienes permisos de administrador para realizar esta acción" });
       }
       return updatePrices(data);
+    }
+
+    if (action === "get_appointments") {
+      return getAppointments();
+    }
+
+    if (action === "add_appointment") {
+      return addAppointment(data);
+    }
+
+    if (action === "delete_appointment") {
+      return deleteAppointment(data.id, data.email);
     }
     
     return jsonResponse({ success: false, message: "Acción POST no soportada" });
@@ -393,4 +409,168 @@ function updatePrices(data) {
   }
   
   return jsonResponse({ success: true, message: "Lista de precios actualizada con éxito en la nube" });
+}
+
+// Obtener el calendario de Google
+function getCalendar() {
+  try {
+    const name = "Evolet Nails";
+    const calendars = CalendarApp.getCalendarsByName(name);
+    if (calendars.length > 0) {
+      return calendars[0];
+    }
+    // Crear el calendario secundario dedicado
+    return CalendarApp.createCalendar(name, {
+      summary: "Turnos agendados desde la aplicación de Evolet Nails",
+      color: CalendarApp.Color.PINK
+    });
+  } catch (error) {
+    // Si falla por permisos (ej. no puede crear calendarios), usar el por defecto
+    try {
+      return CalendarApp.getDefaultCalendar();
+    } catch (e) {
+      return null;
+    }
+  }
+}
+
+// Obtener lista de turnos
+function getAppointments() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("Turnos");
+  
+  // Si la hoja no existe, la creamos vacía con las cabeceras
+  if (!sheet) {
+    sheet = ss.insertSheet("Turnos");
+    sheet.appendRow(["ID", "Fecha", "HoraInicio", "HoraFin", "Cliente", "Servicio", "Precio", "Usuario", "EventID"]);
+    return jsonResponse({ success: true, appointments: [] });
+  }
+  
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) {
+    return jsonResponse({ success: true, appointments: [] });
+  }
+  
+  const appointments = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[0]) continue; // Fila vacía
+    appointments.push({
+      id: row[0],
+      fecha: row[1],
+      horaInicio: row[2],
+      horaFin: row[3],
+      cliente: row[4],
+      servicio: row[5],
+      precio: Number(row[6]) || 0,
+      usuario: row[7],
+      eventId: row[8]
+    });
+  }
+  
+  // Ordenar por fecha y hora de inicio de más cercano a más lejano
+  appointments.sort((a, b) => new Date(a.horaInicio) - new Date(b.horaInicio));
+  
+  return jsonResponse({ success: true, appointments: appointments });
+}
+
+// Agendar un nuevo turno
+function addAppointment(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("Turnos");
+  
+  if (!sheet) {
+    sheet = ss.insertSheet("Turnos");
+    sheet.appendRow(["ID", "Fecha", "HoraInicio", "HoraFin", "Cliente", "Servicio", "Precio", "Usuario", "EventID"]);
+  }
+  
+  const id = data.id || "app_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000);
+  const fecha = data.fecha; // YYYY-MM-DD
+  const horaInicio = data.horaInicio; // ISO string
+  const horaFin = data.horaFin; // ISO string
+  const cliente = data.cliente || "Cliente";
+  const servicio = data.servicio || "Servicio";
+  const precio = Number(data.precio) || 0;
+  const usuario = data.usuario ? data.usuario.toLowerCase().trim() : "";
+  
+  let eventId = "";
+  
+  // Crear evento en Google Calendar
+  try {
+    const cal = getCalendar();
+    if (cal) {
+      const event = cal.createEvent(
+        "Evolet Nails: " + cliente + " (" + servicio + ")",
+        new Date(horaInicio),
+        new Date(horaFin),
+        {
+          description: "Turno agendado para: " + cliente + "\nServicio: " + servicio + "\nPrecio: $" + precio + "\nRegistrado por: " + usuario
+        }
+      );
+      eventId = event.getId();
+    }
+  } catch (e) {
+    console.error("Error al crear evento en Google Calendar: " + e.toString());
+  }
+  
+  sheet.appendRow([
+    id,
+    fecha,
+    horaInicio,
+    horaFin,
+    cliente,
+    servicio,
+    precio,
+    usuario,
+    eventId
+  ]);
+  
+  return jsonResponse({
+    success: true,
+    message: "Turno agendado correctamente en la nube",
+    appointment: { id, fecha, horaInicio, horaFin, cliente, servicio, precio, usuario, eventId }
+  });
+}
+
+// Cancelar un turno
+function deleteAppointment(id, email) {
+  if (!id) {
+    return jsonResponse({ success: false, message: "Falta el ID del turno a eliminar" });
+  }
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Turnos");
+  
+  if (!sheet) {
+    return jsonResponse({ success: false, message: "La pestaña 'Turnos' no existe" });
+  }
+  
+  const rows = sheet.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    const rowId = rows[i][0];
+    const rowEventId = rows[i][8];
+    
+    if (rowId === id) {
+      // Borrar evento en Google Calendar
+      if (rowEventId) {
+        try {
+          const cal = getCalendar();
+          if (cal) {
+            const event = cal.getEventById(rowEventId);
+            if (event) {
+              event.deleteEvent();
+            }
+          }
+        } catch (e) {
+          console.error("Error al borrar evento de Google Calendar: " + e.toString());
+        }
+      }
+      
+      // Borrar fila en Sheets
+      sheet.deleteRow(i + 1);
+      return jsonResponse({ success: true, message: "Turno cancelado y eliminado correctamente" });
+    }
+  }
+  
+  return jsonResponse({ success: false, message: "No se encontró el turno especificado" });
 }
