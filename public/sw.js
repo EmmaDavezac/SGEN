@@ -4,7 +4,7 @@ const ASSETS = [
   './style.css',
   './app.js',
   './manifest.json',
-  './Contexto/logo.png'
+  './logo.png'
 ];
 
 // Instalar y Cachear recursos
