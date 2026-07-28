@@ -273,46 +273,40 @@ function setupEventListeners() {
         renderExpensesHistoryList();
     });
 
-    // Edición de caja inicial (Efectivo y MercadoPago)
-    const promptEditEfectivo = () => {
-        const currentVal = Number(localStorage.getItem("evolet_initial_caja_efectivo")) || 20300.00;
-        const newVal = prompt("Ingresa el monto inicial en Efectivo:", currentVal);
-        if (newVal !== null) {
-            const parsed = parseFloat(newVal);
-            if (!isNaN(parsed)) {
-                localStorage.setItem("evolet_initial_caja_efectivo", parsed);
-                calculateAndRenderStats();
-                showToast("Saldo inicial de Efectivo actualizado", "success");
+    // Edición de caja inicial (Efectivo y MercadoPago consolidados)
+    const promptEditCajasAll = () => {
+        const currentEfectivo = Number(localStorage.getItem("evolet_initial_caja_efectivo")) || 20300.00;
+        const currentMp = Number(localStorage.getItem("evolet_initial_caja_mp")) || 67921.85;
+        
+        const newEfectivo = prompt("Ingresa el monto inicial en Efectivo:", currentEfectivo);
+        if (newEfectivo !== null) {
+            const parsedEfectivo = parseFloat(newEfectivo);
+            if (!isNaN(parsedEfectivo)) {
+                localStorage.setItem("evolet_initial_caja_efectivo", parsedEfectivo);
+                
+                // Pedir el segundo monto
+                const newMp = prompt("Ingresa el monto inicial en MercadoPago:", currentMp);
+                if (newMp !== null) {
+                    const parsedMp = parseFloat(newMp);
+                    if (!isNaN(parsedMp)) {
+                        localStorage.setItem("evolet_initial_caja_mp", parsedMp);
+                        calculateAndRenderStats();
+                        showToast("Saldos iniciales actualizados con éxito", "success");
+                    } else {
+                        showToast("Por favor, ingresa un número válido para MercadoPago.", "error");
+                    }
+                }
             } else {
-                showToast("Por favor, ingresa un número válido.", "error");
+                showToast("Por favor, ingresa un número válido para Efectivo.", "error");
             }
         }
     };
 
-    const promptEditMp = () => {
-        const currentVal = Number(localStorage.getItem("evolet_initial_caja_mp")) || 67921.85;
-        const newVal = prompt("Ingresa el monto inicial en MercadoPago:", currentVal);
-        if (newVal !== null) {
-            const parsed = parseFloat(newVal);
-            if (!isNaN(parsed)) {
-                localStorage.setItem("evolet_initial_caja_mp", parsed);
-                calculateAndRenderStats();
-                showToast("Saldo inicial de MercadoPago actualizado", "success");
-            } else {
-                showToast("Por favor, ingresa un número válido.", "error");
-            }
-        }
-    };
+    const btnEditCajasAll = document.getElementById("btn-edit-cajas-all");
+    const iconEditCajasAll = document.getElementById("icon-edit-cajas-all");
 
-    const btnEditEfectivo = document.getElementById("btn-edit-efectivo");
-    const iconEditEfectivo = document.getElementById("icon-edit-efectivo");
-    const btnEditMp = document.getElementById("btn-edit-mp");
-    const iconEditMp = document.getElementById("icon-edit-mp");
-
-    if (btnEditEfectivo) btnEditEfectivo.addEventListener("click", promptEditEfectivo);
-    if (iconEditEfectivo) iconEditEfectivo.addEventListener("click", (e) => { e.stopPropagation(); promptEditEfectivo(); });
-    if (btnEditMp) btnEditMp.addEventListener("click", promptEditMp);
-    if (iconEditMp) iconEditMp.addEventListener("click", (e) => { e.stopPropagation(); promptEditMp(); });
+    if (btnEditCajasAll) btnEditCajasAll.addEventListener("click", promptEditCajasAll);
+    if (iconEditCajasAll) iconEditCajasAll.addEventListener("click", (e) => { e.stopPropagation(); promptEditCajasAll(); });
 }
 
 // =========================================================================
@@ -946,22 +940,15 @@ function calculateAndRenderStats() {
     const currentTotal = currentEfectivo + currentMp;
 
     // Pintar valores en el DOM
-    const statCajaEfectivo = document.getElementById("stat-caja-efectivo");
-    const statCajaMp = document.getElementById("stat-caja-mp");
     const statCajaTotal = document.getElementById("stat-caja-total");
+    const consolidatedBreakdown = document.getElementById("cajas-consolidated-breakdown");
 
-    const breakdownEfectivo = document.getElementById("caja-efectivo-breakdown");
-    const breakdownMp = document.getElementById("caja-mp-breakdown");
-
-    if (statCajaEfectivo) statCajaEfectivo.textContent = `$${currentEfectivo.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    if (statCajaMp) statCajaMp.textContent = `$${currentMp.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    if (statCajaTotal) statCajaTotal.textContent = `$${currentTotal.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-    if (breakdownEfectivo) {
-        breakdownEfectivo.textContent = `Hoy: +$${todayEfectivoIncome.toLocaleString("es-AR")} / -$${todayEfectivoExpenses.toLocaleString("es-AR")}`;
+    if (statCajaTotal) {
+        statCajaTotal.textContent = `$${currentTotal.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
-    if (breakdownMp) {
-        breakdownMp.textContent = `Hoy: +$${todayMpIncome.toLocaleString("es-AR")} / -$${todayMpExpenses.toLocaleString("es-AR")}`;
+
+    if (consolidatedBreakdown) {
+        consolidatedBreakdown.textContent = `Efectivo: $${currentEfectivo.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | MP: $${currentMp.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
 
     const startOfWeek = new Date();
