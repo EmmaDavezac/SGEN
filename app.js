@@ -1031,18 +1031,29 @@ async function loadPricesFromCloud() {
     }
 }
 
-// Chequear acceso de administrador y ajustar visibilidad del botón de Ajustes
+// Chequear acceso de administrador y ajustar visibilidad del botón de Ajustes e importación
 function checkAdminAccess() {
     const configBtn = document.getElementById("nav-btn-config");
-    if (!configBtn) return;
+    const syncBtn = document.getElementById("btn-sync-history");
+    const isAdmin = state.currentUser && state.currentUser.rol === "admin";
 
-    if (state.currentUser && state.currentUser.rol === "admin") {
-        configBtn.classList.remove("hidden");
-    } else {
-        configBtn.classList.add("hidden");
-        const activeTabBtn = document.querySelector(".nav-item.active");
-        if (activeTabBtn && activeTabBtn.getAttribute("data-tab") === "configuracion") {
-            switchTab("registrar");
+    if (configBtn) {
+        if (isAdmin) {
+            configBtn.classList.remove("hidden");
+        } else {
+            configBtn.classList.add("hidden");
+            const activeTabBtn = document.querySelector(".nav-item.active");
+            if (activeTabBtn && activeTabBtn.getAttribute("data-tab") === "configuracion") {
+                switchTab("registrar");
+            }
+        }
+    }
+
+    if (syncBtn) {
+        if (isAdmin) {
+            syncBtn.classList.remove("hidden");
+        } else {
+            syncBtn.classList.add("hidden");
         }
     }
 }
