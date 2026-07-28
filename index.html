@@ -299,6 +299,14 @@
                     </div>
                 </div>
 
+                <!-- Desglose de Gastos por Categoría -->
+                <div class="chart-section">
+                    <h4>Distribución de Gastos del Mes</h4>
+                    <div class="payment-stats-container" id="category-expenses-stats">
+                        <!-- Generado dinámicamente con JS -->
+                    </div>
+                </div>
+
                 <!-- Distribución de servicios -->
                 <div class="chart-section">
                     <h4>Servicios más Solicitados</h4>
@@ -389,12 +397,26 @@
                 <div class="chart-section">
                     <h4>Registrar Nuevo Gasto</h4>
                     <form id="expense-form" class="cute-form" style="margin-top: 15px;">
-                        <div class="form-group">
-                            <label for="expense-concept">Concepto / Descripción</label>
-                            <div class="input-wrapper">
-                                <i class="fa-solid fa-pen input-icon"></i>
-                                <input type="text" id="expense-concept" placeholder="Ej: Esmaltes, Alquiler, Luz..."
-                                    required>
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label for="expense-concept">Concepto / Descripción</label>
+                                <div class="input-wrapper">
+                                    <i class="fa-solid fa-pen input-icon"></i>
+                                    <input type="text" id="expense-concept" placeholder="Ej: Luz, Esmaltes..." required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="expense-category">Categoría</label>
+                                <div class="input-wrapper">
+                                    <i class="fa-solid fa-tags input-icon"></i>
+                                    <select id="expense-category" required>
+                                        <option value="Insumos">Insumos</option>
+                                        <option value="Servicios">Servicios</option>
+                                        <option value="Comida">Comida</option>
+                                        <option value="Gasto propio">Gasto propio</option>
+                                        <option value="Otro" selected>Otro</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 

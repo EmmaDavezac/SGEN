@@ -716,7 +716,8 @@ function getExpenses() {
       concepto: row[2] ? row[2].toString().trim() : "",
       monto: Number(row[3]) || 0,
       metodoPago: row[4] ? row[4].toString().trim() : "",
-      usuario: row[5] ? row[5].toString().toLowerCase().trim() : ""
+      usuario: row[5] ? row[5].toString().toLowerCase().trim() : "",
+      categoria: row[6] ? row[6].toString().trim() : "Otro"
     });
   }
   
@@ -729,7 +730,14 @@ function addExpense(data) {
   let sheet = ss.getSheetByName("Gastos");
   if (!sheet) {
     sheet = ss.insertSheet("Gastos");
-    sheet.appendRow(["ID", "Fecha", "Concepto", "Monto", "MetodoPago", "Usuario"]);
+    sheet.appendRow(["ID", "Fecha", "Concepto", "Monto", "MetodoPago", "Usuario", "Categoria"]);
+  } else {
+    // Si la hoja ya existe, validar si tiene el encabezado de Categoria (columna 7)
+    // Esto previene que planillas viejas no tengan la columna Categoria
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headers.length < 7 || headers[6] !== "Categoria") {
+      sheet.getRange(1, 7).setValue("Categoria");
+    }
   }
   
   const id = data.id || "exp_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000);
@@ -738,13 +746,14 @@ function addExpense(data) {
   const monto = Number(data.monto) || 0;
   const metodoPago = data.metodoPago || "Efectivo";
   const usuario = data.usuario ? data.usuario.toLowerCase().trim() : "";
+  const categoria = data.categoria || "Otro";
   
-  sheet.appendRow([id, fecha, concepto, monto, metodoPago, usuario]);
+  sheet.appendRow([id, fecha, concepto, monto, metodoPago, usuario, categoria]);
   
   return jsonResponse({
     success: true,
     message: "Gasto registrado correctamente en la nube",
-    expense: { id, fecha, concepto, monto, metodoPago, usuario }
+    expense: { id, fecha, concepto, monto, metodoPago, usuario, categoria }
   });
 }
 

@@ -895,12 +895,27 @@ function calculateAndRenderStats() {
 
     const averageTicket = servicesCountMonth > 0 ? Math.round(totalMonthIncome / servicesCountMonth) : 0;
 
-    // Calcular egresos del mes
+    // Calcular egresos del mes y agrupar por categoría
     let totalMonthExpenses = 0;
+    const categorySums = {
+        "Insumos": 0,
+        "Servicios": 0,
+        "Comida": 0,
+        "Gasto propio": 0,
+        "Otro": 0
+    };
+
     state.expensesList.forEach(item => {
         const date = new Date(item.fecha + "T00:00:00");
         if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-            totalMonthExpenses += Number(item.monto) || 0;
+            const monto = Number(item.monto) || 0;
+            totalMonthExpenses += monto;
+            const cat = item.categoria || "Otro";
+            if (categorySums[cat] !== undefined) {
+                categorySums[cat] += monto;
+            } else {
+                categorySums["Otro"] += monto;
+            }
         }
     });
 
@@ -936,6 +951,41 @@ function calculateAndRenderStats() {
 
     document.getElementById("text-cash").textContent = `$${cashSum.toLocaleString("es-AR")} (${pctCash}%)`;
     document.getElementById("text-transfe").textContent = `$${transfeSum.toLocaleString("es-AR")} (${pctTransfe}%)`;
+
+    // Renderizar desglose de gastos por categoría
+    const catStatsContainer = document.getElementById("category-expenses-stats");
+    if (catStatsContainer) {
+        catStatsContainer.innerHTML = "";
+        
+        // Ordenar categorías de mayor a menor gasto
+        const sortedCats = Object.entries(categorySums)
+            .map(([name, sum]) => ({ name, sum }))
+            .sort((a, b) => b.sum - a.sum);
+            
+        const catIcons = {
+            "Insumos": '<i class="fa-solid fa-box-open" style="color: var(--barbie-pink);"></i>',
+            "Servicios": '<i class="fa-solid fa-bolt" style="color: #FFD700;"></i>',
+            "Comida": '<i class="fa-solid fa-utensils" style="color: #FFA500;"></i>',
+            "Gasto propio": '<i class="fa-solid fa-user-tag" style="color: #9370DB;"></i>',
+            "Otro": '<i class="fa-solid fa-circle-question" style="color: var(--text-light);"></i>'
+        };
+        
+        sortedCats.forEach(cat => {
+            const pct = totalMonthExpenses > 0 ? Math.round((cat.sum / totalMonthExpenses) * 100) : 0;
+            const icon = catIcons[cat.name] || catIcons["Otro"];
+            
+            const row = document.createElement("div");
+            row.className = "payment-stat-row";
+            row.innerHTML = `
+                <div class="payment-stat-label">${icon} ${cat.name}</div>
+                <div class="payment-progress-bar">
+                    <div class="progress" style="width: ${pct}%"></div>
+                </div>
+                <div class="payment-stat-val">$${cat.sum.toLocaleString("es-AR")} (${pct}%)</div>
+            `;
+            catStatsContainer.appendChild(row);
+        });
+    }
 
     renderPopularServices(serviceCounts);
 }
@@ -1828,9 +1878,12 @@ function renderExpensesList() {
             </div>
             <div class="appointment-info-col">
                 <div class="appointment-client-name">${escapeHtml(exp.concepto)}</div>
-                <div class="appointment-service-name">
-                    <i class="fa-solid fa-arrow-trend-down" style="color: #ff4d4d; font-size: 10px;"></i>
-                    <strong>$${exp.monto.toLocaleString("es-AR")}</strong>
+                <div class="appointment-service-name" style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px;">
+                    <span class="pay-badge" style="background-color: #fce4ec; color: #c2185b; font-size: 9px; padding: 1px 6px; border-radius: 4px;">${escapeHtml(exp.categoria || "Otro")}</span>
+                    <span>
+                        <i class="fa-solid fa-arrow-trend-down" style="color: #ff4d4d; font-size: 10px;"></i>
+                        <strong>$${exp.monto.toLocaleString("es-AR")}</strong>
+                    </span>
                 </div>
             </div>
             <div class="appointment-actions-col">
@@ -1864,8 +1917,9 @@ async function handleExpenseSubmit(e) {
     const monto = Number(document.getElementById("expense-amount").value);
     const fecha = document.getElementById("expense-date").value;
     const metodoPago = document.querySelector('input[name="expense-payment"]:checked').value;
+    const categoria = document.getElementById("expense-category").value;
     
-    if (!concepto || !monto || !fecha || !metodoPago) {
+    if (!concepto || !monto || !fecha || !metodoPago || !categoria) {
         showToast("Por favor, completa todos los campos del gasto.", "error");
         return;
     }
@@ -1877,6 +1931,7 @@ async function handleExpenseSubmit(e) {
         concepto: concepto,
         monto: monto,
         metodoPago: metodoPago,
+        categoria: categoria,
         usuario: state.currentUser.email
     };
     
@@ -2022,9 +2077,10 @@ function renderExpensesHistoryList() {
         card.innerHTML = `
             <div class="card-details">
                 <div class="card-client">${escapeHtml(item.concepto)}</div>
-                <div class="card-meta">
+                <div class="card-meta" style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px;">
                     <span><i class="fa-regular fa-calendar" style="color: var(--barbie-pink); margin-right: 3px;"></i>${formattedDate}</span>
                     <span class="pay-badge" title="Método de pago">${payIcon} ${item.metodoPago}</span>
+                    <span class="pay-badge" style="background-color: #fce4ec; color: #c2185b;">${escapeHtml(item.categoria || "Otro")}</span>
                 </div>
             </div>
             <div class="card-amount-box">
