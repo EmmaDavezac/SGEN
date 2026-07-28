@@ -224,28 +224,32 @@
                 <!-- Tarjetas KPI -->
                 <div class="stats-cards-grid">
                     <div class="stat-card pink-glow">
-                        <span class="stat-icon"><i class="fa-solid fa-arrow-trend-up" style="color: var(--barbie-pink);"></i></span>
+                        <span class="stat-icon"><i class="fa-solid fa-arrow-trend-up"
+                                style="color: var(--barbie-pink);"></i></span>
                         <div class="stat-info">
                             <span class="stat-label">Ingresos (Mes)</span>
                             <h2 id="stat-month-income">$0</h2>
                         </div>
                     </div>
                     <div class="stat-card" id="expenses-kpi-card">
-                        <span class="stat-icon"><i class="fa-solid fa-arrow-trend-down" style="color: #ff4d4d;"></i></span>
+                        <span class="stat-icon"><i class="fa-solid fa-arrow-trend-down"
+                                style="color: #ff4d4d;"></i></span>
                         <div class="stat-info">
                             <span class="stat-label">Gastos (Mes)</span>
                             <h2 id="stat-month-expenses">$0</h2>
                         </div>
                     </div>
                     <div class="stat-card pink-glow" id="net-balance-card">
-                        <span class="stat-icon"><i class="fa-solid fa-scale-balanced" style="color: var(--gold);"></i></span>
+                        <span class="stat-icon"><i class="fa-solid fa-scale-balanced"
+                                style="color: var(--gold);"></i></span>
                         <div class="stat-info">
                             <span class="stat-label">Balance Neto</span>
                             <h2 id="stat-net-balance">$0</h2>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-icon"><i class="fa-regular fa-calendar" style="color: var(--barbie-pink);"></i></span>
+                        <span class="stat-icon"><i class="fa-regular fa-calendar"
+                                style="color: var(--barbie-pink);"></i></span>
                         <div class="stat-info">
                             <span class="stat-label">Ingresos Semana</span>
                             <h2 id="stat-week-income">$0</h2>
@@ -259,7 +263,8 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-icon"><i class="fa-solid fa-hand-holding-dollar" style="color: var(--barbie-pink);"></i></span>
+                        <span class="stat-icon"><i class="fa-solid fa-hand-holding-dollar"
+                                style="color: var(--barbie-pink);"></i></span>
                         <div class="stat-info">
                             <span class="stat-label">Ticket Promedio</span>
                             <h2 id="stat-average-ticket">$0</h2>
@@ -300,16 +305,20 @@
 
             <!-- PESTAÑA 3: CALENDARIO / AGENDA -->
             <div id="tab-calendario" class="tab-pane">
-                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                <div class="section-title"
+                    style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                     <div>
-                        <h3>Agenda de Turnos <i class="fa-solid fa-calendar-days" style="color: var(--barbie-pink);"></i></h3>
+                        <h3>Agenda de Turnos <i class="fa-solid fa-calendar-days"
+                                style="color: var(--barbie-pink);"></i></h3>
                         <p>Visualiza y organiza tus citas sincronizadas en la nube.</p>
                     </div>
                     <div style="display: flex; gap: 8px;">
-                        <button id="btn-sync-history" class="btn btn-secondary btn-sm hidden" style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                        <button id="btn-sync-history" class="btn btn-secondary btn-sm hidden"
+                            style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
                             <i class="fa-solid fa-rotate"></i> Importar Cobrados
                         </button>
-                        <button id="btn-open-schedule" class="btn btn-primary btn-sm" style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                        <button id="btn-open-schedule" class="btn btn-primary btn-sm"
+                            style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
                             <i class="fa-solid fa-calendar-plus"></i> Nuevo Turno
                         </button>
                     </div>
@@ -318,11 +327,13 @@
                 <!-- EL CALENDARIO MENSUAL -->
                 <div class="calendar-card">
                     <div class="calendar-header">
-                        <button id="cal-prev-month" class="btn-cal-nav"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button id="cal-prev-month" class="btn-cal-nav"><i
+                                class="fa-solid fa-chevron-left"></i></button>
                         <h4 id="calendar-month-year">Julio 2026</h4>
-                        <button id="cal-next-month" class="btn-cal-nav"><i class="fa-solid fa-chevron-right"></i></button>
+                        <button id="cal-next-month" class="btn-cal-nav"><i
+                                class="fa-solid fa-chevron-right"></i></button>
                     </div>
-                    
+
                     <div class="calendar-weekdays">
                         <div>Lun</div>
                         <div>Mar</div>
@@ -332,7 +343,7 @@
                         <div>Sáb</div>
                         <div>Dom</div>
                     </div>
-                    
+
                     <div id="calendar-days-grid" class="calendar-days-grid">
                         <!-- Generado dinámicamente con JS -->
                     </div>
@@ -340,11 +351,13 @@
 
                 <!-- TURNOS DEL DÍA SELECCIONADO -->
                 <div class="chart-section" style="margin-top: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                         <h4 id="selected-day-title" style="margin-bottom: 0;">Turnos del Día</h4>
-                        <span id="selected-day-date" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">28/07/2026</span>
+                        <span id="selected-day-date"
+                            style="font-size: 12px; color: var(--text-muted); font-weight: 600;">28/07/2026</span>
                     </div>
-                    
+
                     <div id="day-appointments-container" class="day-appointments-container">
                         <!-- Turnos cargados dinámicamente -->
                     </div>
@@ -366,7 +379,8 @@
                             <label for="expense-concept">Concepto / Descripción</label>
                             <div class="input-wrapper">
                                 <i class="fa-solid fa-pen input-icon"></i>
-                                <input type="text" id="expense-concept" placeholder="Ej: Esmaltes, Alquiler, Luz..." required>
+                                <input type="text" id="expense-concept" placeholder="Ej: Esmaltes, Alquiler, Luz..."
+                                    required>
                             </div>
                         </div>
 
@@ -407,15 +421,16 @@
                             </div>
                         </div>
 
-                        <button type="submit" class="btn btn-primary btn-block btn-sparkle" style="margin-top: 20px;">
-                            <i class="fa-solid fa-check"></i> Registrar Gasto
+                        <button type="submit" class="btn btn-primary btn-block " style="margin-top: 20px;">
+                            <i class="fa-solid fa-check"></i> Registrar
                         </button>
                     </form>
                 </div>
 
                 <!-- Historial de gastos -->
                 <div class="chart-section" style="margin-top: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h4 style="margin-bottom: 0;">Gastos del Mes</h4>
                         <strong id="expense-month-total" style="color: var(--barbie-dark); font-size: 16px;">$0</strong>
                     </div>
@@ -563,13 +578,14 @@
         <div class="modal-card" style="max-width: 420px; width: 95%;">
             <h3>Agendar Turno <i class="fa-solid fa-calendar-plus" style="color: var(--barbie-pink);"></i></h3>
             <p class="modal-sub">Completa los datos para agendar la cita:</p>
-            
+
             <form id="schedule-form" class="cute-form" style="margin-top: 15px;">
                 <div class="form-group">
                     <label for="schedule-client-name">Cliente</label>
                     <div class="input-wrapper">
                         <i class="fa-solid fa-user input-icon"></i>
-                        <input type="text" id="schedule-client-name" placeholder="Nombre de la clienta" required list="client-suggestions">
+                        <input type="text" id="schedule-client-name" placeholder="Nombre de la clienta" required
+                            list="client-suggestions">
                     </div>
                 </div>
 
@@ -591,8 +607,10 @@
                 </div>
 
                 <div class="modal-actions" style="margin-top: 25px;">
-                    <button type="button" id="schedule-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Cancelar</button>
-                    <button type="submit" id="schedule-btn-save" class="btn btn-primary"><i class="fa-solid fa-check"></i> Agendar</button>
+                    <button type="button" id="schedule-btn-cancel" class="btn btn-secondary"><i
+                            class="fa-solid fa-xmark"></i> Cancelar</button>
+                    <button type="submit" id="schedule-btn-save" class="btn btn-primary"><i
+                            class="fa-solid fa-check"></i> Agendar</button>
                 </div>
             </form>
         </div>

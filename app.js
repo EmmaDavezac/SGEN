@@ -68,7 +68,25 @@ function initApp() {
     // Registrar Service Worker para PWA Offline
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
-            .then(() => console.log('Service Worker registrado con éxito'))
+            .then(reg => {
+                console.log('Service Worker registrado con éxito');
+                reg.onupdatefound = () => {
+                    const installingWorker = reg.installing;
+                    if (installingWorker) {
+                        installingWorker.onstatechange = () => {
+                            if (installingWorker.state === 'installed') {
+                                if (navigator.serviceWorker.controller) {
+                                    console.log('Nueva versión disponible. Recargando...');
+                                    showToast("Actualizando aplicación a la última versión...", "success");
+                                    setTimeout(() => {
+                                        window.location.reload();
+                                    }, 1500);
+                                }
+                            }
+                        };
+                    }
+                };
+            })
             .catch(err => console.warn('Error al registrar Service Worker:', err));
     }
 
