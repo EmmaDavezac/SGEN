@@ -1551,20 +1551,20 @@ button {
 }
 
 .calendar-day {
-    aspect-ratio: 1;
+    min-height: 62px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: center;
+    justify-content: flex-start;
+    align-items: stretch;
     border-radius: var(--radius-sm);
     background: var(--cream-bg);
     color: var(--text-color);
-    font-size: 13px;
-    font-weight: 500;
     cursor: pointer;
     position: relative;
     transition: var(--transition);
     border: 2px solid transparent;
+    padding: 3px;
+    overflow: hidden;
 }
 
 .calendar-day:hover:not(.empty) {
@@ -1592,19 +1592,47 @@ button {
     box-shadow: 0 4px 8px rgba(255, 105, 180, 0.3);
 }
 
-/* Puntito rosa para indicar turnos */
-.calendar-day.has-appointments::after {
-    content: "";
-    position: absolute;
-    bottom: 4px;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background-color: var(--barbie-dark);
+.day-number {
+    font-size: 11px;
+    font-weight: 700;
+    align-self: flex-end;
+    margin-bottom: 2px;
 }
 
-.calendar-day.selected.has-appointments::after {
-    background-color: var(--white);
+.day-events-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.event-preview-pill {
+    font-size: 8px;
+    line-height: 9px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background-color: var(--barbie-light);
+    color: var(--barbie-dark);
+    padding: 1px 3px;
+    border-radius: 3px;
+    text-align: left;
+    border-left: 2px solid var(--barbie-pink);
+}
+
+.calendar-day.selected .event-preview-pill {
+    background-color: rgba(255, 255, 255, 0.3);
+    color: var(--white);
+    border-left-color: var(--white);
+}
+
+.event-preview-pill.more {
+    background-color: var(--barbie-pale);
+    color: var(--text-muted);
+    border-left: none;
+    text-align: center;
 }
 
 /* Tarjetas de Turnos */

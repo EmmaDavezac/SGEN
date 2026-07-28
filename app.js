@@ -1303,7 +1303,11 @@ function renderCalendar() {
     for (let day = 1; day <= lastDay; day++) {
         const dayBtn = document.createElement("div");
         dayBtn.className = "calendar-day";
-        dayBtn.textContent = day;
+        
+        const numberSpan = document.createElement("span");
+        numberSpan.className = "day-number";
+        numberSpan.textContent = day;
+        dayBtn.appendChild(numberSpan);
         
         const thisDate = new Date(year, month, day);
         
@@ -1317,13 +1321,36 @@ function renderCalendar() {
             dayBtn.classList.add("selected");
         }
         
-        // Tiene turnos agendados?
-        const hasApts = state.appointmentsList.some(apt => {
+        // Filtrar citas de este día
+        const dayApts = state.appointmentsList.filter(apt => {
             const aptDate = new Date(apt.horaInicio);
             return aptDate.getFullYear() === year && aptDate.getMonth() === month && aptDate.getDate() === day;
         });
-        if (hasApts) {
+        
+        if (dayApts.length > 0) {
             dayBtn.classList.add("has-appointments");
+            
+            const previewContainer = document.createElement("div");
+            previewContainer.className = "day-events-preview";
+            
+            // Mostrar hasta 2 píldoras
+            const maxVisible = 2;
+            dayApts.slice(0, maxVisible).forEach(apt => {
+                const pill = document.createElement("div");
+                pill.className = "event-preview-pill";
+                pill.textContent = apt.cliente;
+                previewContainer.appendChild(pill);
+            });
+            
+            // Mostrar "+N" si hay más
+            if (dayApts.length > maxVisible) {
+                const morePill = document.createElement("div");
+                morePill.className = "event-preview-pill more";
+                morePill.textContent = `+${dayApts.length - maxVisible}`;
+                previewContainer.appendChild(morePill);
+            }
+            
+            dayBtn.appendChild(previewContainer);
         }
         
         // Click en el día
