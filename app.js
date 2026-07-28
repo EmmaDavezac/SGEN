@@ -6,7 +6,7 @@
  * CONFIGURACIÓN DE LA NUBE:
  * Pega la URL del Web App de Google (Apps Script) entre las comillas simples de abajo.
  */
-const CONFIG_SHEET_URL = import.meta.env.VITE_SHEET_URL || 'https://script.google.com/macros/s/AKfycbxZT_wSTPClKAN78_TYAEnxBUj_b7BWPmQz2pwiKm4dkff5CgH_96xOLuj30IFdc0uUVg/exec'; 
+const CONFIG_SHEET_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEET_URL) || 'https://script.google.com/macros/s/AKfycbxZT_wSTPClKAN78_TYAEnxBUj_b7BWPmQz2pwiKm4dkff5CgH_96xOLuj30IFdc0uUVg/exec'; 
 
 // Catálogo de Servicios oficial extraído del PDF
 let SERVICES_CATALOG = {
