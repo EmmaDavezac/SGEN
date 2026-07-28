@@ -209,42 +209,6 @@ function setupEventListeners() {
         document.getElementById("schedule-modal").classList.add("hidden");
     });
 
-    // Cambio de Categoría en el formulario de turnos
-    document.getElementById("schedule-category").addEventListener("change", (e) => {
-        const catKey = e.target.value;
-        const serviceSelect = document.getElementById("schedule-service");
-        serviceSelect.innerHTML = '<option value="" disabled selected>Selecciona servicio</option>';
-        
-        const services = SERVICES_CATALOG[catKey];
-        if (services && services.length > 0) {
-            services.forEach((s) => {
-                const opt = document.createElement("option");
-                opt.value = s.name;
-                opt.textContent = s.name;
-                serviceSelect.appendChild(opt);
-            });
-            serviceSelect.disabled = false;
-        } else {
-            serviceSelect.disabled = true;
-        }
-        document.getElementById("schedule-price").value = "";
-    });
-
-    // Cambio de Servicio en el formulario de turnos
-    document.getElementById("schedule-service").addEventListener("change", (e) => {
-        const serviceName = e.target.value;
-        const catKey = document.getElementById("schedule-category").value;
-        const priceInput = document.getElementById("schedule-price");
-        
-        const services = SERVICES_CATALOG[catKey];
-        if (services) {
-            const found = services.find(s => s.name === serviceName);
-            if (found) {
-                priceInput.value = found.price;
-            }
-        }
-    });
-
     // Envío del formulario de agendar turno
     document.getElementById("schedule-form").addEventListener("submit", handleScheduleSubmit);
 }
@@ -1469,20 +1433,17 @@ async function handleScheduleSubmit(e) {
     }
     
     const cliente = document.getElementById("schedule-client-name").value.trim();
-    const category = document.getElementById("schedule-category").value;
-    const servicio = document.getElementById("schedule-service").value;
     const dateVal = document.getElementById("schedule-date").value;
     const timeVal = document.getElementById("schedule-time").value;
-    const duration = Number(document.getElementById("schedule-duration").value);
-    const precio = Number(document.getElementById("schedule-price").value) || 0;
     
-    if (!cliente || !category || !servicio || !dateVal || !timeVal) {
+    if (!cliente || !dateVal || !timeVal) {
         showToast("Por favor, completa todos los campos obligatorios.", "error");
         return;
     }
     
-    // Calcular horas ISO
+    // Calcular horas ISO (Duración por defecto: 90 minutos, Servicio: "Turno", Precio: 0)
     const start = new Date(`${dateVal}T${timeVal}`);
+    const duration = 90;
     const end = new Date(start.getTime() + duration * 60000);
     
     const appointmentData = {
@@ -1492,8 +1453,8 @@ async function handleScheduleSubmit(e) {
         horaInicio: start.toISOString(),
         horaFin: end.toISOString(),
         cliente: cliente,
-        servicio: servicio,
-        precio: precio,
+        servicio: "Turno",
+        precio: 0,
         usuario: state.currentUser.email
     };
     
@@ -1592,13 +1553,6 @@ function openScheduleModalForDate(date) {
     
     // Resetear campos del formulario
     document.getElementById("schedule-client-name").value = "";
-    document.getElementById("schedule-category").value = "";
-    
-    const serviceSelect = document.getElementById("schedule-service");
-    serviceSelect.innerHTML = '<option value="" disabled selected>Primero selecciona categoría</option>';
-    serviceSelect.disabled = true;
-    
-    document.getElementById("schedule-price").value = "";
     document.getElementById("schedule-time").value = "14:00"; // Hora por defecto
     
     document.getElementById("schedule-modal").classList.remove("hidden");
