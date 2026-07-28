@@ -9,10 +9,13 @@
     <!-- Configuración para iPhone PWA (Pantalla Completa) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Evolet Nails App">
-    <link rel="apple-touch-icon" href="/logo.png">
+    <meta name="apple-mobile-web-app-title" content="Evolet Nails">
+    <link rel="icon" type="image/x-icon" href="/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">
+    <link rel="apple-touch-icon" href="/icons/icon-180.png">
 
-    <title>Evolet Nails App - Sistema de Contabilidad</title>
+    <title>Evolet Nails - Sistema de Contabilidad</title>
 
     <!-- Google Fonts: Comfortaa (Redondeada Y2K) y Outfit (Moderna y legible) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -90,7 +93,8 @@
         <header class="app-header">
             <div class="header-user">
                 <div class="mini-logo">
-                    <img src="./logo.png" alt="Logo" style="height: 32px; width: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--barbie-pink); display: block;">
+                    <img src="./logo.png" alt="Logo"
+                        style="height: 32px; width: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--barbie-pink); display: block;">
                 </div>
                 <div>
                     <span class="welcome-text">Hola,</span>
@@ -188,13 +192,15 @@
 
             <!-- PESTAÑA 2: HISTORIAL -->
             <div id="tab-historial" class="tab-pane">
-                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                <div class="section-title"
+                    style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                     <div>
                         <h3>Historial de Ventas <i class="fa-solid fa-clock-rotate-left"
                                 style="color: var(--barbie-pink);"></i></h3>
                         <p>Visualiza y administra los servicios cargados.</p>
                     </div>
-                    <button class="btn btn-secondary btn-sm btn-back-to-calendar" style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                    <button class="btn btn-secondary btn-sm btn-back-to-calendar"
+                        style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
                         <i class="fa-solid fa-arrow-left"></i> Volver
                     </button>
                 </div>
@@ -229,44 +235,56 @@
                 <!-- Tarjetas KPI -->
                 <div class="stats-cards-grid">
                     <!-- Caja Efectivo -->
-                    <div class="stat-card pink-glow" id="caja-efectivo-card" style="border: 2px solid var(--barbie-pink);">
-                        <span class="stat-icon" id="btn-edit-efectivo" style="cursor: pointer;" title="Editar Inicial Efectivo">
+                    <div class="stat-card pink-glow" id="caja-efectivo-card"
+                        style="border: 2px solid var(--barbie-pink);">
+                        <span class="stat-icon" id="btn-edit-efectivo" style="cursor: pointer;"
+                            title="Editar Inicial Efectivo">
                             <i class="fa-solid fa-money-bill-wave" style="color: var(--barbie-pink);"></i>
                         </span>
                         <div class="stat-info">
                             <span class="stat-label" style="display: flex; align-items: center; gap: 6px;">
                                 Caja Efectivo
-                                <i class="fa-solid fa-pen" style="font-size: 10px; color: var(--text-muted); cursor: pointer;" id="icon-edit-efectivo"></i>
+                                <i class="fa-solid fa-pen"
+                                    style="font-size: 10px; color: var(--text-muted); cursor: pointer;"
+                                    id="icon-edit-efectivo"></i>
                             </span>
                             <h2 id="stat-caja-efectivo">$20.300,00</h2>
-                            <small id="caja-efectivo-breakdown" style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 4px;">Inicial: $20.300,00</small>
+                            <small id="caja-efectivo-breakdown"
+                                style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 4px;">Hoy: +$0 / -$0</small>
                         </div>
                     </div>
 
                     <!-- Caja MercadoPago -->
                     <div class="stat-card pink-glow" id="caja-mp-card" style="border: 2px solid #009ee3;">
-                        <span class="stat-icon" id="btn-edit-mp" style="cursor: pointer;" title="Editar Inicial MercadoPago">
+                        <span class="stat-icon" id="btn-edit-mp" style="cursor: pointer;"
+                            title="Editar Inicial MercadoPago">
                             <i class="fa-solid fa-mobile-screen-button" style="color: #009ee3;"></i>
                         </span>
                         <div class="stat-info">
                             <span class="stat-label" style="display: flex; align-items: center; gap: 6px;">
                                 MercadoPago
-                                <i class="fa-solid fa-pen" style="font-size: 10px; color: var(--text-muted); cursor: pointer;" id="icon-edit-mp"></i>
+                                <i class="fa-solid fa-pen"
+                                    style="font-size: 10px; color: var(--text-muted); cursor: pointer;"
+                                    id="icon-edit-mp"></i>
                             </span>
                             <h2 id="stat-caja-mp">$67.921,85</h2>
-                            <small id="caja-mp-breakdown" style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 4px;">Inicial: $67.921,85</small>
+                            <small id="caja-mp-breakdown"
+                                style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 4px;">Hoy: +$0 / -$0</small>
                         </div>
                     </div>
 
                     <!-- Caja Total -->
-                    <div class="stat-card pink-glow" id="caja-total-card" style="border: 2px solid var(--gold); background: linear-gradient(135deg, rgba(255, 215, 0, 0.05) 0%, rgba(255, 105, 180, 0.05) 100%);">
+                    <div class="stat-card pink-glow" id="caja-total-card"
+                        style="border: 2px solid var(--gold); background: linear-gradient(135deg, rgba(255, 215, 0, 0.05) 0%, rgba(255, 105, 180, 0.05) 100%);">
                         <span class="stat-icon">
                             <i class="fa-solid fa-vault" style="color: var(--gold);"></i>
                         </span>
                         <div class="stat-info">
                             <span class="stat-label">Caja Total</span>
                             <h2 id="stat-caja-total">$88.221,85</h2>
-                            <small style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 4px;">Efectivo + MercadoPago</small>
+                            <small
+                                style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 4px;">Efectivo
+                                + MercadoPago</small>
                         </div>
                     </div>
 
@@ -426,12 +444,15 @@
 
             <!-- PESTAÑA: GASTOS -->
             <div id="tab-gastos" class="tab-pane">
-                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                <div class="section-title"
+                    style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                     <div>
-                        <h3>Registro de Gastos <i class="fa-solid fa-wallet" style="color: var(--barbie-pink);"></i></h3>
+                        <h3>Registro de Gastos <i class="fa-solid fa-wallet" style="color: var(--barbie-pink);"></i>
+                        </h3>
                         <p>Controla tus egresos diarios para optimizar tu negocio.</p>
                     </div>
-                    <button id="btn-view-expenses-history" class="btn btn-secondary btn-sm" style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                    <button id="btn-view-expenses-history" class="btn btn-secondary btn-sm"
+                        style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
                         <i class="fa-solid fa-clock-rotate-left"></i> Historial
                     </button>
                 </div>
@@ -520,12 +541,15 @@
 
             <!-- PESTAÑA: HISTORIAL DE GASTOS -->
             <div id="tab-historial-gastos" class="tab-pane">
-                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                <div class="section-title"
+                    style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                     <div>
-                        <h3>Historial de Gastos <i class="fa-solid fa-receipt" style="color: var(--barbie-pink);"></i></h3>
+                        <h3>Historial de Gastos <i class="fa-solid fa-receipt" style="color: var(--barbie-pink);"></i>
+                        </h3>
                         <p>Visualiza y administra todos los gastos registrados.</p>
                     </div>
-                    <button class="btn btn-secondary btn-sm btn-back-to-expenses" style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                    <button class="btn btn-secondary btn-sm btn-back-to-expenses"
+                        style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
                         <i class="fa-solid fa-arrow-left"></i> Volver
                     </button>
                 </div>

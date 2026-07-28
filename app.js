@@ -958,10 +958,10 @@ function calculateAndRenderStats() {
     if (statCajaTotal) statCajaTotal.textContent = `$${currentTotal.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     if (breakdownEfectivo) {
-        breakdownEfectivo.textContent = `Inicial: $${initialEfectivo.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Hoy: +$${todayEfectivoIncome.toLocaleString("es-AR")} / -$${todayEfectivoExpenses.toLocaleString("es-AR")}`;
+        breakdownEfectivo.textContent = `Hoy: +$${todayEfectivoIncome.toLocaleString("es-AR")} / -$${todayEfectivoExpenses.toLocaleString("es-AR")}`;
     }
     if (breakdownMp) {
-        breakdownMp.textContent = `Inicial: $${initialMp.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Hoy: +$${todayMpIncome.toLocaleString("es-AR")} / -$${todayMpExpenses.toLocaleString("es-AR")}`;
+        breakdownMp.textContent = `Hoy: +$${todayMpIncome.toLocaleString("es-AR")} / -$${todayMpExpenses.toLocaleString("es-AR")}`;
     }
 
     const startOfWeek = new Date();
