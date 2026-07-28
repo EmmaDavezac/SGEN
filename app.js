@@ -272,6 +272,47 @@ function setupEventListeners() {
     document.getElementById("expense-filter").addEventListener("change", () => {
         renderExpensesHistoryList();
     });
+
+    // Edición de caja inicial (Efectivo y MercadoPago)
+    const promptEditEfectivo = () => {
+        const currentVal = Number(localStorage.getItem("evolet_initial_caja_efectivo")) || 20300.00;
+        const newVal = prompt("Ingresa el monto inicial en Efectivo:", currentVal);
+        if (newVal !== null) {
+            const parsed = parseFloat(newVal);
+            if (!isNaN(parsed)) {
+                localStorage.setItem("evolet_initial_caja_efectivo", parsed);
+                calculateAndRenderStats();
+                showToast("Saldo inicial de Efectivo actualizado", "success");
+            } else {
+                showToast("Por favor, ingresa un número válido.", "error");
+            }
+        }
+    };
+
+    const promptEditMp = () => {
+        const currentVal = Number(localStorage.getItem("evolet_initial_caja_mp")) || 67921.85;
+        const newVal = prompt("Ingresa el monto inicial en MercadoPago:", currentVal);
+        if (newVal !== null) {
+            const parsed = parseFloat(newVal);
+            if (!isNaN(parsed)) {
+                localStorage.setItem("evolet_initial_caja_mp", parsed);
+                calculateAndRenderStats();
+                showToast("Saldo inicial de MercadoPago actualizado", "success");
+            } else {
+                showToast("Por favor, ingresa un número válido.", "error");
+            }
+        }
+    };
+
+    const btnEditEfectivo = document.getElementById("btn-edit-efectivo");
+    const iconEditEfectivo = document.getElementById("icon-edit-efectivo");
+    const btnEditMp = document.getElementById("btn-edit-mp");
+    const iconEditMp = document.getElementById("icon-edit-mp");
+
+    if (btnEditEfectivo) btnEditEfectivo.addEventListener("click", promptEditEfectivo);
+    if (iconEditEfectivo) iconEditEfectivo.addEventListener("click", (e) => { e.stopPropagation(); promptEditEfectivo(); });
+    if (btnEditMp) btnEditMp.addEventListener("click", promptEditMp);
+    if (iconEditMp) iconEditMp.addEventListener("click", (e) => { e.stopPropagation(); promptEditMp(); });
 }
 
 // =========================================================================
@@ -857,6 +898,71 @@ function calculateAndRenderStats() {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
+
+    // Obtener hoy local YYYY-MM-DD
+    const localDate = new Date();
+    const localY = localDate.getFullYear();
+    const localM = String(localDate.getMonth() + 1).padStart(2, '0');
+    const localD = String(localDate.getDate()).padStart(2, '0');
+    const todayStr = `${localY}-${localM}-${localD}`;
+
+    // Sumar ingresos (servicios) de HOY por método de pago
+    let todayEfectivoIncome = 0;
+    let todayMpIncome = 0;
+
+    state.servicesList.forEach(item => {
+        if (item.fecha === todayStr) {
+            const precio = Number(item.precio) || 0;
+            if (item.metodoPago === "Efectivo") {
+                todayEfectivoIncome += precio;
+            } else if (item.metodoPago === "Transferencia") {
+                todayMpIncome += precio;
+            }
+        }
+    });
+
+    // Sumar egresos (gastos) de HOY por método de pago
+    let todayEfectivoExpenses = 0;
+    let todayMpExpenses = 0;
+
+    state.expensesList.forEach(item => {
+        if (item.fecha === todayStr) {
+            const monto = Number(item.monto) || 0;
+            if (item.metodoPago === "Efectivo") {
+                todayEfectivoExpenses += monto;
+            } else if (item.metodoPago === "Transferencia") {
+                todayMpExpenses += monto;
+            }
+        }
+    });
+
+    // Cargar iniciales guardados en localStorage
+    const initialEfectivo = Number(localStorage.getItem("evolet_initial_caja_efectivo")) || 20300.00;
+    const initialMp = Number(localStorage.getItem("evolet_initial_caja_mp")) || 67921.85;
+
+    // Calcular montos actuales
+    const currentEfectivo = initialEfectivo + todayEfectivoIncome - todayEfectivoExpenses;
+    const currentMp = initialMp + todayMpIncome - todayMpExpenses;
+    const currentTotal = currentEfectivo + currentMp;
+
+    // Pintar valores en el DOM
+    const statCajaEfectivo = document.getElementById("stat-caja-efectivo");
+    const statCajaMp = document.getElementById("stat-caja-mp");
+    const statCajaTotal = document.getElementById("stat-caja-total");
+
+    const breakdownEfectivo = document.getElementById("caja-efectivo-breakdown");
+    const breakdownMp = document.getElementById("caja-mp-breakdown");
+
+    if (statCajaEfectivo) statCajaEfectivo.textContent = `$${currentEfectivo.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (statCajaMp) statCajaMp.textContent = `$${currentMp.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (statCajaTotal) statCajaTotal.textContent = `$${currentTotal.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    if (breakdownEfectivo) {
+        breakdownEfectivo.textContent = `Inicial: $${initialEfectivo.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Hoy: +$${todayEfectivoIncome.toLocaleString("es-AR")} / -$${todayEfectivoExpenses.toLocaleString("es-AR")}`;
+    }
+    if (breakdownMp) {
+        breakdownMp.textContent = `Inicial: $${initialMp.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Hoy: +$${todayMpIncome.toLocaleString("es-AR")} / -$${todayMpExpenses.toLocaleString("es-AR")}`;
+    }
 
     const startOfWeek = new Date();
     startOfWeek.setDate(now.getDate() - 7);

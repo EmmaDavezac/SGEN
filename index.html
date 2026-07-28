@@ -228,6 +228,48 @@
 
                 <!-- Tarjetas KPI -->
                 <div class="stats-cards-grid">
+                    <!-- Caja Efectivo -->
+                    <div class="stat-card pink-glow" id="caja-efectivo-card" style="border: 2px solid var(--barbie-pink);">
+                        <span class="stat-icon" id="btn-edit-efectivo" style="cursor: pointer;" title="Editar Inicial Efectivo">
+                            <i class="fa-solid fa-money-bill-wave" style="color: var(--barbie-pink);"></i>
+                        </span>
+                        <div class="stat-info">
+                            <span class="stat-label" style="display: flex; align-items: center; gap: 6px;">
+                                Caja Efectivo
+                                <i class="fa-solid fa-pen" style="font-size: 10px; color: var(--text-muted); cursor: pointer;" id="icon-edit-efectivo"></i>
+                            </span>
+                            <h2 id="stat-caja-efectivo">$20.300,00</h2>
+                            <small id="caja-efectivo-breakdown" style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 4px;">Inicial: $20.300,00</small>
+                        </div>
+                    </div>
+
+                    <!-- Caja MercadoPago -->
+                    <div class="stat-card pink-glow" id="caja-mp-card" style="border: 2px solid #009ee3;">
+                        <span class="stat-icon" id="btn-edit-mp" style="cursor: pointer;" title="Editar Inicial MercadoPago">
+                            <i class="fa-solid fa-mobile-screen-button" style="color: #009ee3;"></i>
+                        </span>
+                        <div class="stat-info">
+                            <span class="stat-label" style="display: flex; align-items: center; gap: 6px;">
+                                MercadoPago
+                                <i class="fa-solid fa-pen" style="font-size: 10px; color: var(--text-muted); cursor: pointer;" id="icon-edit-mp"></i>
+                            </span>
+                            <h2 id="stat-caja-mp">$67.921,85</h2>
+                            <small id="caja-mp-breakdown" style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 4px;">Inicial: $67.921,85</small>
+                        </div>
+                    </div>
+
+                    <!-- Caja Total -->
+                    <div class="stat-card pink-glow" id="caja-total-card" style="border: 2px solid var(--gold); background: linear-gradient(135deg, rgba(255, 215, 0, 0.05) 0%, rgba(255, 105, 180, 0.05) 100%);">
+                        <span class="stat-icon">
+                            <i class="fa-solid fa-vault" style="color: var(--gold);"></i>
+                        </span>
+                        <div class="stat-info">
+                            <span class="stat-label">Caja Total</span>
+                            <h2 id="stat-caja-total">$88.221,85</h2>
+                            <small style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 4px;">Efectivo + MercadoPago</small>
+                        </div>
+                    </div>
+
                     <div class="stat-card pink-glow">
                         <span class="stat-icon"><i class="fa-solid fa-arrow-trend-up"
                                 style="color: var(--barbie-pink);"></i></span>
