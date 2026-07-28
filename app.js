@@ -192,25 +192,16 @@ function setupEventListeners() {
 
     // Abrir Modal de Agendar Turno
     document.getElementById("btn-open-schedule").addEventListener("click", () => {
-        // Inicializar fecha por defecto en el selector
-        const dateInput = document.getElementById("schedule-date");
-        const yyyy = state.selectedCalendarDay.getFullYear();
-        const mm = String(state.selectedCalendarDay.getMonth() + 1).padStart(2, '0');
-        const dd = String(state.selectedCalendarDay.getDate()).padStart(2, '0');
-        dateInput.value = `${yyyy}-${mm}-${dd}`;
-        
-        // Resetear campos del formulario
-        document.getElementById("schedule-client-name").value = "";
-        document.getElementById("schedule-category").value = "";
-        
-        const serviceSelect = document.getElementById("schedule-service");
-        serviceSelect.innerHTML = '<option value="" disabled selected>Primero selecciona categoría</option>';
-        serviceSelect.disabled = true;
-        
-        document.getElementById("schedule-price").value = "";
-        document.getElementById("schedule-time").value = "14:00"; // Hora por defecto
-        
-        document.getElementById("schedule-modal").classList.remove("hidden");
+        openScheduleModalForDate(state.selectedCalendarDay);
+    });
+
+    // Sincronizar historial de servicios cobrados
+    document.getElementById("btn-sync-history").addEventListener("click", () => {
+        showGenericConfirmModal(
+            "Importar Historial",
+            "¿Deseas importar todos los servicios cobrados históricos de tu planilla como turnos en tu calendario? Se sincronizarán también en tu Google Calendar.",
+            importHistoryServices
+        );
     });
 
     // Cerrar Modal de Agendar Turno
@@ -1373,9 +1364,13 @@ function renderCalendar() {
         
         // Click en el día
         dayBtn.addEventListener("click", () => {
-            state.selectedCalendarDay = thisDate;
-            renderCalendar();
-            renderDayAppointments();
+            if (state.selectedCalendarDay.toDateString() === thisDate.toDateString()) {
+                openScheduleModalForDate(thisDate);
+            } else {
+                state.selectedCalendarDay = thisDate;
+                renderCalendar();
+                renderDayAppointments();
+            }
         });
         
         gridEl.appendChild(dayBtn);
@@ -1407,11 +1402,17 @@ function renderDayAppointments() {
     
     if (dayApts.length === 0) {
         container.innerHTML = `
-            <div class="no-appointments-placeholder">
-                <i class="fa-solid fa-calendar-xmark" style="font-size: 20px; color: var(--text-light); margin-bottom: 5px; display: block;"></i>
-                No hay turnos agendados para este día
+            <div class="no-appointments-placeholder" style="cursor: pointer;" id="btn-empty-schedule">
+                <i class="fa-solid fa-calendar-plus" style="font-size: 24px; color: var(--barbie-pink); margin-bottom: 8px; display: block;"></i>
+                No hay turnos agendados para este día.
+                <span style="font-size: 11px; color: var(--barbie-dark); font-weight: 700; display: block; margin-top: 4px;">
+                    <i class="fa-solid fa-plus"></i> Presiona aquí para agendar
+                </span>
             </div>
         `;
+        document.getElementById("btn-empty-schedule").addEventListener("click", () => {
+            openScheduleModalForDate(selDate);
+        });
         return;
     }
     
@@ -1579,4 +1580,68 @@ function cancelAppointment(id, clientName) {
             }
         }
     );
+}
+
+// Abrir el modal de agendar turno parametrizando una fecha
+function openScheduleModalForDate(date) {
+    const dateInput = document.getElementById("schedule-date");
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    dateInput.value = `${yyyy}-${mm}-${dd}`;
+    
+    // Resetear campos del formulario
+    document.getElementById("schedule-client-name").value = "";
+    document.getElementById("schedule-category").value = "";
+    
+    const serviceSelect = document.getElementById("schedule-service");
+    serviceSelect.innerHTML = '<option value="" disabled selected>Primero selecciona categoría</option>';
+    serviceSelect.disabled = true;
+    
+    document.getElementById("schedule-price").value = "";
+    document.getElementById("schedule-time").value = "14:00"; // Hora por defecto
+    
+    document.getElementById("schedule-modal").classList.remove("hidden");
+}
+
+// Invocar la acción en la nube para importar servicios ya cobrados
+async function importHistoryServices() {
+    if (!state.currentUser) return;
+    
+    if (!CONFIG_SHEET_URL) {
+        showToast("Configuración incorrecta.", "error");
+        return;
+    }
+    
+    showLoader(true, "Importando cobrados y sincronizando en Google Calendar...");
+    
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            body: JSON.stringify({
+                action: "import_services",
+                email: state.currentUser.email
+            })
+        });
+        
+        const data = await response.json();
+        showLoader(false);
+        
+        if (data.success) {
+            showToast(data.message || `¡Sincronización completada!`, "success");
+            
+            // Recargar turnos de la nube
+            await loadAppointments();
+        } else {
+            showToast(data.message || "Error al importar historial", "error");
+        }
+    } catch (error) {
+        showLoader(false);
+        console.error("Error al importar historial:", error);
+        showToast("Error de conexión al importar historial.", "error");
+    }
 }

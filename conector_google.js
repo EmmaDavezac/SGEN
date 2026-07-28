@@ -144,6 +144,10 @@ function doPost(e) {
     if (action === "delete_appointment") {
       return deleteAppointment(data.id, data.email);
     }
+
+    if (action === "import_services") {
+      return importServicesToAppointments();
+    }
     
     return jsonResponse({ success: false, message: "Acción POST no soportada" });
     
@@ -573,4 +577,106 @@ function deleteAppointment(id, email) {
   }
   
   return jsonResponse({ success: false, message: "No se encontró el turno especificado" });
+}
+
+// Importar servicios históricos ya cobrados como turnos en el calendario
+function importServicesToAppointments() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let servicesSheet = ss.getSheetByName("Servicios");
+  if (!servicesSheet) {
+    return jsonResponse({ success: false, message: "No hay registros de servicios cobrados aún" });
+  }
+  
+  let turnosSheet = ss.getSheetByName("Turnos");
+  if (!turnosSheet) {
+    turnosSheet = ss.insertSheet("Turnos");
+    turnosSheet.appendRow(["ID", "Fecha", "HoraInicio", "HoraFin", "Cliente", "Servicio", "Precio", "Usuario", "EventID"]);
+  }
+  
+  // Obtener IDs de turnos existentes para evitar duplicados
+  const turnosData = turnosSheet.getDataRange().getValues();
+  const existingTurnosIds = {};
+  for (let i = 1; i < turnosData.length; i++) {
+    if (turnosData[i][0]) {
+      existingTurnosIds[turnosData[i][0]] = true;
+    }
+  }
+  
+  const servicesData = servicesSheet.getDataRange().getValues();
+  if (servicesData.length <= 1) {
+    return jsonResponse({ success: true, message: "No hay servicios registrados para importar", importedCount: 0 });
+  }
+  
+  const cal = getCalendar();
+  let importedCount = 0;
+  
+  // Procesar filas de Servicios
+  for (let i = 1; i < servicesData.length; i++) {
+    const row = servicesData[i];
+    const id = row[0];
+    if (!id || existingTurnosIds[id]) continue; // Omitir si ya está importado o fila vacía
+    
+    const fechaISO = row[1]; // Fecha/hora del servicio cobrado
+    const cliente = row[2];
+    const servicio = row[3];
+    const precio = Number(row[4]) || 0;
+    const email = row[6] ? row[6].toLowerCase().trim() : "";
+    
+    // Parsear fecha
+    let start;
+    try {
+      start = new Date(fechaISO);
+    } catch (e) {
+      start = new Date();
+    }
+    
+    // Asumir duración por defecto de 90 minutos para turnos viejos
+    const end = new Date(start.getTime() + 90 * 60000);
+    
+    // Formato de fecha YYYY-MM-DD
+    const yyyy = start.getFullYear();
+    const mm = String(start.getMonth() + 1).padStart(2, '0');
+    const dd = String(start.getDate()).padStart(2, '0');
+    const fechaStr = `${yyyy}-${mm}-${dd}`;
+    
+    let eventId = "";
+    
+    // Crear evento en Google Calendar
+    if (cal) {
+      try {
+        const event = cal.createEvent(
+          "Evolet Nails: " + cliente + " (" + servicio + ") [Cobrado]",
+          start,
+          end,
+          {
+            description: "Turno importado de servicio ya cobrado.\nCliente: " + cliente + "\nServicio: " + servicio + "\nPrecio: $" + precio + "\nRegistrado por: " + email
+          }
+        );
+        eventId = event.getId();
+      } catch (e) {
+        console.error("Error importando evento a Calendar: " + e.toString());
+      }
+    }
+    
+    // Escribir en la hoja de Turnos
+    turnosSheet.appendRow([
+      id,
+      fechaStr,
+      start.toISOString(),
+      end.toISOString(),
+      cliente,
+      servicio,
+      precio,
+      email,
+      eventId
+    ]);
+    
+    importedCount++;
+  }
+  
+  return jsonResponse({
+    success: true,
+    message: "Se importaron " + importedCount + " turnos cobrados con éxito al calendario",
+    importedCount: importedCount
+  });
 }
