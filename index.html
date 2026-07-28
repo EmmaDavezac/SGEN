@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+    <!-- Configuración para iPhone PWA (Pantalla Completa) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Evolet Nails App">
+    <link rel="apple-touch-icon" href="/Contexto/logo.png">
+
+    <title>Evolet Nails App - Sistema de Contabilidad</title>
+
+    <!-- Google Fonts: Comfortaa (Redondeada Y2K) y Outfit (Moderna y legible) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&family=Outfit:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- FontAwesome 6 para Iconos Modernos y Profesionales -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+    <link rel="stylesheet" href="/style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+
+<body>
+
+    <!-- NOTIFICACIONES TOAST (Popups flotantes) -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- PANTALLA DE CARGA GLOBAL -->
+    <div id="loader-overlay" class="loader-overlay hidden">
+        <div class="spinner-container">
+            <div class="heart-spinner"><i class="fa-solid fa-heart text-primary"></i></div>
+            <p>Conectando con la nube...</p>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!--           PANTALLA DE LOGIN                -->
+    <!-- ========================================== -->
+    <section id="login-screen" class="login-screen active">
+        <div class="sparkles-bg"></div>
+        <div class="login-card">
+            <div class="brand-logo-container">
+                <div class="logo-circle">
+                    <img id="logo-img" src="/Contexto/logo.png" alt="Evolet Nails Logo"
+                        onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block';">
+                    <div id="logo-fallback" class="logo-fallback" style="display:none;"><i class="fa-solid fa-crown"
+                            style="font-size: 45px; color: var(--barbie-pink);"></i></div>
+                </div>
+            </div>
+
+            <h1>Evolet Nails App</h1>
+            <p class="subtitle">Sistema de Contabilidad</p>
+
+            <form id="login-form" class="retro-form">
+                <div class="form-group">
+                    <label for="login-email"><i class="fa-solid fa-envelope"></i> Email Autorizado</label>
+                    <input type="email" id="login-email" placeholder="ejemplo@correo.com" required inputmode="email">
+                </div>
+                <div class="form-group">
+                    <label for="login-password"><i class="fa-solid fa-lock"></i> Contraseña</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fa-solid fa-heart-pulse"></i> Ingresar
+                </button>
+            </form>
+
+            <div class="login-footer">
+                <p>Solo personal autorizado de Evolet Nails.</p>
+                <div class="credits-footer">
+                    Desarrollado con <i class="fa-solid fa-heart text-primary"></i> por Emmanuel Davezac
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!--         PANTALLA PRINCIPAL (APP)           -->
+    <!-- ========================================== -->
+    <section id="app-screen" class="app-screen">
+        <!-- HEADER SUPERIOR -->
+        <header class="app-header">
+            <div class="header-user">
+                <div class="mini-logo"><i class="fa-solid fa-crown" style="color: var(--barbie-pink);"></i></div>
+                <div>
+                    <span class="welcome-text">Hola,</span>
+                    <h2 id="user-display-name" class="user-name">Manicurista</h2>
+                </div>
+            </div>
+            <button id="btn-logout" class="btn-logout" title="Cerrar Sesión">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            </button>
+        </header>
+
+        <!-- CONTENIDO PRINCIPAL SCROLLABLE -->
+        <main class="app-content">
+
+            <!-- PESTAÑA 1: REGISTRAR SERVICIO -->
+            <div id="tab-registrar" class="tab-pane active">
+                <div class="section-title">
+                    <h3>Registrar Servicio <i class="fa-solid fa-circle-plus" style="color: var(--barbie-pink);"></i>
+                    </h3>
+                    <p>Agrega un nuevo trabajo realizado en segundos.</p>
+                </div>
+
+                <form id="service-form" class="cute-form">
+                    <!-- Nombre de la clienta (datalist para autocompletar) -->
+                    <div class="form-group">
+                        <label for="client-name"><i class="fa-solid fa-user"></i> Nombre de la Clienta</label>
+                        <input type="text" id="client-name" list="past-clients-list" placeholder="Ej. Camila Silva"
+                            required autocomplete="off">
+                        <datalist id="past-clients-list">
+                            <!-- Se puebla dinámicamente con las clientas previas -->
+                        </datalist>
+                    </div>
+
+                    <!-- Categorías de Servicios -->
+                    <div class="form-group">
+                        <label><i class="fa-solid fa-tags"></i> Selecciona una Categoría</label>
+                        <div class="category-grid">
+                            <button type="button" class="btn-cat active" data-cat="semi">Semi</button>
+                            <button type="button" class="btn-cat" data-cat="kapping">Kapping</button>
+                            <button type="button" class="btn-cat" data-cat="softgel">Soft Gel</button>
+                            <button type="button" class="btn-cat" data-cat="esculpidas">Esculpidas</button>
+                            <button type="button" class="btn-cat" data-cat="remocion">Remoción</button>
+                            <button type="button" class="btn-cat" data-cat="personalizado">Otro</button>
+                        </div>
+                    </div>
+
+                    <!-- Grid de Subservicios (Se actualiza dinámicamente con JS) -->
+                    <div class="form-group">
+                        <label id="services-grid-label">Servicio Específico</label>
+                        <div id="services-grid" class="services-grid">
+                            <!-- Los botones se renderizan con JS -->
+                        </div>
+                    </div>
+
+                    <!-- Formulario de Precio Ajustable -->
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="service-name-input">Servicio Elegido</label>
+                            <input type="text" id="service-name-input" placeholder="Nombre del servicio" required
+                                readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="service-price">Precio Total ($)</label>
+                            <input type="number" id="service-price" placeholder="0" required inputmode="numeric">
+                        </div>
+                    </div>
+
+                    <!-- Método de Pago (Transferencia por defecto, Efectivo) -->
+                    <div class="form-group">
+                        <label><i class="fa-solid fa-money-bill-transfer"></i> Método de Pago</label>
+                        <div class="payment-method-selector">
+                            <label class="pay-btn">
+                                <input type="radio" name="payment-method" value="Transferencia" checked>
+                                <div class="pay-btn-content">
+                                    <span class="pay-icon"><i class="fa-solid fa-mobile-screen-button"></i></span>
+                                    <span>Transferencia</span>
+                                </div>
+                            </label>
+                            <label class="pay-btn">
+                                <input type="radio" name="payment-method" value="Efectivo">
+                                <div class="pay-btn-content">
+                                    <span class="pay-icon"><i class="fa-solid fa-money-bill-wave"></i></span>
+                                    <span>Efectivo</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Botón de Registro -->
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fa-solid fa-check"></i> Registrar
+                    </button>
+                </form>
+            </div>
+
+            <!-- PESTAÑA 2: HISTORIAL -->
+            <div id="tab-historial" class="tab-pane">
+                <div class="section-title">
+                    <div>
+                        <h3>Historial de Ventas <i class="fa-solid fa-clock-rotate-left"
+                                style="color: var(--barbie-pink);"></i></h3>
+                        <p>Visualiza y administra los servicios cargados.</p>
+                    </div>
+                </div>
+
+                <!-- Buscador e Historial -->
+                <div class="filters-container">
+                    <div class="search-box-container">
+                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input type="text" id="history-search" placeholder="Buscar clienta..." class="search-input">
+                    </div>
+                    <select id="history-filter" class="filter-select">
+                        <option value="todos">Todos</option>
+                        <option value="hoy">Hoy</option>
+                        <option value="semana">Esta Semana</option>
+                        <option value="mes">Este Mes</option>
+                    </select>
+                </div>
+
+                <div id="history-list" class="history-list">
+                    <!-- Los registros se cargan aquí en formato tarjeta -->
+                </div>
+            </div>
+
+            <!-- PESTAÑA 3: ESTADÍSTICAS -->
+            <div id="tab-estadisticas" class="tab-pane">
+                <div class="section-title">
+                    <h3>Estadísticas Evolet <i class="fa-solid fa-chart-line" style="color: var(--barbie-pink);"></i>
+                    </h3>
+                    <p>Tus finanzas brillando y en orden.</p>
+                </div>
+
+                <!-- Tarjetas KPI -->
+                <div class="stats-cards-grid">
+                    <div class="stat-card pink-glow">
+                        <span class="stat-icon"><i class="fa-solid fa-wallet"
+                                style="color: var(--barbie-pink);"></i></span>
+                        <div class="stat-info">
+                            <span class="stat-label">Ganancia del Mes</span>
+                            <h2 id="stat-month-income">$0</h2>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icon"><i class="fa-regular fa-calendar"
+                                style="color: var(--barbie-pink);"></i></span>
+                        <div class="stat-info">
+                            <span class="stat-label">Ganancia Semana</span>
+                            <h2 id="stat-week-income">$0</h2>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icon"><i class="fa-solid fa-star" style="color: var(--gold);"></i></span>
+                        <div class="stat-info">
+                            <span class="stat-label">Servicios (Mes)</span>
+                            <h2 id="stat-count-month">0</h2>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icon"><i class="fa-solid fa-hand-holding-dollar"
+                                style="color: var(--barbie-pink);"></i></span>
+                        <div class="stat-info">
+                            <span class="stat-label">Ticket Promedio</span>
+                            <h2 id="stat-average-ticket">$0</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Desglose por Método de Pago -->
+                <div class="chart-section">
+                    <h4>Métodos de Pago Utilizados</h4>
+                    <div class="payment-stats-container">
+                        <div class="payment-stat-row">
+                            <div class="payment-stat-label"><i class="fa-solid fa-mobile-screen-button"></i> Transfe
+                            </div>
+                            <div class="payment-progress-bar">
+                                <div id="bar-transfe" class="progress" style="width: 0%"></div>
+                            </div>
+                            <div id="text-transfe" class="payment-stat-val">$0 (0%)</div>
+                        </div>
+                        <div class="payment-stat-row">
+                            <div class="payment-stat-label"><i class="fa-solid fa-money-bill-wave"></i> Efectivo</div>
+                            <div class="payment-progress-bar">
+                                <div id="bar-cash" class="progress" style="width: 0%"></div>
+                            </div>
+                            <div id="text-cash" class="payment-stat-val">$0 (0%)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Distribución de servicios -->
+                <div class="chart-section">
+                    <h4>Servicios más Solicitados</h4>
+                    <div id="popular-services-list" class="popular-services-list">
+                        <!-- Renderizado dinámico -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="credits-footer app-credits">
+                Desarrollado con <i class="fa-solid fa-heart text-primary"></i> por Emmanuel Davezac
+            </div>
+        </main>
+
+        <!-- MENU DE NAVEGACION FLOTANTE INFERIOR -->
+        <nav class="app-nav">
+            <button class="nav-item active" data-tab="registrar">
+                <span class="nav-icon"><i class="fa-solid fa-circle-plus"></i></span>
+                <span class="nav-text">Registrar</span>
+            </button>
+            <button class="nav-item" data-tab="historial">
+                <span class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
+                <span class="nav-text">Historial</span>
+            </button>
+            <button class="nav-item" data-tab="estadisticas">
+                <span class="nav-icon"><i class="fa-solid fa-chart-line"></i></span>
+                <span class="nav-text">Estadísticas</span>
+            </button>
+        </nav>
+    </section>
+
+    <!-- VENTANA MODAL DE CONFIRMACIÓN -->
+    <div id="confirm-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>¿Confirmar Registro? <i class="fa-solid fa-circle-question" style="color: var(--barbie-pink);"></i></h3>
+            <p class="modal-sub">Por favor, verifica los datos del servicio realizado:</p>
+
+            <div class="modal-body">
+                <div class="confirm-item">
+                    <span class="confirm-label">Clienta</span>
+                    <strong id="confirm-client">-</strong>
+                </div>
+                <div class="confirm-item">
+                    <span class="confirm-label">Servicio</span>
+                    <strong id="confirm-service">-</strong>
+                </div>
+                <div class="confirm-item">
+                    <span class="confirm-label">Precio</span>
+                    <strong id="confirm-price">-</strong>
+                </div>
+                <div class="confirm-item">
+                    <span class="confirm-label">Pago</span>
+                    <strong id="confirm-payment">-</strong>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button id="modal-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i>
+                    Cancelar</button>
+                <button id="modal-btn-confirm" class="btn btn-primary"><i class="fa-solid fa-heart"></i>
+                    Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VENTANA MODAL PARA CONFIRMAR ELIMINACIÓN -->
+    <div id="delete-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <h3>¿Eliminar Registro? <i class="fa-solid fa-triangle-exclamation" style="color: #ff4d4d;"></i></h3>
+            <p class="modal-sub">Esta acción no se puede deshacer. ¿Segura de borrarlo?</p>
+            <div class="modal-actions">
+                <button id="delete-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+                <button id="delete-btn-confirm" class="btn btn-danger"><i class="fa-solid fa-trash-can"></i> Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+</body>
+
+</html>

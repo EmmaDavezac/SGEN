@@ -1,0 +1,18 @@
+{
+    "short_name": "Evolet Nails App",
+    "name": "Evolet Nails App - Contabilidad Mágica",
+    "description": "Aplicación de contabilidad y registro de servicios para Evolet Nails",
+    "icons": [
+        {
+            "src": "Contexto/logo.png",
+            "type": "image/png",
+            "sizes": "512x512",
+            "purpose": "any maskable"
+        }
+    ],
+    "start_url": "./index.html",
+    "background_color": "#FCF9F5",
+    "theme_color": "#FF69B4",
+    "display": "standalone",
+    "orientation": "portrait"
+}
