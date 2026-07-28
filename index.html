@@ -288,6 +288,29 @@
                 </div>
             </div>
 
+            <!-- PESTAÑA 4: CONFIGURACIÓN (SOLO ADMINS) -->
+            <div id="tab-configuracion" class="tab-pane">
+                <div class="section-title">
+                    <h3>Ajustes de Precios <i class="fa-solid fa-gears" style="color: var(--barbie-pink);"></i></h3>
+                    <p>Modifica los precios oficiales del catálogo de servicios.</p>
+                </div>
+                
+                <div class="chart-section">
+                    <h4>Editar Lista de Precios</h4>
+                    <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px;">
+                        Actualiza el precio de cada servicio. Presiona "Guardar Cambios" al finalizar.
+                    </p>
+                    
+                    <div id="prices-editor-container" class="prices-editor-container">
+                        <!-- Cargado dinámicamente con JS -->
+                    </div>
+                    
+                    <button id="btn-save-prices" class="btn btn-primary btn-block" style="margin-top: 20px;">
+                        <i class="fa-solid fa-floppy-disk"></i> Guardar Cambios
+                    </button>
+                </div>
+            </div>
+
             <div class="credits-footer app-credits">
                 Desarrollado con <i class="fa-solid fa-heart text-primary"></i> por Emmanuel Davezac
             </div>
@@ -306,6 +329,10 @@
             <button class="nav-item" data-tab="estadisticas">
                 <span class="nav-icon"><i class="fa-solid fa-chart-line"></i></span>
                 <span class="nav-text">Estadísticas</span>
+            </button>
+            <button id="nav-btn-config" class="nav-item hidden" data-tab="configuracion">
+                <span class="nav-icon"><i class="fa-solid fa-gears"></i></span>
+                <span class="nav-text">Ajustes</span>
             </button>
         </nav>
     </section>

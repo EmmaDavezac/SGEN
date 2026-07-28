@@ -9,7 +9,7 @@
 const CONFIG_SHEET_URL = import.meta.env.VITE_SHEET_URL || 'https://script.google.com/macros/s/AKfycbxZT_wSTPClKAN78_TYAEnxBUj_b7BWPmQz2pwiKm4dkff5CgH_96xOLuj30IFdc0uUVg/exec'; 
 
 // Catálogo de Servicios oficial extraído del PDF
-const SERVICES_CATALOG = {
+let SERVICES_CATALOG = {
     semi: [
         { name: "Semipermanente Basic", price: 12000 },
         { name: "Semipermanente Full", price: 14000 }
@@ -74,6 +74,8 @@ function initApp() {
         document.getElementById("user-display-name").textContent = state.currentUser.nombre;
         showAppScreen();
         loadServicesData();
+        loadPricesFromCloud(); // Cargar precios dinámicos
+        checkAdminAccess(); // Verificar si es admin para la pestaña Ajustes
     } else {
         showLoginScreen();
     }
@@ -124,6 +126,9 @@ function setupEventListeners() {
     // Historial - Buscador y Filtros
     document.getElementById("history-search").addEventListener("input", filterHistory);
     document.getElementById("history-filter").addEventListener("change", filterHistory);
+
+    // Ajustes de precios (Admin)
+    document.getElementById("btn-save-prices").addEventListener("click", savePricesToCloud);
 }
 
 // =========================================================================
@@ -165,6 +170,8 @@ function switchTab(tabId) {
         renderHistoryList();
     } else if (tabId === "estadisticas") {
         calculateAndRenderStats();
+    } else if (tabId === "configuracion") {
+        renderPricesEditor();
     }
 }
 
@@ -207,6 +214,8 @@ async function handleLoginSubmit(e) {
             showToast(`¡Bienvenida de vuelta, ${data.user.nombre}!`, "success");
             showAppScreen();
             loadServicesData();
+            loadPricesFromCloud(); // Cargar precios dinámicos
+            checkAdminAccess(); // Chequear permisos
         } else {
             showToast(data.message || "Email o contraseña incorrectos", "error");
         }
@@ -221,6 +230,11 @@ function handleLogout() {
     localStorage.removeItem("evolet_session_v4");
     state.currentUser = null;
     state.servicesList = [];
+    
+    // Ocultar botón de configuración al cerrar sesión
+    const configBtn = document.getElementById("nav-btn-config");
+    if (configBtn) configBtn.classList.add("hidden");
+    
     showLoginScreen();
     showToast("Sesión cerrada con éxito. ¡Vuelve pronto!");
 }
@@ -875,3 +889,180 @@ function showLoader(show, text = "Cargando...") {
 window.app = {
     deleteServiceRecord
 };
+
+// Cargar catálogo de precios desde Google Sheets
+async function loadPricesFromCloud() {
+    if (!CONFIG_SHEET_URL) return;
+    try {
+        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_prices`);
+        const data = await response.json();
+        
+        if (data.success && data.prices && data.prices.length > 0) {
+            const newCatalog = {};
+            data.prices.forEach(p => {
+                if (!newCatalog[p.categoria]) {
+                    newCatalog[p.categoria] = [];
+                }
+                newCatalog[p.categoria].push({ name: p.name, price: p.price });
+            });
+            
+            // Reemplazar catálogo global
+            SERVICES_CATALOG = newCatalog;
+            
+            // Re-renderizar formulario
+            renderCategories();
+            if (state.selectedCategory && SERVICES_CATALOG[state.selectedCategory]) {
+                selectCategory(state.selectedCategory);
+            } else {
+                selectCategory(Object.keys(SERVICES_CATALOG)[0]);
+            }
+            console.log("Catálogo actualizado desde la nube:", SERVICES_CATALOG);
+        }
+    } catch (error) {
+        console.warn("No se pudieron cargar los precios de la nube, usando valores locales.", error);
+    }
+}
+
+// Chequear acceso de administrador y ajustar visibilidad del botón de Ajustes
+function checkAdminAccess() {
+    const configBtn = document.getElementById("nav-btn-config");
+    if (!configBtn) return;
+    
+    if (state.currentUser && state.currentUser.rol === "admin") {
+        configBtn.classList.remove("hidden");
+    } else {
+        configBtn.classList.add("hidden");
+        const activeTabBtn = document.querySelector(".nav-item.active");
+        if (activeTabBtn && activeTabBtn.getAttribute("data-tab") === "configuracion") {
+            switchTab("registrar");
+        }
+    }
+}
+
+// Renderizar el editor de precios dinámico en Ajustes
+function renderPricesEditor() {
+    const container = document.getElementById("prices-editor-container");
+    if (!container) return;
+    
+    container.innerHTML = "";
+    
+    Object.keys(SERVICES_CATALOG).forEach(catKey => {
+        if (catKey === "personalizado") return; // No se edita el manual/otro
+        
+        const categoryGroup = document.createElement("div");
+        categoryGroup.className = "price-category-group";
+        
+        const catLabels = {
+            semi: "Semipermanente",
+            kapping: "Kapping",
+            softgel: "Soft Gel",
+            esculpidas: "Esculpidas",
+            remocion: "Remociones"
+        };
+        
+        const title = document.createElement("div");
+        title.className = "price-category-title";
+        title.textContent = catLabels[catKey] || catKey;
+        categoryGroup.appendChild(title);
+        
+        const services = SERVICES_CATALOG[catKey];
+        services.forEach(service => {
+            const row = document.createElement("div");
+            row.className = "price-item-row";
+            
+            const nameLabel = document.createElement("div");
+            nameLabel.className = "price-item-name";
+            nameLabel.textContent = service.name;
+            row.appendChild(nameLabel);
+            
+            const inputWrapper = document.createElement("div");
+            inputWrapper.className = "price-input-wrapper";
+            inputWrapper.innerHTML = `
+                <span>$</span>
+                <input type="number" 
+                       class="price-input-field" 
+                       data-category="${catKey}" 
+                       data-name="${escapeHtml(service.name)}" 
+                       value="${service.price}" 
+                       min="0" 
+                       inputmode="numeric">
+            `;
+            row.appendChild(inputWrapper);
+            categoryGroup.appendChild(row);
+        });
+        
+        if (services.length > 0) {
+            container.appendChild(categoryGroup);
+        }
+    });
+}
+
+// Guardar precios modificados en Google Sheets
+async function savePricesToCloud() {
+    if (!state.currentUser || state.currentUser.rol !== "admin") {
+        showToast("No tienes permisos de administrador", "error");
+        return;
+    }
+    
+    if (!CONFIG_SHEET_URL) {
+        showToast("URL de Google Sheets no configurada en app.js", "error");
+        return;
+    }
+    
+    const inputs = document.querySelectorAll(".price-input-field");
+    const updatedPrices = [];
+    
+    inputs.forEach(input => {
+        const category = input.getAttribute("data-category");
+        const name = input.getAttribute("data-name");
+        const price = Number(input.value) || 0;
+        
+        updatedPrices.push({
+            categoria: category,
+            name: name,
+            price: price
+        });
+    });
+    
+    // Preservar la categoría de personalizado/otro que no tiene inputs editables
+    if (SERVICES_CATALOG["personalizado"]) {
+        SERVICES_CATALOG["personalizado"].forEach(service => {
+            updatedPrices.push({
+                categoria: "personalizado",
+                name: service.name,
+                price: service.price
+            });
+        });
+    }
+    
+    showLoader(true, "Guardando lista de precios en la nube...");
+    
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            body: JSON.stringify({
+                action: "update_prices",
+                email: state.currentUser.email,
+                prices: updatedPrices
+            })
+        });
+        
+        const data = await response.json();
+        showLoader(false);
+        
+        if (data.success) {
+            showToast("¡Lista de precios guardada con éxito!", "success");
+            await loadPricesFromCloud();
+        } else {
+            showToast(data.message || "Error al actualizar precios", "error");
+        }
+    } catch (error) {
+        showLoader(false);
+        console.error("Error al guardar precios:", error);
+        showToast("Error de conexión al guardar los precios.", "error");
+    }
+}

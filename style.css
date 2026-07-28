@@ -1290,6 +1290,100 @@ button {
     width: 100%;
 }
 
+/* =========================================================================
+   EDITOR DE PRECIOS (ADMIN)
+   ========================================================================= */
+
+.prices-editor-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.price-category-group {
+    background: var(--white);
+    border: 2px solid var(--barbie-pale);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
+}
+
+.price-category-title {
+    font-family: 'Comfortaa', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--barbie-dark);
+    margin-bottom: 12px;
+    border-bottom: 2px dashed var(--barbie-pale);
+    padding-bottom: 6px;
+    text-transform: capitalize;
+}
+
+.price-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 8px 0;
+}
+
+.price-item-row:not(:last-child) {
+    border-bottom: 1px dashed var(--barbie-pale);
+}
+
+.price-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-color);
+    flex: 1;
+}
+
+.price-input-wrapper {
+    position: relative;
+    width: 100px;
+}
+
+.price-input-wrapper span {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.price-input-field {
+    width: 100%;
+    padding: 8px 8px 8px 20px;
+    border: 2px solid var(--barbie-light);
+    border-radius: var(--radius-sm);
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-color);
+    background-color: var(--cream-bg);
+    text-align: right;
+    transition: var(--transition);
+}
+
+.price-input-field:focus {
+    border-color: var(--barbie-pink);
+    background-color: var(--white);
+    outline: none;
+    box-shadow: 0 0 8px rgba(255, 105, 180, 0.2);
+}
+
+/* Ocultar flechas de tipo número */
+.price-input-field::-webkit-outer-spin-button,
+.price-input-field::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.price-input-field[type=number] {
+    -moz-appearance: textfield;
+}
+
 
 
 

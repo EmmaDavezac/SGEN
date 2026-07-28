@@ -76,6 +76,10 @@ function doGet(e) {
       const email = e.parameter.email ? e.parameter.email.toLowerCase().trim() : "";
       return getServices(email);
     }
+    
+    if (action === "get_prices") {
+      return getPrices();
+    }
   } catch (error) {
     return jsonResponse({ success: false, message: "Error en el servidor: " + error.toString() });
   }
@@ -113,6 +117,18 @@ function doPost(e) {
       return getServices(email);
     }
     
+    if (action === "get_prices") {
+      return getPrices();
+    }
+    
+    if (action === "update_prices") {
+      const email = data.email ? data.email.toLowerCase().trim() : "";
+      if (!isAdmin(email)) {
+        return jsonResponse({ success: false, message: "No tienes permisos de administrador para realizar esta acción" });
+      }
+      return updatePrices(data);
+    }
+    
     return jsonResponse({ success: false, message: "Acción POST no soportada" });
     
   } catch (error) {
@@ -146,6 +162,7 @@ function handleLogin(email, password) {
     const rowEmail = data[i][0] ? data[i][0].toString().toLowerCase().trim() : "";
     const rowPassword = data[i][1] ? data[i][1].toString().trim() : "";
     const rowNombre = data[i][2] ? data[i][2].toString().trim() : "Manicurista";
+    const rowRol = (data[i].length > 3 && data[i][3]) ? data[i][3].toString().trim().toLowerCase() : "manicurista";
     
     if (rowEmail === email && rowPassword === password) {
       // Login exitoso, generamos un token simple
@@ -156,6 +173,7 @@ function handleLogin(email, password) {
         user: {
           email: email,
           nombre: rowNombre,
+          rol: rowRol,
           token: token
         }
       });
@@ -284,4 +302,95 @@ function deleteService(id, email) {
   }
   
   return jsonResponse({ success: false, message: "No se encontró el registro para eliminar o no tienes permisos" });
+}
+
+// Verificar si el usuario es administrador
+function isAdmin(email) {
+  if (!email) return false;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Usuarios");
+  if (!sheet) return false;
+  
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    const rowEmail = data[i][0] ? data[i][0].toString().toLowerCase().trim() : "";
+    const rowRol = (data[i].length > 3 && data[i][3]) ? data[i][3].toString().trim().toLowerCase() : "manicurista";
+    if (rowEmail === email && rowRol === "admin") {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Obtener catálogo de precios
+function getPrices() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("Precios");
+  
+  // Si no existe, crear la pestaña con los valores por defecto oficiales
+  if (!sheet) {
+    sheet = ss.insertSheet("Precios");
+    sheet.appendRow(["Categoria", "Nombre", "Precio"]);
+    const defaultPrices = [
+      ["semi", "Semipermanente Basic", 12000],
+      ["semi", "Semipermanente Full", 14000],
+      ["kapping", "Kapping", 12500],
+      ["kapping", "Kapping Basic", 14000],
+      ["kapping", "Kapping Full", 15500],
+      ["kapping", "Kapping con Polygel Basic", 15500],
+      ["kapping", "Kapping con Polygel Full", 17000],
+      ["softgel", "Soft Gel Basic", 16500],
+      ["softgel", "Soft Gel Full", 18000],
+      ["esculpidas", "Esculpidas en Polygel Basic", 17500],
+      ["esculpidas", "Esculpidas en Polygel Full", 19000],
+      ["remocion", "Remoción Semipermanente", 4500],
+      ["remocion", "Remoción Kapping", 5000],
+      ["remocion", "Remoción Softgel", 5500],
+      ["remocion", "Remoción Polygel", 6000],
+      ["remocion", "Remoción Acrilico", 6500],
+      ["personalizado", "Servicio Personalizado", 0]
+    ];
+    for (let i = 0; i < defaultPrices.length; i++) {
+      sheet.appendRow(defaultPrices[i]);
+    }
+  }
+  
+  const data = sheet.getDataRange().getValues();
+  const prices = [];
+  for (let i = 1; i < data.length; i++) {
+    prices.push({
+      categoria: data[i][0].toString().trim(),
+      name: data[i][1].toString().trim(),
+      price: Number(data[i][2]) || 0
+    });
+  }
+  
+  return jsonResponse({ success: true, prices: prices });
+}
+
+// Actualizar catálogo de precios
+function updatePrices(data) {
+  const prices = data.prices;
+  if (!prices || !Array.isArray(prices)) {
+    return jsonResponse({ success: false, message: "Datos de precios inválidos" });
+  }
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("Precios");
+  if (!sheet) {
+    return jsonResponse({ success: false, message: "La pestaña 'Precios' no existe" });
+  }
+  
+  sheet.clearContents();
+  sheet.appendRow(["Categoria", "Nombre", "Precio"]);
+  
+  for (let i = 0; i < prices.length; i++) {
+    sheet.appendRow([
+      prices[i].categoria,
+      prices[i].name,
+      prices[i].price
+    ]);
+  }
+  
+  return jsonResponse({ success: true, message: "Lista de precios actualizada con éxito en la nube" });
 }
