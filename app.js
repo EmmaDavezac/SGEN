@@ -1026,11 +1026,15 @@ function calculateAndRenderStats() {
     const pctCash = totalPayments > 0 ? Math.round((cashSum / totalPayments) * 100) : 0;
     const pctTransfe = totalPayments > 0 ? Math.round((transfeSum / totalPayments) * 100) : 0;
 
-    document.getElementById("bar-cash").style.width = `${pctCash}%`;
-    document.getElementById("bar-transfe").style.width = `${pctTransfe}%`;
+    const barCash = document.getElementById("bar-cash");
+    const barTransfe = document.getElementById("bar-transfe");
+    const textCash = document.getElementById("text-cash");
+    const textTransfe = document.getElementById("text-transfe");
 
-    document.getElementById("text-cash").textContent = `$${cashSum.toLocaleString("es-AR")} (${pctCash}%)`;
-    document.getElementById("text-transfe").textContent = `$${transfeSum.toLocaleString("es-AR")} (${pctTransfe}%)`;
+    if (barCash) barCash.style.width = `${pctCash}%`;
+    if (barTransfe) barTransfe.style.width = `${pctTransfe}%`;
+    if (textCash) textCash.textContent = `$${cashSum.toLocaleString("es-AR")} (${pctCash}%)`;
+    if (textTransfe) textTransfe.textContent = `$${transfeSum.toLocaleString("es-AR")} (${pctTransfe}%)`;
 
     // Renderizar desglose de gastos por categoría
     const catStatsContainer = document.getElementById("category-expenses-stats");
