@@ -366,6 +366,8 @@ button {
 .form-group input[type="email"],
 .form-group input[type="password"],
 .form-group input[type="number"],
+.form-group input[type="date"],
+.form-group input[type="time"],
 .form-group input[type="url"],
 .form-group select {
     background: var(--white);
@@ -1748,4 +1750,35 @@ button {
 .btn-delete-appointment:hover {
     color: #ff4d4d;
     background: #fff0f0;
+}
+
+/* Posicionamiento del icono dentro de inputs con wrapper */
+.input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.input-wrapper .input-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.input-wrapper input {
+    padding-left: 40px !important;
+}
+
+/* Normalización de Date/Time inputs en Safari y iOS */
+.form-group input[type="date"],
+.form-group input[type="time"] {
+    font-family: inherit;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    min-height: 48px; /* Altura uniforme */
 }

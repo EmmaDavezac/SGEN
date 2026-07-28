@@ -126,8 +126,14 @@ function setupEventListeners() {
         });
     });
 
-    // Logout Directo
-    document.getElementById("btn-logout").addEventListener("click", handleLogout);
+    // Logout con Confirmación
+    document.getElementById("btn-logout").addEventListener("click", () => {
+        showGenericConfirmModal(
+            "Cerrar Sesión",
+            "¿Segura de que deseas cerrar sesión en la aplicación?",
+            handleLogout
+        );
+    });
 
     // Formulario de Registro - Categorías
     document.querySelector(".category-grid").addEventListener("click", (e) => {

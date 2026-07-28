@@ -49,7 +49,7 @@
         <div class="login-card">
             <div class="brand-logo-container">
                 <div class="logo-circle">
-                    <img id="logo-img" src="./public/Contexto/logo.png" alt="Evolet Nails Logo"
+                    <img id="logo-img" src="./Contexto/logo.png" alt="Evolet Nails Logo"
                         onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block';">
                     <div id="logo-fallback" class="logo-fallback" style="display:none;"><i class="fa-solid fa-crown"
                             style="font-size: 45px; color: var(--barbie-pink);"></i></div>
@@ -89,7 +89,9 @@
         <!-- HEADER SUPERIOR -->
         <header class="app-header">
             <div class="header-user">
-                <div class="mini-logo"><i class="fa-solid fa-crown" style="color: var(--barbie-pink);"></i></div>
+                <div class="mini-logo">
+                    <img src="./Contexto/logo.png" alt="Logo" style="height: 32px; width: 32px; border-radius: 50%; object-fit: cover; border: 2px solid var(--barbie-pink); display: block;">
+                </div>
                 <div>
                     <span class="welcome-text">Hola,</span>
                     <h2 id="user-display-name" class="user-name">Manicurista</h2>
