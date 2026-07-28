@@ -51,6 +51,7 @@ const state = {
     pendingDeleteId: null,      // ID de registro en espera de eliminación
     isEditingPrices: false,     // Control del modo edición de precios
     appointmentsList: [],       // Lista de turnos agendados en la nube
+    expensesList: [],           // Lista de gastos registrados
     calendarDate: new Date(),   // Mes visible en el calendario
     selectedCalendarDay: new Date() // Día seleccionado en el calendario
 };
@@ -80,6 +81,7 @@ function initApp() {
         loadServicesData();
         loadPricesFromCloud(); // Cargar precios dinámicos
         loadAppointments(); // Cargar turnos agendados en la nube
+        loadExpenses(); // Cargar gastos registrados
         checkAdminAccess(); // Verificar si es admin para la pestaña Ajustes
     } else {
         showLoginScreen();
@@ -211,6 +213,9 @@ function setupEventListeners() {
 
     // Envío del formulario de agendar turno
     document.getElementById("schedule-form").addEventListener("submit", handleScheduleSubmit);
+
+    // Envío del formulario de registrar gasto
+    document.getElementById("expense-form").addEventListener("submit", handleExpenseSubmit);
 }
 
 // =========================================================================
@@ -278,6 +283,13 @@ function executeSwitchTab(tabId) {
     } else if (tabId === "calendario") {
         renderCalendar();
         renderDayAppointments();
+    } else if (tabId === "gastos") {
+        const expDateInput = document.getElementById("expense-date");
+        if (expDateInput) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            expDateInput.value = todayStr;
+        }
+        renderExpensesList();
     } else if (tabId === "configuracion") {
         renderPricesEditor();
     }
@@ -323,6 +335,7 @@ async function handleLoginSubmit(e) {
             showAppScreen();
             loadServicesData();
             loadPricesFromCloud(); // Cargar precios dinámicos
+            loadExpenses(); // Cargar gastos registrados
             checkAdminAccess(); // Chequear permisos
         } else {
             showToast(data.message || "Email o contraseña incorrectos", "error");
@@ -820,7 +833,34 @@ function calculateAndRenderStats() {
 
     const averageTicket = servicesCountMonth > 0 ? Math.round(totalMonthIncome / servicesCountMonth) : 0;
 
+    // Calcular egresos del mes
+    let totalMonthExpenses = 0;
+    state.expensesList.forEach(item => {
+        const date = new Date(item.fecha + "T00:00:00");
+        if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
+            totalMonthExpenses += Number(item.monto) || 0;
+        }
+    });
+
+    const netBalance = totalMonthIncome - totalMonthExpenses;
+
     document.getElementById("stat-month-income").textContent = `$${totalMonthIncome.toLocaleString("es-AR")}`;
+    document.getElementById("stat-month-expenses").textContent = `$${totalMonthExpenses.toLocaleString("es-AR")}`;
+    
+    const balanceEl = document.getElementById("stat-net-balance");
+    balanceEl.textContent = `${netBalance < 0 ? '-' : ''}$${Math.abs(netBalance).toLocaleString("es-AR")}`;
+    
+    const netBalanceCard = document.getElementById("net-balance-card");
+    if (netBalanceCard) {
+        if (netBalance >= 0) {
+            netBalanceCard.classList.add("pink-glow");
+            netBalanceCard.classList.remove("red-glow");
+        } else {
+            netBalanceCard.classList.remove("pink-glow");
+            netBalanceCard.classList.add("red-glow");
+        }
+    }
+
     document.getElementById("stat-week-income").textContent = `$${totalWeekIncome.toLocaleString("es-AR")}`;
     document.getElementById("stat-count-month").textContent = servicesCountMonth;
     document.getElementById("stat-average-ticket").textContent = `$${averageTicket.toLocaleString("es-AR")}`;
@@ -1636,4 +1676,242 @@ async function importHistoryServices() {
         console.error("Error al importar historial:", error);
         showToast("Error de conexión al importar historial.", "error");
     }
+}
+
+// Cargar gastos de la nube
+async function loadExpenses() {
+    if (!state.currentUser) return;
+    
+    const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+        state.expensesList = JSON.parse(cached);
+        const activeTab = document.querySelector(".nav-item.active");
+        if (activeTab && activeTab.getAttribute("data-tab") === "gastos") {
+            renderExpensesList();
+        }
+    }
+    
+    if (!CONFIG_SHEET_URL) return;
+    
+    try {
+        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_expenses`);
+        const data = await response.json();
+        
+        if (data.success && data.expenses) {
+            state.expensesList = data.expenses;
+            localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
+            
+            const activeTab = document.querySelector(".nav-item.active");
+            if (activeTab && activeTab.getAttribute("data-tab") === "gastos") {
+                renderExpensesList();
+            }
+            // Actualizar también estadísticas si cambiaran los egresos
+            if (activeTab && activeTab.getAttribute("data-tab") === "estadisticas") {
+                calculateAndRenderStats();
+            }
+        }
+    } catch (error) {
+        console.warn("No se pudieron cargar gastos en tiempo real:", error);
+    }
+}
+
+// Renderizar el historial de gastos del mes actual
+function renderExpensesList() {
+    const container = document.getElementById("expenses-list");
+    const totalEl = document.getElementById("expense-month-total");
+    if (!container || !totalEl) return;
+    
+    container.innerHTML = "";
+    
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Filtrar los gastos del mes actual
+    const monthExpenses = state.expensesList.filter(item => {
+        const date = new Date(item.fecha + "T00:00:00");
+        return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+    });
+    
+    // Ordenar de más nuevo a más viejo
+    monthExpenses.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    
+    let totalSum = 0;
+    
+    if (monthExpenses.length === 0) {
+        container.innerHTML = `
+            <div class="no-appointments-placeholder">
+                <i class="fa-solid fa-receipt" style="font-size: 20px; color: var(--text-light); margin-bottom: 5px; display: block;"></i>
+                No hay gastos registrados este mes
+            </div>
+        `;
+        totalEl.textContent = "$0";
+        return;
+    }
+    
+    monthExpenses.forEach(exp => {
+        totalSum += exp.monto;
+        
+        const date = new Date(exp.fecha + "T00:00:00");
+        const day = String(date.getDate()).padStart(2, '0');
+        const monthStr = String(date.getMonth() + 1).padStart(2, '0');
+        
+        const card = document.createElement("div");
+        card.className = "appointment-card";
+        card.innerHTML = `
+            <div class="appointment-time-col">
+                <span class="appointment-time-start">${day}/${monthStr}</span>
+                <span class="appointment-time-duration">${escapeHtml(exp.metodoPago)}</span>
+            </div>
+            <div class="appointment-info-col">
+                <div class="appointment-client-name">${escapeHtml(exp.concepto)}</div>
+                <div class="appointment-service-name">
+                    <i class="fa-solid fa-arrow-trend-down" style="color: #ff4d4d; font-size: 10px;"></i>
+                    <strong>$${exp.monto.toLocaleString("es-AR")}</strong>
+                </div>
+            </div>
+            <div class="appointment-actions-col">
+                <button class="btn-delete-expense btn-delete-appointment" title="Eliminar Gasto" data-id="${exp.id}">
+                    <i class="fa-regular fa-trash-can"></i>
+                </button>
+            </div>
+        `;
+        
+        // Asignar el listener de eliminación
+        card.querySelector(".btn-delete-expense").addEventListener("click", () => {
+            deleteExpenseRecord(exp.id, exp.concepto);
+        });
+        
+        container.appendChild(card);
+    });
+    
+    totalEl.textContent = `$${totalSum.toLocaleString("es-AR")}`;
+}
+
+// Registrar gasto (Submit de formulario)
+async function handleExpenseSubmit(e) {
+    e.preventDefault();
+    
+    if (!state.currentUser) {
+        showToast("Inicia sesión para registrar gastos.", "error");
+        return;
+    }
+    
+    const concepto = document.getElementById("expense-concept").value.trim();
+    const monto = Number(document.getElementById("expense-amount").value);
+    const fecha = document.getElementById("expense-date").value;
+    const metodoPago = document.querySelector('input[name="expense-payment"]:checked').value;
+    
+    if (!concepto || !monto || !fecha || !metodoPago) {
+        showToast("Por favor, completa todos los campos del gasto.", "error");
+        return;
+    }
+    
+    const expenseData = {
+        action: "add_expense",
+        id: "exp_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000),
+        fecha: fecha,
+        concepto: concepto,
+        monto: monto,
+        metodoPago: metodoPago,
+        usuario: state.currentUser.email
+    };
+    
+    showLoader(true, "Registrando gasto en la planilla...");
+    
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            body: JSON.stringify(expenseData)
+        });
+        
+        const data = await response.json();
+        showLoader(false);
+        
+        if (data.success) {
+            showToast("¡Gasto registrado con éxito!", "success");
+            
+            // Limpiar formulario
+            document.getElementById("expense-concept").value = "";
+            document.getElementById("expense-amount").value = "";
+            
+            // Añadir localmente
+            state.expensesList.push(data.expense || expenseData);
+            
+            const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
+            localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
+            
+            renderExpensesList();
+            calculateAndRenderStats();
+        } else {
+            showToast(data.message || "Error al registrar el gasto", "error");
+        }
+    } catch (error) {
+        showLoader(false);
+        console.error("Error al registrar gasto:", error);
+        showToast("Error de conexión al registrar. Se guardó offline.", "error");
+        
+        // Guardar offline
+        const queueKey = `evolet_offline_expenses_v4_${state.currentUser.email}`;
+        const queue = JSON.parse(localStorage.getItem(queueKey) || "[]");
+        queue.push(expenseData);
+        localStorage.setItem(queueKey, JSON.stringify(queue));
+        
+        state.expensesList.push(expenseData);
+        const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
+        localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
+        
+        renderExpensesList();
+        calculateAndRenderStats();
+    }
+}
+
+// Eliminar registro de gasto
+function deleteExpenseRecord(id, concepto) {
+    showGenericConfirmModal(
+        "Eliminar Gasto",
+        `¿Segura de que deseas eliminar el gasto por "${concepto}"?`,
+        async () => {
+            showLoader(true, "Eliminando gasto...");
+            
+            try {
+                const response = await fetch(CONFIG_SHEET_URL, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: JSON.stringify({
+                        action: "delete_expense",
+                        id: id
+                    })
+                });
+                
+                const data = await response.json();
+                showLoader(false);
+                
+                if (data.success) {
+                    showToast("Gasto eliminado correctamente.", "success");
+                    
+                    state.expensesList = state.expensesList.filter(exp => exp.id !== id);
+                    const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
+                    localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
+                    
+                    renderExpensesList();
+                    calculateAndRenderStats();
+                } else {
+                    showToast(data.message || "Error al eliminar gasto", "error");
+                }
+            } catch (error) {
+                showLoader(false);
+                console.error("Error al eliminar gasto:", error);
+                showToast("Error de conexión al intentar eliminar.", "error");
+            }
+        }
+    );
 }

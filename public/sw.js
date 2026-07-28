@@ -1,4 +1,4 @@
-const CACHE_NAME = 'evolet-nails-v7';
+const CACHE_NAME = 'evolet-nails-v9';
 const ASSETS = [
   './index.html',
   './style.css',
@@ -31,7 +31,7 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Interceptar Peticiones
+// Interceptar Peticiones (Estrategia Network-First con Fallback a Cache)
 self.addEventListener('fetch', (e) => {
   // Evitar interceptar llamadas a la API de Google Sheets
   if (e.request.url.includes('script.google.com')) {
@@ -39,11 +39,20 @@ self.addEventListener('fetch', (e) => {
   }
   
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(e.request);
-    })
+    fetch(e.request)
+      .then((networkResponse) => {
+        // Si la respuesta es válida, clonarla y guardarla en la caché
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        // En caso de estar offline o fallar la red, buscar en la caché
+        return caches.match(e.request);
+      })
   );
 });

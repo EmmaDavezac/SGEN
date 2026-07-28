@@ -224,18 +224,30 @@
                 <!-- Tarjetas KPI -->
                 <div class="stats-cards-grid">
                     <div class="stat-card pink-glow">
-                        <span class="stat-icon"><i class="fa-solid fa-wallet"
-                                style="color: var(--barbie-pink);"></i></span>
+                        <span class="stat-icon"><i class="fa-solid fa-arrow-trend-up" style="color: var(--barbie-pink);"></i></span>
                         <div class="stat-info">
-                            <span class="stat-label">Ganancia del Mes</span>
+                            <span class="stat-label">Ingresos (Mes)</span>
                             <h2 id="stat-month-income">$0</h2>
                         </div>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-icon"><i class="fa-regular fa-calendar"
-                                style="color: var(--barbie-pink);"></i></span>
+                    <div class="stat-card" id="expenses-kpi-card">
+                        <span class="stat-icon"><i class="fa-solid fa-arrow-trend-down" style="color: #ff4d4d;"></i></span>
                         <div class="stat-info">
-                            <span class="stat-label">Ganancia Semana</span>
+                            <span class="stat-label">Gastos (Mes)</span>
+                            <h2 id="stat-month-expenses">$0</h2>
+                        </div>
+                    </div>
+                    <div class="stat-card pink-glow" id="net-balance-card">
+                        <span class="stat-icon"><i class="fa-solid fa-scale-balanced" style="color: var(--gold);"></i></span>
+                        <div class="stat-info">
+                            <span class="stat-label">Balance Neto</span>
+                            <h2 id="stat-net-balance">$0</h2>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icon"><i class="fa-regular fa-calendar" style="color: var(--barbie-pink);"></i></span>
+                        <div class="stat-info">
+                            <span class="stat-label">Ingresos Semana</span>
                             <h2 id="stat-week-income">$0</h2>
                         </div>
                     </div>
@@ -247,8 +259,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-icon"><i class="fa-solid fa-hand-holding-dollar"
-                                style="color: var(--barbie-pink);"></i></span>
+                        <span class="stat-icon"><i class="fa-solid fa-hand-holding-dollar" style="color: var(--barbie-pink);"></i></span>
                         <div class="stat-info">
                             <span class="stat-label">Ticket Promedio</span>
                             <h2 id="stat-average-ticket">$0</h2>
@@ -340,6 +351,80 @@
                 </div>
             </div>
 
+            <!-- PESTAÑA: GASTOS -->
+            <div id="tab-gastos" class="tab-pane">
+                <div class="section-title">
+                    <h3>Registro de Gastos <i class="fa-solid fa-wallet" style="color: var(--barbie-pink);"></i></h3>
+                    <p>Controla tus egresos diarios para optimizar tu negocio.</p>
+                </div>
+
+                <!-- Formulario de nuevo gasto -->
+                <div class="chart-section">
+                    <h4>Registrar Nuevo Gasto</h4>
+                    <form id="expense-form" class="cute-form" style="margin-top: 15px;">
+                        <div class="form-group">
+                            <label for="expense-concept">Concepto / Descripción</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-pen input-icon"></i>
+                                <input type="text" id="expense-concept" placeholder="Ej: Esmaltes, Alquiler, Luz..." required>
+                            </div>
+                        </div>
+
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label for="expense-amount">Monto ($)</label>
+                                <div class="input-wrapper">
+                                    <i class="fa-solid fa-dollar-sign input-icon"></i>
+                                    <input type="number" id="expense-amount" placeholder="0" min="1" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="expense-date">Fecha</label>
+                                <div class="input-wrapper">
+                                    <i class="fa-solid fa-calendar-day input-icon"></i>
+                                    <input type="date" id="expense-date" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Método de Pago</label>
+                            <div class="payment-method-selector">
+                                <label class="pay-btn">
+                                    <input type="radio" name="expense-payment" value="Efectivo" checked>
+                                    <div class="pay-btn-content">
+                                        <i class="fa-solid fa-money-bill-wave pay-icon"></i>
+                                        Efectivo
+                                    </div>
+                                </label>
+                                <label class="pay-btn">
+                                    <input type="radio" name="expense-payment" value="Transferencia">
+                                    <div class="pay-btn-content">
+                                        <i class="fa-solid fa-mobile-screen-button pay-icon"></i>
+                                        Transferencia
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block btn-sparkle" style="margin-top: 20px;">
+                            <i class="fa-solid fa-check"></i> Registrar Gasto
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Historial de gastos -->
+                <div class="chart-section" style="margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4 style="margin-bottom: 0;">Gastos del Mes</h4>
+                        <strong id="expense-month-total" style="color: var(--barbie-dark); font-size: 16px;">$0</strong>
+                    </div>
+                    <div id="expenses-list" class="day-appointments-container">
+                        <!-- Cargado dinámicamente -->
+                    </div>
+                </div>
+            </div>
+
             <!-- PESTAÑA 4: CONFIGURACIÓN (SOLO ADMINS) -->
             <div id="tab-configuracion" class="tab-pane">
                 <div class="section-title"
@@ -394,6 +479,10 @@
             <button class="nav-item" data-tab="calendario">
                 <span class="nav-icon"><i class="fa-solid fa-calendar-days"></i></span>
                 <span class="nav-text">Agenda</span>
+            </button>
+            <button class="nav-item" data-tab="gastos">
+                <span class="nav-icon"><i class="fa-solid fa-wallet"></i></span>
+                <span class="nav-text">Gastos</span>
             </button>
             <button class="nav-item" data-tab="estadisticas">
                 <span class="nav-icon"><i class="fa-solid fa-chart-line"></i></span>

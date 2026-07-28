@@ -84,6 +84,10 @@ function doGet(e) {
     if (action === "get_appointments") {
       return getAppointments();
     }
+
+    if (action === "get_expenses") {
+      return getExpenses();
+    }
   } catch (error) {
     return jsonResponse({ success: false, message: "Error en el servidor: " + error.toString() });
   }
@@ -147,6 +151,14 @@ function doPost(e) {
 
     if (action === "import_services") {
       return importServicesToAppointments();
+    }
+
+    if (action === "add_expense") {
+      return addExpense(data);
+    }
+
+    if (action === "delete_expense") {
+      return deleteExpense(data.id);
     }
     
     return jsonResponse({ success: false, message: "Acción POST no soportada" });
@@ -679,4 +691,77 @@ function importServicesToAppointments() {
     message: "Se importaron " + importedCount + " turnos cobrados con éxito al calendario",
     importedCount: importedCount
   });
+}
+
+// Obtener todos los gastos de la planilla
+function getExpenses() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Gastos");
+  if (!sheet) {
+    return jsonResponse({ success: true, expenses: [] });
+  }
+  
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) {
+    return jsonResponse({ success: true, expenses: [] });
+  }
+  
+  const expenses = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[0]) continue; // Fila vacía
+    expenses.push({
+      id: row[0].toString().trim(),
+      fecha: row[1] ? row[1].toString().trim() : "",
+      concepto: row[2] ? row[2].toString().trim() : "",
+      monto: Number(row[3]) || 0,
+      metodoPago: row[4] ? row[4].toString().trim() : "",
+      usuario: row[5] ? row[5].toString().toLowerCase().trim() : ""
+    });
+  }
+  
+  return jsonResponse({ success: true, expenses: expenses });
+}
+
+// Registrar un nuevo gasto
+function addExpense(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("Gastos");
+  if (!sheet) {
+    sheet = ss.insertSheet("Gastos");
+    sheet.appendRow(["ID", "Fecha", "Concepto", "Monto", "MetodoPago", "Usuario"]);
+  }
+  
+  const id = data.id || "exp_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000);
+  const fecha = data.fecha || new Date().toISOString().split('T')[0];
+  const concepto = data.concepto || "Varios";
+  const monto = Number(data.monto) || 0;
+  const metodoPago = data.metodoPago || "Efectivo";
+  const usuario = data.usuario ? data.usuario.toLowerCase().trim() : "";
+  
+  sheet.appendRow([id, fecha, concepto, monto, metodoPago, usuario]);
+  
+  return jsonResponse({
+    success: true,
+    message: "Gasto registrado correctamente en la nube",
+    expense: { id, fecha, concepto, monto, metodoPago, usuario }
+  });
+}
+
+// Eliminar un gasto
+function deleteExpense(id) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Gastos");
+  if (!sheet) {
+    return jsonResponse({ success: false, message: "No existe la hoja de Gastos" });
+  }
+  
+  const rows = sheet.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] && rows[i][0].toString().trim() === id.toString().trim()) {
+      sheet.deleteRow(i + 1);
+      return jsonResponse({ success: true, message: "Gasto eliminado correctamente de la planilla" });
+    }
+  }
+  return jsonResponse({ success: false, message: "No se encontró el gasto especificado" });
 }
