@@ -1566,6 +1566,7 @@ button {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 8px;
+    padding-bottom: 25px; /* Espacio para que el botón no tape ningún día */
 }
 
 .calendar-day {
@@ -1788,10 +1789,10 @@ button {
 /* Botón de Agregar Turno dentro de la Tarjeta del Calendario */
 .calendar-add-btn {
     position: absolute;
-    bottom: -20px; /* Sobresale por el borde inferior */
-    right: 20px;
-    width: 46px;
-    height: 46px;
+    bottom: 12px; /* Completamente dentro del contenedor */
+    right: 12px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--barbie-pink) 0%, var(--barbie-dark) 100%);
     color: var(--white);
