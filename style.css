@@ -1384,6 +1384,26 @@ button {
     -moz-appearance: textfield;
 }
 
+/* Estilos para el refinamiento del editor de precios */
+.old-price-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    opacity: 0.75;
+    font-style: italic;
+}
+
+.price-val-label {
+    font-family: 'Comfortaa', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-color);
+    background-color: var(--barbie-pale);
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    border: 2px solid transparent;
+}
+
 
 
 

@@ -48,7 +48,8 @@ const state = {
     selectedCategory: "semi", // Categoría activa
     selectedService: null,    // Servicio específico activo
     pendingTransaction: null, // Transacción en espera de confirmación
-    pendingDeleteId: null     // ID de registro en espera de eliminación
+    pendingDeleteId: null,    // ID de registro en espera de eliminación
+    isEditingPrices: false    // Control del modo edición de precios
 };
 
 // =========================================================================
@@ -128,7 +129,50 @@ function setupEventListeners() {
     document.getElementById("history-filter").addEventListener("change", filterHistory);
 
     // Ajustes de precios (Admin)
-    document.getElementById("btn-save-prices").addEventListener("click", savePricesToCloud);
+    document.getElementById("btn-edit-mode").addEventListener("click", () => {
+        state.isEditingPrices = true;
+        document.getElementById("edit-actions-container").classList.remove("hidden");
+        document.getElementById("btn-edit-mode").classList.add("hidden");
+        renderPricesEditor();
+    });
+
+    document.getElementById("btn-cancel-prices").addEventListener("click", () => {
+        showGenericConfirmModal(
+            "Descartar cambios",
+            "Tienes cambios sin guardar. ¿Deseas cancelar la edición y perder los cambios?",
+            () => {
+                state.isEditingPrices = false;
+                document.getElementById("edit-actions-container").classList.add("hidden");
+                document.getElementById("btn-edit-mode").classList.remove("hidden");
+                renderPricesEditor();
+                showToast("Edición cancelada", "info");
+            }
+        );
+    });
+
+    document.getElementById("btn-save-prices").addEventListener("click", () => {
+        showGenericConfirmModal(
+            "Guardar cambios",
+            "¿Confirmas que deseas guardar la nueva lista de precios en la nube?",
+            () => {
+                savePricesToCloud();
+            }
+        );
+    });
+
+    // Modal Genérico de Confirmación
+    document.getElementById("generic-modal-btn-confirm").addEventListener("click", () => {
+        document.getElementById("generic-confirm-modal").classList.add("hidden");
+        if (genericConfirmCallback) {
+            genericConfirmCallback();
+            genericConfirmCallback = null;
+        }
+    });
+
+    document.getElementById("generic-modal-btn-cancel").addEventListener("click", () => {
+        document.getElementById("generic-confirm-modal").classList.add("hidden");
+        genericConfirmCallback = null;
+    });
 }
 
 // =========================================================================
@@ -145,6 +189,29 @@ function showAppScreen() {
 }
 
 function switchTab(tabId) {
+    if (state.isEditingPrices && tabId !== "configuracion") {
+        showGenericConfirmModal(
+            "Descartar cambios",
+            "Tienes cambios sin guardar en los precios. ¿Deseas cambiar de pestaña y perder los cambios?",
+            () => {
+                // Desactivar modo edición y proceder
+                state.isEditingPrices = false;
+                
+                const actionsContainer = document.getElementById("edit-actions-container");
+                if (actionsContainer) actionsContainer.classList.add("hidden");
+                
+                const editBtn = document.getElementById("btn-edit-mode");
+                if (editBtn) editBtn.classList.remove("hidden");
+                
+                executeSwitchTab(tabId);
+            }
+        );
+        return;
+    }
+    executeSwitchTab(tabId);
+}
+
+function executeSwitchTab(tabId) {
     // Cambiar estado en navegación inferior
     const navItems = document.querySelectorAll(".nav-item");
     navItems.forEach(item => {
@@ -975,19 +1042,40 @@ function renderPricesEditor() {
             nameLabel.textContent = service.name;
             row.appendChild(nameLabel);
             
-            const inputWrapper = document.createElement("div");
-            inputWrapper.className = "price-input-wrapper";
-            inputWrapper.innerHTML = `
-                <span>$</span>
-                <input type="number" 
-                       class="price-input-field" 
-                       data-category="${catKey}" 
-                       data-name="${escapeHtml(service.name)}" 
-                       value="${service.price}" 
-                       min="0" 
-                       inputmode="numeric">
-            `;
-            row.appendChild(inputWrapper);
+            if (state.isEditingPrices) {
+                // Modo Edición: Mostrar inputs y el precio anterior en una etiqueta a la izquierda
+                const rowContent = document.createElement("div");
+                rowContent.style.display = "flex";
+                rowContent.style.alignItems = "center";
+                rowContent.style.gap = "10px";
+                
+                const oldPriceSpan = document.createElement("span");
+                oldPriceSpan.className = "old-price-label";
+                oldPriceSpan.textContent = `(Antes: $${service.price.toLocaleString("es-AR")})`;
+                rowContent.appendChild(oldPriceSpan);
+                
+                const inputWrapper = document.createElement("div");
+                inputWrapper.className = "price-input-wrapper";
+                inputWrapper.innerHTML = `
+                    <span>$</span>
+                    <input type="number" 
+                           class="price-input-field" 
+                           data-category="${catKey}" 
+                           data-name="${escapeHtml(service.name)}" 
+                           value="${service.price}" 
+                           min="0" 
+                           inputmode="numeric">
+                `;
+                rowContent.appendChild(inputWrapper);
+                row.appendChild(rowContent);
+            } else {
+                // Modo Solo Lectura: Mostrar etiqueta limpia del valor actual
+                const priceVal = document.createElement("div");
+                priceVal.className = "price-val-label";
+                priceVal.textContent = `$${service.price.toLocaleString("es-AR")}`;
+                row.appendChild(priceVal);
+            }
+            
             categoryGroup.appendChild(row);
         });
         
@@ -1055,6 +1143,14 @@ async function savePricesToCloud() {
         showLoader(false);
         
         if (data.success) {
+            state.isEditingPrices = false;
+            
+            const actionsContainer = document.getElementById("edit-actions-container");
+            if (actionsContainer) actionsContainer.classList.add("hidden");
+            
+            const editBtn = document.getElementById("btn-edit-mode");
+            if (editBtn) editBtn.classList.remove("hidden");
+            
             showToast("¡Lista de precios guardada con éxito!", "success");
             await loadPricesFromCloud();
         } else {
@@ -1065,4 +1161,20 @@ async function savePricesToCloud() {
         console.error("Error al guardar precios:", error);
         showToast("Error de conexión al guardar los precios.", "error");
     }
+}
+
+// Variables y lógica para el modal genérico de confirmación
+let genericConfirmCallback = null;
+
+function showGenericConfirmModal(title, subtitle, onConfirm) {
+    const titleEl = document.getElementById("generic-modal-title");
+    const subEl = document.getElementById("generic-modal-sub");
+    
+    if (titleEl) titleEl.innerHTML = `${title} <i class="fa-solid fa-circle-question" style="color: var(--barbie-pink);"></i>`;
+    if (subEl) subEl.textContent = subtitle;
+    
+    genericConfirmCallback = onConfirm;
+    
+    const modal = document.getElementById("generic-confirm-modal");
+    if (modal) modal.classList.remove("hidden");
 }
