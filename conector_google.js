@@ -613,14 +613,14 @@ function importServicesToAppointments() {
   // Procesar filas de Servicios
   for (let i = 1; i < servicesData.length; i++) {
     const row = servicesData[i];
-    const id = row[0];
+    const id = row[0] ? row[0].toString().trim() : "";
     if (!id || existingTurnosIds[id]) continue; // Omitir si ya está importado o fila vacía
     
     const fechaISO = row[1]; // Fecha/hora del servicio cobrado
-    const cliente = row[2];
-    const servicio = row[3];
-    const precio = Number(row[4]) || 0;
-    const email = row[6] ? row[6].toLowerCase().trim() : "";
+    const email = row[2] ? row[2].toString().toLowerCase().trim() : "";
+    const cliente = row[3] ? row[3].toString().trim() : "Cliente";
+    const servicio = row[4] ? row[4].toString().trim() : "Servicio";
+    const precio = Number(row[6]) || 0;
     
     // Parsear fecha
     let start;
