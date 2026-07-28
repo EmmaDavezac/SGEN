@@ -1769,7 +1769,8 @@ button {
     z-index: 5;
 }
 
-.input-wrapper input {
+.input-wrapper input,
+.input-wrapper select {
     padding-left: 40px !important;
 }
 
