@@ -102,9 +102,14 @@
                     <h2 id="user-display-name" class="user-name">Manicurista</h2>
                 </div>
             </div>
-            <button id="btn-logout" class="btn-logout" title="Cerrar Sesión">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i>
-            </button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button id="btn-global-reload" class="btn-logout" title="Actualizar Todos los Datos" style="background: var(--barbie-pale); color: var(--barbie-dark);">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+                <button id="btn-logout" class="btn-logout" title="Cerrar Sesión">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </button>
+            </div>
         </header>
 
         <!-- CONTENIDO PRINCIPAL SCROLLABLE -->
@@ -112,9 +117,14 @@
 
             <!-- PESTAÑA 1: REGISTRAR SERVICIO -->
             <div id="tab-registrar" class="tab-pane active">
-                <div class="section-title">
-                    <h3>Registrar Servicio</h3>
-                    <p>Agrega un nuevo trabajo realizado en segundos.</p>
+                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <div>
+                        <h3>Registrar Servicio</h3>
+                        <p>Agrega un nuevo trabajo realizado en segundos.</p>
+                    </div>
+                    <button type="button" id="btn-cancel-checkout" class="btn btn-secondary btn-sm hidden" style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                        <i class="fa-solid fa-arrow-left"></i> Volver a Agenda
+                    </button>
                 </div>
 
                 <form id="service-form" class="cute-form">
@@ -142,10 +152,58 @@
                     </div>
 
                     <!-- Grid de Subservicios (Se actualiza dinámicamente con JS) -->
-                    <div class="form-group">
+                    <div class="form-group" id="services-grid-wrapper">
                         <label id="services-grid-label">Servicio Específico</label>
                         <div id="services-grid" class="services-grid">
                             <!-- Los botones se renderizan con JS -->
+                        </div>
+                    </div>
+
+                    <!-- Panel de Servicio Combinado (Categoría "Otro") -->
+                    <div id="combined-service-builder" class="hidden" style="margin-bottom: 15px; padding: 14px; background: #fff8f9; border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
+                        <div style="font-size: 13px; font-weight: 700; color: var(--barbie-dark); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-puzzle-piece" style="color: var(--barbie-pink);"></i>
+                            Combinación de 2 Servicios (10 uñas en total)
+                        </div>
+
+                        <!-- Servicio 1 -->
+                        <div class="form-row-2" style="margin-bottom: 10px; align-items: end;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 11px;">Servicio 1 (Principal)</label>
+                                <select id="combined-service-1" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
+                                    <!-- Se puebla con opciones -->
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 11px;">Uñas Serv. 1</label>
+                                <select id="combined-count-1" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
+                                    <option value="1">1 uña</option>
+                                    <option value="2">2 uñas</option>
+                                    <option value="3">3 uñas</option>
+                                    <option value="4">4 uñas</option>
+                                    <option value="5">5 uñas</option>
+                                    <option value="6">6 uñas</option>
+                                    <option value="7" selected>7 uñas</option>
+                                    <option value="8">8 uñas</option>
+                                    <option value="9">9 uñas</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Servicio 2 -->
+                        <div class="form-row-2" style="align-items: end;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 11px;">Servicio 2 (Secundario)</label>
+                                <select id="combined-service-2" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
+                                    <!-- Se puebla con opciones -->
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 11px;">Uñas Serv. 2</label>
+                                <select id="combined-count-2" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%; background: #f3f4f6;" disabled>
+                                    <option value="3" selected>3 uñas</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -159,6 +217,32 @@
                         <div class="form-group">
                             <label for="service-price">Precio Total ($)</label>
                             <input type="number" id="service-price" placeholder="0" required inputmode="numeric">
+                        </div>
+                    </div>
+
+                    <!-- Retiro de servicio previo externo (Toggle Switch y Grid de Botones) -->
+                    <div class="form-group" id="external-removal-wrapper" style="margin-top: 10px;">
+                        <div class="cute-toggle-card"
+                            style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--white); border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
+                            <span
+                                style="font-size: 13px; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
+                                ¿Tiene retiro previo externo?
+                            </span>
+                            <label class="switch-toggle">
+                                <input type="checkbox" id="chk-external-removal">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="external-removal-options-container" class="hidden"
+                        style="margin-top: 8px; margin-bottom: 12px; padding: 4px 0;">
+                        <span style="font-size: 12px; font-weight: 700; color: var(--text-color); margin-bottom: 8px; display: block;">
+                            Tipo de Retiro:
+                        </span>
+                        <div id="external-removal-buttons-grid" class="sub-services-grid"
+                            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px;">
+                            <!-- Botones renderizados dinámicamente con estética btn-service -->
                         </div>
                     </div>
 
@@ -178,6 +262,13 @@
                                 <div class="pay-btn-content">
                                     <span class="pay-icon"><i class="fa-solid fa-money-bill-wave"></i></span>
                                     <span>Efectivo</span>
+                                </div>
+                            </label>
+                            <label class="pay-btn" id="pay-btn-fiado-wrapper">
+                                <input type="radio" name="payment-method" value="Fiado">
+                                <div class="pay-btn-content">
+                                    <span class="pay-icon"><i class="fa-solid fa-hand-holding-hand"></i></span>
+                                    <span>Fiado</span>
                                 </div>
                             </label>
                         </div>
@@ -295,6 +386,18 @@
                     </div>
                 </div>
 
+                <!-- Panel de Deudores (Fiados) - Oculto por defecto -->
+                <div id="debtors-panel" class="chart-section hidden"
+                    style="margin-top: 25px; border: 2px dashed #ffb3b3; background: #fffcfc;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <i class="fa-solid fa-hand-holding-hand" style="color: #ff4d4d; font-size: 18px;"></i>
+                        <h4 style="margin-bottom: 0; color: #cc0000;">Clientes que Deben (Fiados)</h4>
+                    </div>
+                    <div id="debtors-list-container" class="day-appointments-container">
+                        <!-- Lista de deudoras generada dinámicamente -->
+                    </div>
+                </div>
+
             </div>
 
             <!-- PESTAÑA 3: CALENDARIO / AGENDA -->
@@ -306,6 +409,10 @@
                         <p>Visualiza y organiza tus citas sincronizadas en la nube.</p>
                     </div>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button id="btn-refresh-calendar" class="btn btn-secondary btn-sm"
+                            style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                            <i class="fa-solid fa-rotate-right"></i> Actualizar
+                        </button>
                         <button id="btn-sync-history" class="btn btn-secondary btn-sm hidden"
                             style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
                             <i class="fa-solid fa-rotate"></i> Importar Cobrados
@@ -531,6 +638,20 @@
                     <div id="prices-editor-container" class="prices-editor-container">
                         <!-- Cargado dinámicamente con JS -->
                     </div>
+                <div class="chart-section" style="margin-top: 15px;">
+                    <h4 style="margin-bottom: 6px;">Opciones de Cobro</h4>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Configura qué métodos de pago están habilitados en el formulario de servicios.</p>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--white); border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
+                        <span style="font-size: 13px; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-hand-holding-hand" style="color: #ff4d4d;"></i>
+                            Habilitar Cobro en Modo Fiado
+                        </span>
+                        <label class="switch-toggle">
+                            <input type="checkbox" id="chk-allow-fiado">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -541,7 +662,7 @@
 
         <!-- MENU DE NAVEGACION FLOTANTE INFERIOR -->
         <nav class="app-nav">
-            <button class="nav-item active" data-tab="registrar">
+            <button class="nav-item active" data-tab="registrar" id="nav-btn-registrar">
                 <span class="nav-icon"><i class="fa-solid fa-circle-plus"></i></span>
                 <span class="nav-text">Registrar</span>
             </button>
@@ -664,11 +785,129 @@
                     </div>
                 </div>
 
+                <div class="form-group">
+                    <label for="schedule-status">Estado del Turno</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-circle-info input-icon"></i>
+                        <select id="schedule-status" required>
+                            <option value="Provisional" selected>Provisional (A confirmar)</option>
+                            <option value="Reservado">Reservado con Seña</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="schedule-sena-fields" class="hidden">
+                    <div class="form-group">
+                        <label for="schedule-sena-amount">Monto de la Seña ($)</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-dollar-sign input-icon"></i>
+                            <input type="number" id="schedule-sena-amount" placeholder="0" min="0" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Método de Pago de la Seña</label>
+                        <div class="payment-method-selector">
+                            <label class="pay-btn">
+                                <input type="radio" name="schedule-payment" value="Efectivo" checked>
+                                <div class="pay-btn-content">
+                                    <i class="fa-solid fa-money-bill-wave pay-icon"></i>
+                                    Efectivo
+                                </div>
+                            </label>
+                            <label class="pay-btn">
+                                <input type="radio" name="schedule-payment" value="Transferencia">
+                                <div class="pay-btn-content">
+                                    <i class="fa-solid fa-mobile-screen-button pay-icon"></i>
+                                    Transferencia
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="modal-actions" style="margin-top: 25px;">
                     <button type="button" id="schedule-btn-cancel" class="btn btn-secondary"><i
                             class="fa-solid fa-xmark"></i> Cancelar</button>
                     <button type="submit" id="schedule-btn-save" class="btn btn-primary"><i
                             class="fa-solid fa-check"></i> Agendar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- VENTANA MODAL PARA CARGAR SEÑA EN TURNO PROVISIONAL -->
+    <div id="sena-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width: 400px; width: 95%;">
+            <h3>Cargar Seña y Reservar</h3>
+            <p id="sena-modal-sub" class="modal-sub">Ingresa la seña recibida para confirmar la reserva:</p>
+
+            <form id="sena-form" class="cute-form" style="margin-top: 15px;">
+                <div class="form-group">
+                    <label for="sena-modal-amount">Monto de la Seña ($)</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-dollar-sign input-icon"></i>
+                        <input type="number" id="sena-modal-amount" placeholder="2500" min="0" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Método de Pago de la Seña</label>
+                    <div class="payment-method-selector">
+                        <label class="pay-btn">
+                            <input type="radio" name="sena-modal-payment" value="Transferencia" checked>
+                            <div class="pay-btn-content">
+                                <i class="fa-solid fa-mobile-screen-button pay-icon"></i>
+                                Transferencia
+                            </div>
+                        </label>
+                        <label class="pay-btn">
+                            <input type="radio" name="sena-modal-payment" value="Efectivo">
+                            <div class="pay-btn-content">
+                                <i class="fa-solid fa-money-bill-wave pay-icon"></i>
+                                Efectivo
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 25px;">
+                    <button type="button" id="sena-modal-btn-cancel" class="btn btn-secondary"><i
+                            class="fa-solid fa-xmark"></i> Cancelar</button>
+                    <button type="submit" id="sena-modal-btn-save" class="btn btn-primary"><i
+                            class="fa-solid fa-check"></i> Confirmar Reserva</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- VENTANA MODAL PARA REAGENDAR TURNO -->
+    <div id="reschedule-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width: 400px; width: 95%;">
+            <h3>Reagendar Turno</h3>
+            <p id="reschedule-modal-sub" class="modal-sub">Selecciona la nueva fecha y hora para el turno:</p>
+
+            <form id="reschedule-form" class="cute-form" style="margin-top: 15px;">
+                <div class="form-group" style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label for="reschedule-date">Nueva Fecha</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-calendar-day input-icon"></i>
+                            <input type="date" id="reschedule-date" required>
+                        </div>
+                    </div>
+                    <div style="flex: 1;">
+                        <label for="reschedule-time">Nueva Hora</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-clock input-icon"></i>
+                            <input type="time" id="reschedule-time" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 25px;">
+                    <button type="button" id="reschedule-modal-btn-cancel" class="btn btn-secondary"><i
+                            class="fa-solid fa-xmark"></i> Cancelar</button>
+                    <button type="submit" id="reschedule-modal-btn-save" class="btn btn-primary"><i
+                            class="fa-solid fa-calendar-check"></i> Reagendar</button>
                 </div>
             </form>
         </div>

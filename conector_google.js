@@ -120,6 +120,10 @@ function doPost(e) {
       return deleteService(data.id, data.email);
     }
     
+    if (action === "edit_service") {
+      return editService(data);
+    }
+    
     if (action === "get_services") {
       const email = data.email ? data.email.toLowerCase().trim() : "";
       return getServices(email);
@@ -147,6 +151,10 @@ function doPost(e) {
 
     if (action === "delete_appointment") {
       return deleteAppointment(data.id, data.email);
+    }
+
+    if (action === "edit_appointment") {
+      return editAppointment(data);
     }
 
     if (action === "import_services") {
@@ -336,6 +344,51 @@ function deleteService(id, email) {
   return jsonResponse({ success: false, message: "No se encontró el registro para eliminar o no tienes permisos" });
 }
 
+// Editar o actualizar un servicio (ej. cobrar deuda o cambiar campos)
+function editService(data) {
+  const id = data.id;
+  if (!id) {
+    return jsonResponse({ success: false, message: "Falta el ID del servicio a editar" });
+  }
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Servicios");
+  if (!sheet) {
+    return jsonResponse({ success: false, message: "La pestaña 'Servicios' no existe" });
+  }
+  
+  const rows = sheet.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0] && rows[i][0].toString().trim() === id.toString().trim()) {
+      const rowNum = i + 1;
+      
+      // Si se provee una nueva fecha (ej. el día del cobro de la deuda)
+      if (data.fecha) {
+        sheet.getRange(rowNum, 2).setValue(data.fecha);
+      }
+      // Si se provee un nuevo método de pago (ej. cambiar de 'Fiado' a 'Efectivo' o 'Transferencia')
+      if (data.metodoPago) {
+        sheet.getRange(rowNum, 9).setValue(data.metodoPago);
+      }
+      // Si se provee un precio (opcional)
+      if (data.precio !== undefined) {
+        sheet.getRange(rowNum, 7).setValue(Number(data.precio));
+      }
+      // Si se provee una seña (opcional)
+      if (data.seña !== undefined) {
+        sheet.getRange(rowNum, 8).setValue(Number(data.seña));
+      }
+      // Si se marca como completado
+      if (data.completado !== undefined) {
+        sheet.getRange(rowNum, 10).setValue(data.completado);
+      }
+      
+      return jsonResponse({ success: true, message: "Servicio actualizado correctamente en la planilla" });
+    }
+  }
+  return jsonResponse({ success: false, message: "No se encontró el servicio a editar" });
+}
+
 // Verificar si el usuario es administrador
 function isAdmin(email) {
   if (!email) return false;
@@ -480,7 +533,8 @@ function getAppointments() {
       servicio: row[5],
       precio: Number(row[6]) || 0,
       usuario: row[7],
-      eventId: row[8]
+      eventId: row[8],
+      estado: row[9] || "Provisional"
     });
   }
   
@@ -497,7 +551,7 @@ function addAppointment(data) {
   
   if (!sheet) {
     sheet = ss.insertSheet("Turnos");
-    sheet.appendRow(["ID", "Fecha", "HoraInicio", "HoraFin", "Cliente", "Servicio", "Precio", "Usuario", "EventID"]);
+    sheet.appendRow(["ID", "Fecha", "HoraInicio", "HoraFin", "Cliente", "Servicio", "Precio", "Usuario", "EventID", "Estado"]);
   }
   
   const id = data.id || "app_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000);
@@ -544,7 +598,8 @@ function addAppointment(data) {
     servicio,
     precio,
     usuario,
-    eventId
+    eventId,
+    data.estado || "Provisional"
   ]);
   
   return jsonResponse({
@@ -595,6 +650,93 @@ function deleteAppointment(id, email) {
   }
   
   return jsonResponse({ success: false, message: "No se encontró el turno especificado" });
+}
+
+// Editar un turno (ej. cambiar estado, precio o eventId)
+function editAppointment(data) {
+  const id = data.id;
+  if (!id) {
+    return jsonResponse({ success: false, message: "Falta el ID del turno a editar" });
+  }
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Turnos");
+  if (!sheet) {
+    return jsonResponse({ success: false, message: "La pestaña 'Turnos' no existe" });
+  }
+  
+  const rows = sheet.getDataRange().getValues();
+  
+  const targetId = id ? id.toString().trim() : "";
+  const targetEventId = data.eventId ? data.eventId.toString().trim() : "";
+  const targetCliente = data.cliente ? data.cliente.toString().trim().toLowerCase() : "";
+
+  for (let i = 1; i < rows.length; i++) {
+    const rowId = rows[i][0] ? rows[i][0].toString().trim() : "";
+    const rowEventId = rows[i][8] ? rows[i][8].toString().trim() : "";
+    const rowCliente = rows[i][4] ? rows[i][4].toString().trim().toLowerCase() : "";
+    const rowFecha = rows[i][1] ? rows[i][1].toString().trim() : "";
+
+    const isMatch = (targetId && rowId === targetId) ||
+                    (targetEventId && rowEventId === targetEventId) ||
+                    (targetCliente && rowCliente === targetCliente && (!data.fecha || rowFecha === data.fecha));
+
+    if (isMatch) {
+      const rowNum = i + 1;
+      
+      if (data.estado) {
+        sheet.getRange(rowNum, 10).setValue(data.estado);
+      }
+      if (data.precio !== undefined) {
+        sheet.getRange(rowNum, 7).setValue(Number(data.precio));
+      }
+      if (data.servicio) {
+        sheet.getRange(rowNum, 6).setValue(data.servicio);
+      }
+      if (data.fecha) {
+        sheet.getRange(rowNum, 2).setValue(data.fecha);
+      }
+      if (data.horaInicio) {
+        sheet.getRange(rowNum, 3).setValue(data.horaInicio);
+      }
+      if (data.horaFin) {
+        sheet.getRange(rowNum, 4).setValue(data.horaFin);
+      }
+      if (data.eventId) {
+        sheet.getRange(rowNum, 9).setValue(data.eventId);
+      }
+      
+      // Actualizar evento en Google Calendar si existe rowEventId
+      const rowEventId = rows[i][8];
+      if (rowEventId) {
+        try {
+          const cal = getCalendar();
+          if (cal) {
+            const event = cal.getEventById(rowEventId);
+            if (event) {
+              const cliente = rows[i][4];
+              const servicio = data.servicio || rows[i][5];
+              const precio = data.precio !== undefined ? Number(data.precio) : Number(rows[i][6]);
+              const usuario = rows[i][7];
+              const estado = data.estado || rows[i][9] || "Provisional";
+              
+              if (data.horaInicio && data.horaFin) {
+                event.setTime(new Date(data.horaInicio), new Date(data.horaFin));
+              }
+              // Actualizar título y descripción
+              event.setTitle(cliente + (estado === "Provisional" ? " (Provisional)" : ""));
+              event.setDescription("Turno " + estado + " para: " + cliente + "\nServicio: " + servicio + "\nPrecio: $" + precio + "\nRegistrado por: " + usuario);
+            }
+          }
+        } catch (e) {
+          console.error("Error al actualizar evento de Google Calendar: " + e.toString());
+        }
+      }
+      
+      return jsonResponse({ success: true, message: "Turno actualizado correctamente" });
+    }
+  }
+  return jsonResponse({ success: false, message: "No se encontró el turno a editar" });
 }
 
 // Importar servicios históricos ya cobrados como turnos en el calendario

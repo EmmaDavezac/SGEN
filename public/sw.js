@@ -1,4 +1,4 @@
-const CACHE_NAME = 'evolet-nails-v10';
+const CACHE_NAME = 'evolet-nails-v11';
 const ASSETS = [
   './index.html',
   './style.css',

@@ -30,6 +30,7 @@ let SERVICES_CATALOG = {
         { name: "Esculpidas en Polygel Full", price: 19000 }
     ],
     remocion: [
+        { name: "Retiro Servicio Propio", price: 0 },
         { name: "Remoción Semipermanente", price: 4500 },
         { name: "Remoción Kapping", price: 5000 },
         { name: "Remoción Softgel", price: 5500 },
@@ -53,7 +54,9 @@ const state = {
     appointmentsList: [],       // Lista de turnos agendados en la nube
     expensesList: [],           // Lista de gastos registrados
     calendarDate: new Date(),   // Mes visible en el calendario
-    selectedCalendarDay: new Date() // Día seleccionado en el calendario
+    selectedCalendarDay: new Date(), // Día seleccionado en el calendario
+    selectedExternalRemoval: null, // Objeto de remoción externa seleccionada
+    allowFiado: localStorage.getItem("evolet_allow_fiado") === "true" // Opción de cobro fiado
 };
 
 // =========================================================================
@@ -65,11 +68,12 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initApp() {
-    // Registrar Service Worker para PWA Offline
+    // Registrar Service Worker para PWA Offline (Forzar chequeo de actualización de red)
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
             .then(reg => {
                 console.log('Service Worker registrado con éxito');
+                reg.update(); // Forzar verificación de nueva versión en cada carga
                 reg.onupdatefound = () => {
                     const installingWorker = reg.installing;
                     if (installingWorker) {
@@ -89,6 +93,12 @@ function initApp() {
             })
             .catch(err => console.warn('Error al registrar Service Worker:', err));
     }
+
+    // Escuchar cuando el navegador vuelve a tener conexión para sincronizar de inmediato
+    window.addEventListener("online", () => {
+        showToast("Conexión de red restablecida. Sincronizando datos offline...", "info");
+        checkAndSyncOfflineTransactions();
+    });
 
     // Verificar Sesión Activa (v4)
     const savedSession = localStorage.getItem("evolet_session_v4");
@@ -146,6 +156,20 @@ function setupEventListeners() {
     // Envío de Formulario de Servicio
     document.getElementById("service-form").addEventListener("submit", handleServiceSubmit);
 
+    // Mostrar/ocultar y manejar precios de retiro externo previo
+    document.getElementById("chk-external-removal").addEventListener("change", (e) => {
+        const container = document.getElementById("external-removal-options-container");
+        if (e.target.checked) {
+            populateExternalRemovalTypes();
+            container.classList.remove("hidden");
+        } else {
+            container.classList.add("hidden");
+        }
+        recalculateFinalServicePrice();
+    });
+
+
+
     // Modal de Confirmación de Registro
     document.getElementById("modal-btn-confirm").addEventListener("click", confirmServiceRegistration);
     document.getElementById("modal-btn-cancel").addEventListener("click", cancelServiceRegistration);
@@ -157,6 +181,58 @@ function setupEventListeners() {
     // Historial - Buscador y Filtros
     document.getElementById("history-search").addEventListener("input", filterHistory);
     document.getElementById("history-filter").addEventListener("change", filterHistory);
+
+    // Modales de Seña y Reagendamiento de Turnos
+    document.getElementById("sena-form").addEventListener("submit", handleSenaSubmit);
+    document.getElementById("sena-modal-btn-cancel").addEventListener("click", closeSenaModal);
+    document.getElementById("reschedule-form").addEventListener("submit", handleRescheduleSubmit);
+    document.getElementById("reschedule-modal-btn-cancel").addEventListener("click", closeRescheduleModal);
+
+    // Botones de Recarga/Sincronización (Solución Móvil)
+    const globalReloadBtn = document.getElementById("btn-global-reload");
+    if (globalReloadBtn) {
+        globalReloadBtn.addEventListener("click", () => refreshAllData(true));
+    }
+    
+    const refreshCalBtn = document.getElementById("btn-refresh-calendar");
+    if (refreshCalBtn) {
+        refreshCalBtn.addEventListener("click", () => loadAppointments(true));
+    }
+
+    // Escuchar cuando la app vuelve a estar visible en pantalla en celulares
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && state.currentUser) {
+            console.log("Pantalla encendida/App en primer plano, sincronizando turnos...");
+            loadAppointments(false);
+        }
+    });
+
+    // Cancelar cobro de turno y volver a Agenda
+    const cancelCheckoutBtn = document.getElementById("btn-cancel-checkout");
+    if (cancelCheckoutBtn) {
+        cancelCheckoutBtn.addEventListener("click", cancelCheckoutAndReturnToAgenda);
+    }
+
+    // Listeners del constructor de servicio combinado (Categoría Otro)
+    const selComb1 = document.getElementById("combined-service-1");
+    const selComb2 = document.getElementById("combined-service-2");
+    const cntComb1 = document.getElementById("combined-count-1");
+
+    if (selComb1) selComb1.addEventListener("change", updateCombinedServiceCalculation);
+    if (selComb2) selComb2.addEventListener("change", updateCombinedServiceCalculation);
+    if (cntComb1) cntComb1.addEventListener("change", updateCombinedServiceCalculation);
+
+    // Opciones de Cobro (Fiado toggle)
+    const chkFiado = document.getElementById("chk-allow-fiado");
+    if (chkFiado) {
+        chkFiado.addEventListener("change", (e) => {
+            state.allowFiado = e.target.checked;
+            localStorage.setItem("evolet_allow_fiado", state.allowFiado ? "true" : "false");
+            updateFiadoPaymentVisibility();
+            showToast(state.allowFiado ? "Modo Fiado habilitado" : "Modo Fiado deshabilitado", "info");
+        });
+    }
+    updateFiadoPaymentVisibility();
 
     // Ajustes de precios (Admin)
     document.getElementById("btn-edit-mode").addEventListener("click", () => {
@@ -238,6 +314,17 @@ function setupEventListeners() {
     // Envío del formulario de agendar turno
     document.getElementById("schedule-form").addEventListener("submit", handleScheduleSubmit);
 
+    // Mostrar/ocultar campos de seña según estado del turno
+    document.getElementById("schedule-status").addEventListener("change", (e) => {
+        const senaFields = document.getElementById("schedule-sena-fields");
+        if (e.target.value === "Reservado") {
+            senaFields.classList.remove("hidden");
+        } else {
+            senaFields.classList.add("hidden");
+            document.getElementById("schedule-sena-amount").value = "0";
+        }
+    });
+
     // Envío del formulario de registrar gasto
     document.getElementById("expense-form").addEventListener("submit", handleExpenseSubmit);
 
@@ -272,6 +359,30 @@ function setupEventListeners() {
     document.getElementById("expense-filter").addEventListener("change", () => {
         renderExpensesHistoryList();
     });
+}
+
+// Controlar visibilidad del método de pago Fiado según configuración
+function updateFiadoPaymentVisibility() {
+    const fiadoWrapper = document.getElementById("pay-btn-fiado-wrapper");
+    const chkFiado = document.getElementById("chk-allow-fiado");
+    
+    if (chkFiado) {
+        chkFiado.checked = !!state.allowFiado;
+    }
+    
+    if (fiadoWrapper) {
+        if (state.allowFiado) {
+            fiadoWrapper.style.display = "block";
+        } else {
+            fiadoWrapper.style.display = "none";
+            // Si estaba seleccionado Fiado y se deshabilitó, pasar a Transferencia
+            const fiadoRadio = document.querySelector('input[name="payment-method"][value="Fiado"]');
+            if (fiadoRadio && fiadoRadio.checked) {
+                const transRadio = document.querySelector('input[name="payment-method"][value="Transferencia"]');
+                if (transRadio) transRadio.checked = true;
+            }
+        }
+    }
 }
 
 // =========================================================================
@@ -343,6 +454,7 @@ function executeSwitchTab(tabId) {
     } else if (tabId === "calendario") {
         renderCalendar();
         renderDayAppointments();
+        loadAppointments();
     } else if (tabId === "gastos") {
         const expDateInput = document.getElementById("expense-date");
         if (expDateInput) {
@@ -460,7 +572,26 @@ function selectCategory(catKey) {
         }
     });
 
-    renderSubServicesGrid(catKey);
+    const gridWrapper = document.getElementById("services-grid-wrapper");
+    const builder = document.getElementById("combined-service-builder");
+    const extWrapper = document.getElementById("external-removal-wrapper");
+
+    if (catKey === "personalizado") {
+        if (gridWrapper) gridWrapper.classList.add("hidden");
+        if (builder) builder.classList.remove("hidden");
+        if (extWrapper) extWrapper.style.display = "block";
+        populateCombinedServiceDropdowns();
+        updateCombinedServiceCalculation();
+    } else {
+        if (gridWrapper) gridWrapper.classList.remove("hidden");
+        if (builder) builder.classList.add("hidden");
+        if (catKey === "remocion") {
+            if (extWrapper) extWrapper.style.display = "none";
+        } else {
+            if (extWrapper) extWrapper.style.display = "block";
+        }
+        renderSubServicesGrid(catKey);
+    }
 }
 
 function renderSubServicesGrid(catKey) {
@@ -509,6 +640,21 @@ function selectSubService(service, buttonElement) {
     const nameInput = document.getElementById("service-name-input");
     const priceInput = document.getElementById("service-price");
 
+    // Ocultar checkbox de retiro externo si la categoría elegida es de remoción o personalizado
+    const extWrapper = document.getElementById("external-removal-wrapper");
+    const chk = document.getElementById("chk-external-removal");
+    const opts = document.getElementById("external-removal-options-container");
+    if (extWrapper && chk && opts) {
+        if (state.selectedCategory === "remocion" || state.selectedCategory === "personalizado") {
+            extWrapper.style.display = "none";
+        } else {
+            extWrapper.style.display = "block";
+        }
+        chk.checked = false;
+        opts.classList.add("hidden");
+        state.selectedExternalRemoval = null;
+    }
+
     if (state.selectedCategory === "personalizado") {
         nameInput.value = "";
         nameInput.readOnly = false;
@@ -520,6 +666,141 @@ function selectSubService(service, buttonElement) {
         nameInput.value = service.name;
         nameInput.readOnly = true;
         priceInput.value = service.price;
+    }
+}
+
+// Poblar de forma dinámica los selectores del constructor de servicio combinado
+function populateCombinedServiceDropdowns() {
+    const sel1 = document.getElementById("combined-service-1");
+    const sel2 = document.getElementById("combined-service-2");
+    if (!sel1 || !sel2) return;
+
+    if (sel1.options.length > 0 && sel2.options.length > 0) return;
+
+    sel1.innerHTML = "";
+    sel2.innerHTML = "";
+
+    const categoriesToInclude = ["kapping", "softgel", "esculpidas", "semi"];
+
+    categoriesToInclude.forEach(cat => {
+        const services = SERVICES_CATALOG[cat] || [];
+        services.forEach(s => {
+            const opt1 = document.createElement("option");
+            opt1.value = s.name;
+            opt1.textContent = `${s.name} ($${s.price.toLocaleString("es-AR")})`;
+            opt1.setAttribute("data-price", s.price);
+            sel1.appendChild(opt1);
+
+            const opt2 = document.createElement("option");
+            opt2.value = s.name;
+            opt2.textContent = `${s.name} ($${s.price.toLocaleString("es-AR")})`;
+            opt2.setAttribute("data-price", s.price);
+            sel2.appendChild(opt2);
+        });
+    });
+
+    if (sel1.options.length > 0) sel1.selectedIndex = 0;
+    if (sel2.options.length > 1) {
+        const idxEsculpidas = Array.from(sel2.options).findIndex(opt => opt.value.toLowerCase().includes("esculpida"));
+        sel2.selectedIndex = idxEsculpidas !== -1 ? idxEsculpidas : (sel2.options.length - 1);
+    }
+}
+
+// Recalcular la combinación de los 2 servicios (10 uñas en total)
+function updateCombinedServiceCalculation() {
+    if (state.selectedCategory !== "personalizado") return;
+
+    const sel1 = document.getElementById("combined-service-1");
+    const sel2 = document.getElementById("combined-service-2");
+    const count1El = document.getElementById("combined-count-1");
+    const count2El = document.getElementById("combined-count-2");
+
+    if (!sel1 || !sel2 || !count1El || !count2El) return;
+
+    const count1 = parseInt(count1El.value) || 7;
+    const count2 = 10 - count1;
+    
+    count2El.innerHTML = `<option value="${count2}" selected>${count2} ${count2 === 1 ? 'uña' : 'uñas'}</option>`;
+
+    const opt1 = sel1.options[sel1.selectedIndex];
+    const opt2 = sel2.options[sel2.selectedIndex];
+
+    if (!opt1 || !opt2) return;
+
+    const name1 = opt1.value;
+    const price1 = Number(opt1.getAttribute("data-price")) || 0;
+
+    const name2 = opt2.value;
+    const price2 = Number(opt2.getAttribute("data-price")) || 0;
+
+    const combinedName = `${name1} (${count1} ${count1 === 1 ? 'uña' : 'uñas'}) + ${name2} (${count2} ${count2 === 1 ? 'uña' : 'uñas'})`;
+    const baseCombinedPrice = Math.round(((price1 * count1) + (price2 * count2)) / 10);
+
+    state.selectedService = {
+        name: combinedName,
+        price: baseCombinedPrice
+    };
+
+    const nameInput = document.getElementById("service-name-input");
+    if (nameInput) {
+        nameInput.value = combinedName;
+        nameInput.readOnly = true;
+    }
+
+    recalculateFinalServicePrice();
+}
+
+// Cargar de forma dinámica las opciones de retiro externo como botones btn-service
+function populateExternalRemovalTypes() {
+    const grid = document.getElementById("external-removal-buttons-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    
+    const rems = SERVICES_CATALOG.remocion || [];
+    const validRems = rems.filter(rem => rem.name !== "Retiro Servicio Propio");
+    
+    state.selectedExternalRemoval = null;
+    
+    validRems.forEach((rem, idx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn-service btn-ext-removal";
+        btn.innerHTML = `
+            <span>${escapeHtml(rem.name)}</span>
+            <span class="price-tag">+$${rem.price.toLocaleString("es-AR")}</span>
+        `;
+        
+        btn.addEventListener("click", () => {
+            const allBtns = grid.querySelectorAll(".btn-ext-removal");
+            allBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            state.selectedExternalRemoval = rem;
+            recalculateFinalServicePrice();
+        });
+        
+        grid.appendChild(btn);
+        
+        if (idx === 0) {
+            btn.classList.add("active");
+            state.selectedExternalRemoval = rem;
+        }
+    });
+    recalculateFinalServicePrice();
+}
+
+// Recalcular el precio sumando el retiro previo si está marcado
+function recalculateFinalServicePrice() {
+    const priceInput = document.getElementById("service-price");
+    if (!priceInput || !state.selectedService) return;
+    
+    let basePrice = Number(state.selectedService.price) || 0;
+    
+    const chk = document.getElementById("chk-external-removal");
+    if (chk && chk.checked && state.selectedExternalRemoval) {
+        const extraPrice = Number(state.selectedExternalRemoval.price) || 0;
+        priceInput.value = basePrice + extraPrice;
+    } else {
+        priceInput.value = basePrice;
     }
 }
 
@@ -535,7 +816,11 @@ function handleServiceSubmit(e) {
     }
 
     const clientName = document.getElementById("client-name").value.trim();
-    const serviceName = document.getElementById("service-name-input").value.trim();
+    let serviceName = document.getElementById("service-name-input").value.trim();
+    const chk = document.getElementById("chk-external-removal");
+    if (chk && chk.checked && state.selectedExternalRemoval) {
+        serviceName = `${serviceName} + ${state.selectedExternalRemoval.name}`;
+    }
     const price = Number(document.getElementById("service-price").value) || 0;
 
     const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
@@ -545,7 +830,13 @@ function handleServiceSubmit(e) {
         return;
     }
 
-    // Estructura de transacción pre-cobrada por completo (seña=0, completado="Sí")
+    // Calcular si hay seña vinculada
+    let senaAmount = 0;
+    if (state.linkedAppointment && state.linkedAppointment.cliente === clientName) {
+        senaAmount = Number(state.linkedAppointment.precio) || 0;
+    }
+
+    // Estructura de transacción pre-cobrada por completo (seña=senaAmount, completado="Sí")
     const transaction = {
         id: "evt_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000),
         fecha: new Date().toISOString(),
@@ -554,7 +845,7 @@ function handleServiceSubmit(e) {
         servicio: serviceName,
         categoria: state.selectedCategory,
         precio: price,
-        seña: 0,
+        seña: senaAmount,
         metodoPago: paymentMethod,
         completado: "Sí"
     };
@@ -564,7 +855,14 @@ function handleServiceSubmit(e) {
 
     document.getElementById("confirm-client").textContent = transaction.cliente;
     document.getElementById("confirm-service").textContent = transaction.servicio;
-    document.getElementById("confirm-price").textContent = `$${transaction.precio.toLocaleString("es-AR")}`;
+    
+    if (senaAmount > 0) {
+        const netPrice = price - senaAmount;
+        document.getElementById("confirm-price").innerHTML = `Total: $${price.toLocaleString("es-AR")} <br> <span style="font-size: 11px; color: var(--text-muted);">Seña: -$${senaAmount.toLocaleString("es-AR")} | Neto: <strong>$${netPrice.toLocaleString("es-AR")}</strong></span>`;
+    } else {
+        document.getElementById("confirm-price").textContent = `$${transaction.precio.toLocaleString("es-AR")}`;
+    }
+    
     document.getElementById("confirm-payment").textContent = transaction.metodoPago;
 
     document.getElementById("confirm-modal").classList.remove("hidden");
@@ -608,13 +906,51 @@ async function confirmServiceRegistration() {
         showLoader(false);
 
         if (data.success) {
+            const wasLinked = !!state.linkedAppointment;
             state.servicesList.unshift(data.service);
             saveServicesCache();
             updateClientAutocomplete(); // Recargar el autocompletado
             showToast("¡Servicio guardado con éxito!", "success");
+            
+            // Si el servicio estaba vinculado a un turno, eliminar el turno
+            if (state.linkedAppointment) {
+                const aptId = state.linkedAppointment.id;
+                
+                // Borrar el turno de forma silenciosa de la nube
+                try {
+                    await fetch(CONFIG_SHEET_URL, {
+                        method: "POST",
+                        mode: "cors",
+                        headers: { "Content-Type": "text/plain" },
+                        body: JSON.stringify({
+                            action: "delete_appointment",
+                            id: aptId,
+                            email: state.currentUser.email
+                        })
+                    });
+                    
+                    // Remover de la lista local
+                    state.appointmentsList = state.appointmentsList.filter(x => x.id !== aptId);
+                    const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+                    localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+                    
+                    renderCalendar();
+                    renderDayAppointments();
+                } catch (delErr) {
+                    console.error("Error al remover el turno después de cobrar:", delErr);
+                }
+            }
+            
+            clearCheckoutState();
             renderHistoryList();
             calculateAndRenderStats();
             resetServiceForm();
+
+            // Si fue un cobro de turno o la manicurista no es admin, regresar a la Agenda
+            const isAdmin = state.currentUser && state.currentUser.rol === "admin";
+            if (wasLinked || !isAdmin) {
+                switchTab("calendario");
+            }
         } else {
             showToast(data.message || "Error al registrar en Google Sheets", "error");
         }
@@ -627,8 +963,42 @@ async function confirmServiceRegistration() {
     }
 }
 
+async function registerServiceDirectly(transaction) {
+    if (!CONFIG_SHEET_URL) {
+        showToast("Por favor configura la URL de tu Google Sheet en app.js para poder guardar.", "error");
+        return null;
+    }
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            body: JSON.stringify({
+                action: "add_service",
+                ...transaction
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            state.servicesList.unshift(data.service);
+            saveServicesCache();
+            updateClientAutocomplete();
+            renderHistoryList();
+            calculateAndRenderStats();
+            return data.service;
+        } else {
+            console.error("Error al registrar servicio directamente en Sheets:", data.message);
+        }
+    } catch (err) {
+        console.error("Error al registrar servicio directamente:", err);
+    }
+    return null;
+}
+
 function resetServiceForm() {
-    document.getElementById("client-name").value = "";
+    clearCheckoutState();
     selectCategory(state.selectedCategory);
     document.querySelector(".app-content").scrollTop = 0;
 }
@@ -727,6 +1097,8 @@ function renderHistoryList() {
 
         const totalFormatted = `$${Number(item.precio).toLocaleString("es-AR")}`;
 
+        const isAdmin = state.currentUser && state.currentUser.rol === "admin";
+
         card.innerHTML = `
             <div class="card-details">
                 <div class="card-client">${escapeHtml(item.cliente)}</div>
@@ -739,9 +1111,11 @@ function renderHistoryList() {
             <div class="card-amount-box">
                 <div class="card-price" style="font-size: 18px; color: var(--barbie-dark);">${totalFormatted}</div>
             </div>
+            ${isAdmin ? `
             <button class="btn-delete-card" onclick="app.deleteServiceRecord('${item.id}')" title="Eliminar Registro">
                 <i class="fa-solid fa-trash-can"></i>
             </button>
+            ` : ''}
         `;
 
         listElement.appendChild(card);
@@ -785,8 +1159,12 @@ function filterHistory() {
     renderHistoryList();
 }
 
-// Eliminar un registro (Usando el modal personalizado)
+// Eliminar un registro (Usando el modal personalizado - Solo Administradores)
 function deleteServiceRecord(id) {
+    if (!state.currentUser || state.currentUser.rol !== "admin") {
+        showToast("Solo los administradores pueden eliminar registros.", "error");
+        return;
+    }
     state.pendingDeleteId = id;
     document.getElementById("delete-modal").classList.remove("hidden");
 }
@@ -874,10 +1252,13 @@ function calculateAndRenderStats() {
             const itemDateStr = item.fecha.substring(0, 10);
             if (itemDateStr >= todayStr) {
                 const precio = Number(item.precio) || 0;
+                const seña = Number(item.seña) || 0;
+                const neto = precio - seña;
+                
                 if (item.metodoPago === "Efectivo") {
-                    todayEfectivoIncome += precio;
+                    todayEfectivoIncome += neto;
                 } else if (item.metodoPago === "Transferencia") {
-                    todayMpIncome += precio;
+                    todayMpIncome += neto;
                 }
             }
         }
@@ -1056,10 +1437,98 @@ function calculateAndRenderStats() {
     }
 
     renderPopularServices(serviceCounts);
+    renderDebtorsList();
+}
+
+// Renderizar el listado dinámico de deudores (fiados)
+function renderDebtorsList() {
+    const debtors = state.servicesList.filter(item => item.metodoPago === "Fiado");
+    const panel = document.getElementById("debtors-panel");
+    const container = document.getElementById("debtors-list-container");
+    if (!panel || !container) return;
+    
+    if (debtors.length === 0) {
+        panel.classList.add("hidden");
+        return;
+    }
+    
+    panel.classList.remove("hidden");
+    container.innerHTML = "";
+    
+    debtors.forEach(debt => {
+        const card = document.createElement("div");
+        card.className = "appointment-card";
+        card.style.borderColor = "#ffb3b3";
+        card.style.background = "#fffefe";
+        
+        const dateStr = debt.fecha ? new Date(debt.fecha).toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' }) : "-";
+        
+        card.innerHTML = `
+            <div class="appointment-time-col" style="border-right-color: #ffcccc; min-width: 60px;">
+                <span class="appointment-time-start" style="color: #cc0000; font-size: 13px;">${dateStr}</span>
+            </div>
+            <div class="appointment-info-col">
+                <div class="appointment-client-name">${escapeHtml(debt.cliente)}</div>
+                <div class="appointment-service-name" style="color: #666;">
+                    ${escapeHtml(debt.servicio)} — <strong style="color: #cc0000;">$${debt.precio.toLocaleString("es-AR")}</strong>
+                </div>
+            </div>
+            <div class="appointment-actions-col">
+                <button class="btn-collect-debt btn btn-success" data-id="${debt.id}" style="width: auto; padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: var(--radius-sm); border: none; display: flex; align-items: center; gap: 4px; background: #2e7d32; color: white;">
+                    <i class="fa-solid fa-money-bill-wave"></i> Cobrar
+                </button>
+            </div>
+        `;
+        
+        card.querySelector(".btn-collect-debt").addEventListener("click", () => {
+            collectDebt(debt);
+        });
+        
+        container.appendChild(card);
+    });
+}
+
+// Cobrar una deuda pendiente (pasar de Fiado a Efectivo/Transferencia)
+async function collectDebt(debt) {
+    const metodo = confirm(`¿El cobro de la deuda de $${debt.precio} de ${debt.cliente} fue por transferencia / MercadoPago?\n(Aceptar = MercadoPago/Transferencia, Cancelar = Efectivo)`) ? "Transferencia" : "Efectivo";
+    
+    showLoader(true, "Registrando pago de deuda en la nube...");
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({
+                action: "edit_service",
+                id: debt.id,
+                metodoPago: metodo,
+                fecha: new Date().toISOString()
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            showToast("¡Deuda cobrada e ingresada a la caja correctamente!", "success");
+            
+            // Actualizar localmente el servicio
+            debt.metodoPago = metodo;
+            debt.fecha = new Date().toISOString();
+            
+            saveServicesCache();
+            calculateAndRenderStats();
+        } else {
+            showToast(data.message || "Error al cobrar la deuda", "error");
+        }
+    } catch (err) {
+        console.error("Error al cobrar la deuda:", err);
+        showToast("Error de conexión. Inténtalo de nuevo.", "error");
+    } finally {
+        showLoader(false);
+    }
 }
 
 function renderPopularServices(serviceCounts) {
     const listElement = document.getElementById("popular-services-list");
+    if (!listElement) return;
     listElement.innerHTML = "";
 
     const sorted = Object.entries(serviceCounts)
@@ -1100,40 +1569,78 @@ function saveOfflineTransaction(transaction) {
 async function checkAndSyncOfflineTransactions() {
     if (!navigator.onLine || !CONFIG_SHEET_URL || !state.currentUser) return;
 
-    const queueKey = `evolet_offline_v4_${state.currentUser.email}`;
-    const offlineQueue = JSON.parse(localStorage.getItem(queueKey) || "[]");
+    // 1. Sincronizar Servicios (Ventas)
+    const servicesKey = `evolet_offline_v4_${state.currentUser.email}`;
+    const servicesQueue = JSON.parse(localStorage.getItem(servicesKey) || "[]");
 
-    if (offlineQueue.length === 0) return;
-
-    console.log(`Sincronizando ${offlineQueue.length} registros offline...`);
-
-    const failedQueue = [];
-
-    for (const transaction of offlineQueue) {
-        try {
-            const response = await fetch(CONFIG_SHEET_URL, {
-                method: "POST",
-                mode: "cors",
-                body: JSON.stringify({
-                    action: "add_service",
-                    ...transaction
-                })
-            });
-            const data = await response.json();
-            if (!data.success) {
-                failedQueue.push(transaction);
+    if (servicesQueue.length > 0) {
+        console.log(`Sincronizando ${servicesQueue.length} servicios offline...`);
+        const failedServices = [];
+        for (const transaction of servicesQueue) {
+            try {
+                const response = await fetch(CONFIG_SHEET_URL, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: JSON.stringify({
+                        action: "add_service",
+                        ...transaction
+                    })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    failedServices.push(transaction);
+                }
+            } catch (e) {
+                failedServices.push(transaction);
             }
-        } catch (e) {
-            failedQueue.push(transaction);
+        }
+        if (failedServices.length === 0) {
+            localStorage.removeItem(servicesKey);
+            showToast("¡Servicios guardados offline sincronizados con éxito!", "success");
+            loadServicesData();
+        } else {
+            localStorage.setItem(servicesKey, JSON.stringify(failedServices));
         }
     }
 
-    if (failedQueue.length === 0) {
-        localStorage.removeItem(queueKey);
-        showToast("¡Todos los registros offline fueron sincronizados!", "success");
-        loadServicesData();
-    } else {
-        localStorage.setItem(queueKey, JSON.stringify(failedQueue));
+    // 2. Sincronizar Gastos
+    const expensesKey = `evolet_offline_expenses_v4_${state.currentUser.email}`;
+    const expensesQueue = JSON.parse(localStorage.getItem(expensesKey) || "[]");
+
+    if (expensesQueue.length > 0) {
+        console.log(`Sincronizando ${expensesQueue.length} gastos offline...`);
+        const failedExpenses = [];
+        for (const expenseData of expensesQueue) {
+            try {
+                const response = await fetch(CONFIG_SHEET_URL, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: JSON.stringify({
+                        action: "add_expense",
+                        ...expenseData
+                    })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    failedExpenses.push(expenseData);
+                }
+            } catch (e) {
+                failedExpenses.push(expenseData);
+            }
+        }
+        if (failedExpenses.length === 0) {
+            localStorage.removeItem(expensesKey);
+            showToast("¡Gastos guardados offline sincronizados con éxito!", "success");
+            loadExpensesData();
+        } else {
+            localStorage.setItem(expensesKey, JSON.stringify(failedExpenses));
+        }
     }
 }
 
@@ -1255,6 +1762,7 @@ async function loadPricesFromCloud() {
 function checkAdminAccess() {
     const configBtn = document.getElementById("nav-btn-config");
     const syncBtn = document.getElementById("btn-sync-history");
+    const registrarBtn = document.getElementById("nav-btn-registrar");
     const isAdmin = state.currentUser && state.currentUser.rol === "admin";
 
     if (configBtn) {
@@ -1264,7 +1772,7 @@ function checkAdminAccess() {
             configBtn.classList.add("hidden");
             const activeTabBtn = document.querySelector(".nav-item.active");
             if (activeTabBtn && activeTabBtn.getAttribute("data-tab") === "configuracion") {
-                switchTab("registrar");
+                switchTab("calendario");
             }
         }
     }
@@ -1274,6 +1782,18 @@ function checkAdminAccess() {
             syncBtn.classList.remove("hidden");
         } else {
             syncBtn.classList.add("hidden");
+        }
+    }
+
+    if (registrarBtn) {
+        if (isAdmin) {
+            registrarBtn.classList.remove("hidden");
+        } else {
+            registrarBtn.classList.add("hidden");
+            const activeTabBtn = document.querySelector(".nav-item.active");
+            if (activeTabBtn && activeTabBtn.getAttribute("data-tab") === "registrar" && !state.linkedAppointment) {
+                switchTab("calendario");
+            }
         }
     }
 }
@@ -1455,21 +1975,26 @@ function showGenericConfirmModal(title, subtitle, onConfirm) {
 //                   GESTIÓN DE TURNOS Y CALENDARIO
 // =========================================================================
 
-// Cargar turnos de la nube
-async function loadAppointments() {
+// Cargar turnos de la nube con protección offline
+async function loadAppointments(showNotification = false) {
     if (!state.currentUser) return;
     
     // Carga inicial del caché local (PWA Offline)
     const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
-        state.appointmentsList = JSON.parse(cached);
-        // Si estamos en la pestaña calendario, re-renderizar
-        const activeTab = document.querySelector(".nav-item.active");
-        if (activeTab && activeTab.getAttribute("data-tab") === "calendario") {
-            renderCalendar();
-            renderDayAppointments();
+        try {
+            state.appointmentsList = JSON.parse(cached);
+        } catch (e) {
+            console.error("Error al parsear caché local de turnos:", e);
         }
+    }
+    
+    // Renderizar lo que hay en memoria/cache de inmediato para que NUNCA quede vacía la agenda
+    const activeTab = document.querySelector(".nav-item.active");
+    if (activeTab && activeTab.getAttribute("data-tab") === "calendario") {
+        renderCalendar();
+        renderDayAppointments();
     }
     
     if (!CONFIG_SHEET_URL) return;
@@ -1478,19 +2003,54 @@ async function loadAppointments() {
         const response = await fetch(`${CONFIG_SHEET_URL}?action=get_appointments`);
         const data = await response.json();
         
-        if (data.success) {
+        if (data.success && data.appointments) {
             state.appointmentsList = data.appointments;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
             
-            // Re-renderizar si estamos en la pestaña del calendario
-            const activeTab = document.querySelector(".nav-item.active");
-            if (activeTab && activeTab.getAttribute("data-tab") === "calendario") {
+            const currentTab = document.querySelector(".nav-item.active");
+            if (currentTab && currentTab.getAttribute("data-tab") === "calendario") {
                 renderCalendar();
                 renderDayAppointments();
+            }
+            if (showNotification) {
+                showToast("Agenda actualizada desde la nube.", "success");
+            }
+        } else {
+            if (showNotification) {
+                showToast(data.message || "No se pudieron obtener los turnos", "error");
             }
         }
     } catch (error) {
         console.warn("No se pudieron cargar los turnos de la nube, usando caché local.", error);
+        if (showNotification) {
+            showToast("Sin conexión a la nube. Mostrando turnos guardados localmente.", "warning");
+        }
+    }
+}
+
+// Función global para forzar recarga/sincronización de todos los datos
+async function refreshAllData(showLoaderToast = true) {
+    if (!state.currentUser) return;
+    
+    const icon = document.querySelector("#btn-global-reload i");
+    if (icon) icon.classList.add("fa-spin");
+    
+    if (showLoaderToast) showLoader(true, "Sincronizando datos con la nube...");
+    
+    try {
+        await Promise.all([
+            loadAppointments(),
+            loadServicesData(),
+            loadPricesFromCloud(),
+            loadExpenses()
+        ]);
+        showToast("¡Datos sincronizados correctamente!", "success");
+    } catch (err) {
+        console.error("Error al sincronizar datos:", err);
+        showToast("Sin conexión. Mostrando datos locales.", "warning");
+    } finally {
+        if (icon) icon.classList.remove("fa-spin");
+        if (showLoaderToast) showLoader(false);
     }
 }
 
@@ -1568,7 +2128,8 @@ function renderCalendar() {
             const maxVisible = 2;
             dayApts.slice(0, maxVisible).forEach(apt => {
                 const pill = document.createElement("div");
-                pill.className = "event-preview-pill";
+                const statusClass = (apt.estado || "Provisional").toLowerCase();
+                pill.className = `event-preview-pill ${statusClass}`;
                 pill.textContent = apt.cliente;
                 previewContainer.appendChild(pill);
             });
@@ -1640,7 +2201,8 @@ function renderDayAppointments() {
     
     dayApts.forEach(apt => {
         const card = document.createElement("div");
-        card.className = "appointment-card";
+        const statusClass = (apt.estado || "Provisional").toLowerCase();
+        card.className = `appointment-card ${statusClass}`;
         
         const start = new Date(apt.horaInicio);
         const end = new Date(apt.horaFin);
@@ -1654,10 +2216,23 @@ function renderDayAppointments() {
                 <div class="appointment-client-name">${escapeHtml(apt.cliente)}</div>
                 <div class="appointment-service-name">
                     <i class="fa-solid fa-sparkles" style="color: var(--barbie-pink); font-size: 9px;"></i> 
-                    ${escapeHtml(apt.servicio)} — <strong>$${apt.precio.toLocaleString("es-AR")}</strong>
+                    ${apt.estado === "Reservado" ? `Reservado (Seña: $${apt.precio.toLocaleString("es-AR")})` : `Provisional`}
                 </div>
             </div>
-            <div class="appointment-actions-col">
+            <div class="appointment-actions-col" style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn-reschedule-appointment" title="Reagendar Turno" data-id="${apt.id}" style="background: #fff3e0; color: #e65100; border: none; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <i class="fa-regular fa-calendar-plus" style="font-size: 11px;"></i>
+                </button>
+                ${apt.estado === "Provisional" ? `
+                    <button class="btn-confirm-appointment-sena" title="Cargar Seña" data-id="${apt.id}" style="background: #e3f2fd; color: #0d47a1; border: none; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
+                        <i class="fa-solid fa-check-double" style="font-size: 11px;"></i>
+                    </button>
+                ` : ''}
+                ${apt.estado === "Reservado" ? `
+                    <button class="btn-checkout-appointment" title="Cobrar Turno" data-id="${apt.id}" style="background: #e8f5e9; color: #2e7d32; border: none; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
+                        <i class="fa-solid fa-dollar-sign" style="font-size: 11px;"></i>
+                    </button>
+                ` : ''}
                 <button class="btn-delete-appointment" title="Cancelar Turno" data-id="${apt.id}">
                     <i class="fa-regular fa-trash-can"></i>
                 </button>
@@ -1668,12 +2243,274 @@ function renderDayAppointments() {
         card.querySelector(".btn-delete-appointment").addEventListener("click", () => {
             cancelAppointment(apt.id, apt.cliente);
         });
+
+        // Evento de reagendar
+        const btnReschedule = card.querySelector(".btn-reschedule-appointment");
+        if (btnReschedule) {
+            btnReschedule.addEventListener("click", () => {
+                openRescheduleModal(apt);
+            });
+        }
+
+        // Evento de confirmar reserva con seña (Modal)
+        const btnSena = card.querySelector(".btn-confirm-appointment-sena");
+        if (btnSena) {
+            btnSena.addEventListener("click", () => {
+                openSenaModal(apt);
+            });
+        }
+
+        // Evento de cobrar turno
+        const btnCheckout = card.querySelector(".btn-checkout-appointment");
+        if (btnCheckout) {
+            btnCheckout.addEventListener("click", () => {
+                openCheckoutForAppointment(apt);
+            });
+        }
         
         container.appendChild(card);
     });
 }
 
-// Agendar Turno (Submit del formulario)
+// =========================================================================
+//                  MANEJO DE MODALES DE SEÑA Y REAGENDAMIENTO
+// =========================================================================
+let currentSenaAppointment = null;
+let currentRescheduleAppointment = null;
+
+function openSenaModal(apt) {
+    currentSenaAppointment = apt;
+    const sub = document.getElementById("sena-modal-sub");
+    if (sub) sub.textContent = `Modificar estado o cargar seña de ${apt.cliente}:`;
+    
+    const statusSelect = document.getElementById("sena-modal-status");
+    if (statusSelect) statusSelect.value = apt.estado || "Reservado";
+
+    const amt = document.getElementById("sena-modal-amount");
+    if (amt) amt.value = apt.precio ? apt.precio : "2500";
+    
+    const modal = document.getElementById("sena-modal");
+    if (modal) modal.classList.remove("hidden");
+}
+
+function closeSenaModal() {
+    currentSenaAppointment = null;
+    const modal = document.getElementById("sena-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+async function handleSenaSubmit(e) {
+    e.preventDefault();
+    if (!currentSenaAppointment) return;
+
+    const apt = currentSenaAppointment;
+    const newStatus = document.getElementById("sena-modal-status").value;
+    const sena = Number(document.getElementById("sena-modal-amount").value) || 0;
+    const metodo = document.querySelector('input[name="sena-modal-payment"]:checked').value;
+
+    closeSenaModal();
+    showLoader(true, "Actualizando turno en la nube...");
+
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({
+                action: "edit_appointment",
+                id: apt.id,
+                cliente: apt.cliente,
+                fecha: apt.fecha,
+                estado: newStatus,
+                precio: sena
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            apt.estado = newStatus;
+            apt.precio = sena;
+
+            if (newStatus === "Reservado" && sena > 0) {
+                await registerServiceDirectly({
+                    id: "serv_" + new Date().getTime(),
+                    fecha: new Date().toISOString(),
+                    usuario: state.currentUser ? state.currentUser.email : "Evolet",
+                    cliente: apt.cliente,
+                    servicio: "Seña",
+                    categoria: "Manicuría",
+                    precio: sena,
+                    seña: 0,
+                    metodoPago: metodo,
+                    completado: false
+                });
+            }
+
+            const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+            showToast(`¡Turno actualizado a "${newStatus}"!`, "success");
+            renderCalendar();
+            renderDayAppointments();
+        } else {
+            showToast(data.message || "Error al actualizar turno", "error");
+        }
+    } catch (err) {
+        console.error("Error al actualizar turno:", err);
+        showToast("Error de conexión. Inténtalo de nuevo.", "error");
+    } finally {
+        showLoader(false);
+    }
+}
+
+function openRescheduleModal(apt) {
+    currentRescheduleAppointment = apt;
+    const sub = document.getElementById("reschedule-modal-sub");
+    if (sub) sub.textContent = `Reagendar turno de ${apt.cliente} (Estado: ${apt.estado}):`;
+    
+    let dateStr = "";
+    let timeStr = "10:00";
+    if (apt.horaInicio) {
+        const d = new Date(apt.horaInicio);
+        if (!isNaN(d.getTime())) {
+            dateStr = d.toISOString().split('T')[0];
+            timeStr = d.toTimeString().substring(0, 5);
+        }
+    }
+    if (!dateStr && apt.fecha) {
+        dateStr = apt.fecha.substring(0, 10);
+    }
+    
+    document.getElementById("reschedule-date").value = dateStr;
+    document.getElementById("reschedule-time").value = timeStr;
+    const modal = document.getElementById("reschedule-modal");
+    if (modal) modal.classList.remove("hidden");
+}
+
+function closeRescheduleModal() {
+    currentRescheduleAppointment = null;
+    const modal = document.getElementById("reschedule-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+async function handleRescheduleSubmit(e) {
+    e.preventDefault();
+    if (!currentRescheduleAppointment) return;
+
+    const apt = currentRescheduleAppointment;
+    const newDate = document.getElementById("reschedule-date").value;
+    const newTime = document.getElementById("reschedule-time").value;
+
+    if (!newDate || !newTime) {
+        showToast("Selecciona fecha y hora para reagendar.", "error");
+        return;
+    }
+
+    const startIso = `${newDate}T${newTime}:00`;
+    const startDate = new Date(startIso);
+    const endDate = new Date(startDate.getTime() + (90 * 60 * 1000));
+    const endIso = endDate.toISOString();
+
+    closeRescheduleModal();
+    showLoader(true, "Reagendando turno en la nube y Google Calendar...");
+
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({
+                action: "edit_appointment",
+                id: apt.id,
+                fecha: newDate,
+                horaInicio: startDate.toISOString(),
+                horaFin: endIso
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            apt.fecha = newDate;
+            apt.horaInicio = startDate.toISOString();
+            apt.horaFin = endIso;
+
+            const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+            showToast("¡Turno reagendado con éxito!", "success");
+            
+            state.selectedCalendarDay = startDate;
+            state.calendarDate = startDate;
+            
+            renderCalendar();
+            renderDayAppointments();
+        } else {
+            showToast(data.message || "Error al reagendar el turno", "error");
+        }
+    } catch (err) {
+        console.error("Error al reagendar el turno:", err);
+        showToast("Error de conexión al reagendar.", "error");
+    } finally {
+        showLoader(false);
+    }
+}
+
+// Limpiar estado de cobro de turno
+function clearCheckoutState() {
+    state.linkedAppointment = null;
+    const senaBanner = document.getElementById("checkout-sena-banner");
+    if (senaBanner) senaBanner.classList.add("hidden");
+    
+    const cancelCheckoutBtn = document.getElementById("btn-cancel-checkout");
+    if (cancelCheckoutBtn) cancelCheckoutBtn.classList.add("hidden");
+    
+    const clientInput = document.getElementById("client-name");
+    if (clientInput) {
+        clientInput.readOnly = false;
+        clientInput.value = "";
+    }
+}
+
+function cancelCheckoutAndReturnToAgenda() {
+    clearCheckoutState();
+    switchTab("calendario");
+    showToast("Cobro cancelado. De vuelta en la Agenda.", "info");
+}
+
+// Abrir pantalla de registro pre-llenando los datos del turno y haciendo el nombre readonly
+function openCheckoutForAppointment(apt) {
+    state.linkedAppointment = apt;
+    
+    const clientInput = document.getElementById("client-name");
+    clientInput.value = apt.cliente;
+    clientInput.readOnly = true;
+    
+    const cancelCheckoutBtn = document.getElementById("btn-cancel-checkout");
+    if (cancelCheckoutBtn) cancelCheckoutBtn.classList.remove("hidden");
+    
+    // Crear o actualizar un banner informativo de seña en el formulario
+    let senaBanner = document.getElementById("checkout-sena-banner");
+    if (!senaBanner) {
+        senaBanner = document.createElement("div");
+        senaBanner.id = "checkout-sena-banner";
+        senaBanner.style.padding = "10px 14px";
+        senaBanner.style.background = "#e3f2fd";
+        senaBanner.style.color = "#0d47a1";
+        senaBanner.style.borderRadius = "var(--radius-sm)";
+        senaBanner.style.fontSize = "12px";
+        senaBanner.style.fontWeight = "600";
+        senaBanner.style.marginBottom = "15px";
+        senaBanner.style.display = "flex";
+        senaBanner.style.alignItems = "center";
+        senaBanner.style.gap = "8px";
+        
+        const form = document.getElementById("service-form");
+        form.insertBefore(senaBanner, form.firstChild);
+    }
+    senaBanner.innerHTML = `<i class="fa-solid fa-circle-info"></i> Turno Reservado. Seña de <strong>$${apt.precio}</strong> ya cobrada será descontada del total automáticamente.`;
+    senaBanner.classList.remove("hidden");
+    
+    switchTab("registrar");
+    showToast(`Cobrando turno de ${apt.cliente} (Seña: -$${apt.precio})`, "info");
+}
+
+// Envío del formulario de agendar turno
 async function handleScheduleSubmit(e) {
     e.preventDefault();
     
@@ -1691,7 +2528,12 @@ async function handleScheduleSubmit(e) {
         return;
     }
     
-    // Calcular horas ISO (Duración por defecto: 90 minutos, Servicio: "Turno", Precio: 0)
+    const statusVal = document.getElementById("schedule-status").value;
+    const senaAmount = Number(document.getElementById("schedule-sena-amount").value) || 0;
+    const paymentMethodEl = document.querySelector('input[name="schedule-payment"]:checked');
+    const senaPaymentMethod = paymentMethodEl ? paymentMethodEl.value : "Transferencia";
+
+    // Calcular horas ISO (Duración por defecto: 90 minutos, Servicio: "Turno", Precio: seña o 0)
     const start = new Date(`${dateVal}T${timeVal}`);
     const duration = 90;
     const end = new Date(start.getTime() + duration * 60000);
@@ -1704,10 +2546,14 @@ async function handleScheduleSubmit(e) {
         horaFin: end.toISOString(),
         cliente: cliente,
         servicio: "Turno",
-        precio: 0,
-        usuario: state.currentUser.email
+        precio: statusVal === "Reservado" ? senaAmount : 0,
+        usuario: state.currentUser.email,
+        estado: statusVal
     };
     
+    // Resetear formulario para siguientes llamadas
+    document.getElementById("schedule-form").reset();
+    document.getElementById("schedule-sena-fields").classList.add("hidden");
     document.getElementById("schedule-modal").classList.add("hidden");
     showLoader(true, "Agendando turno y sincronizando con Google Calendar...");
     
@@ -1733,6 +2579,23 @@ async function handleScheduleSubmit(e) {
             
             const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+            
+            if (statusVal === "Reservado" && senaAmount > 0) {
+                showLoader(true, "Registrando seña en la contabilidad...");
+                await registerServiceDirectly({
+                    id: "serv_" + new Date().getTime(),
+                    fecha: new Date().toISOString(), // Se registra con la fecha de hoy
+                    usuario: state.currentUser.email,
+                    cliente: cliente,
+                    servicio: "Seña",
+                    categoria: "Manicuría",
+                    precio: senaAmount,
+                    seña: 0,
+                    metodoPago: senaPaymentMethod,
+                    completado: false
+                });
+                showLoader(false);
+            }
             
             renderCalendar();
             renderDayAppointments();
@@ -1931,6 +2794,8 @@ function renderExpensesList() {
         
         const card = document.createElement("div");
         card.className = "appointment-card";
+        const isAdmin = state.currentUser && state.currentUser.rol === "admin";
+
         card.innerHTML = `
             <div class="appointment-time-col">
                 <span class="appointment-time-start">${day}/${monthStr}</span>
@@ -1946,17 +2811,23 @@ function renderExpensesList() {
                     </span>
                 </div>
             </div>
+            ${isAdmin ? `
             <div class="appointment-actions-col">
                 <button class="btn-delete-expense btn-delete-appointment" title="Eliminar Gasto" data-id="${exp.id}">
                     <i class="fa-regular fa-trash-can"></i>
                 </button>
             </div>
+            ` : ''}
         `;
         
-        // Asignar el listener de eliminación
-        card.querySelector(".btn-delete-expense").addEventListener("click", () => {
-            deleteExpenseRecord(exp.id, exp.concepto);
-        });
+        if (isAdmin) {
+            const deleteBtn = card.querySelector(".btn-delete-expense");
+            if (deleteBtn) {
+                deleteBtn.addEventListener("click", () => {
+                    deleteExpenseRecord(exp.id, exp.concepto);
+                });
+            }
+        }
         
         container.appendChild(card);
     });
@@ -2048,8 +2919,12 @@ async function handleExpenseSubmit(e) {
     }
 }
 
-// Eliminar registro de gasto
+// Eliminar registro de gasto (Solo Administradores)
 function deleteExpenseRecord(id, concepto) {
+    if (!state.currentUser || state.currentUser.rol !== "admin") {
+        showToast("Solo los administradores pueden eliminar gastos.", "error");
+        return;
+    }
     showGenericConfirmModal(
         "Eliminar Gasto",
         `¿Segura de que deseas eliminar el gasto por "${concepto}"?`,
@@ -2134,6 +3009,8 @@ function renderExpensesHistoryList() {
         const payIcon = payIcons[item.metodoPago] || '<i class="fa-solid fa-receipt"></i>';
         const totalFormatted = `$${Number(item.monto).toLocaleString("es-AR")}`;
         
+        const isAdmin = state.currentUser && state.currentUser.rol === "admin";
+
         card.innerHTML = `
             <div class="card-details">
                 <div class="card-client">${escapeHtml(item.concepto)}</div>
@@ -2146,14 +3023,21 @@ function renderExpensesHistoryList() {
             <div class="card-amount-box">
                 <div class="card-price" style="font-size: 18px; color: var(--barbie-dark);">${totalFormatted}</div>
             </div>
-            <button class="btn-delete-card" title="Eliminar Gasto">
+            ${isAdmin ? `
+            <button class="btn-delete-card btn-delete-expense-history" title="Eliminar Gasto">
                 <i class="fa-solid fa-trash-can"></i>
             </button>
+            ` : ''}
         `;
         
-        card.querySelector(".btn-delete-card").addEventListener("click", () => {
-            deleteExpenseRecord(item.id, item.concepto);
-        });
+        if (isAdmin) {
+            const deleteBtn = card.querySelector(".btn-delete-expense-history");
+            if (deleteBtn) {
+                deleteBtn.addEventListener("click", () => {
+                    deleteExpenseRecord(item.id, item.concepto);
+                });
+            }
+        }
         
         listElement.appendChild(card);
     });

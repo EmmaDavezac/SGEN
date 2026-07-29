@@ -388,6 +388,63 @@ button {
     outline: none;
 }
 
+input::placeholder,
+select::placeholder {
+    color: #aaaaaa;
+    opacity: 0.8;
+    transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+input:focus::placeholder {
+    color: transparent !important;
+    opacity: 0 !important;
+}
+
+/* Barbie Switch Toggle */
+.switch-toggle {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 26px;
+    flex-shrink: 0;
+}
+
+.switch-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.switch-toggle .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #d1d5db;
+    transition: var(--transition);
+    border-radius: 26px;
+}
+
+.switch-toggle .slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: var(--transition);
+    border-radius: 50%;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.switch-toggle input:checked + .slider {
+    background: linear-gradient(135deg, var(--barbie-pink) 0%, var(--barbie-dark) 100%);
+}
+
+.switch-toggle input:checked + .slider:before {
+    transform: translateX(22px);
+}
+
 .form-row-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1652,6 +1709,67 @@ button {
     color: var(--text-muted);
     border-left: none;
     text-align: center;
+}
+
+/* Modificadores para pildoras del calendario según el estado */
+.event-preview-pill.provisional {
+    background-color: #f3f4f6;
+    color: #4b5563;
+    border-left-color: #f59e0b; /* Borde ámbar/naranja provisional */
+}
+.event-preview-pill.reservado,
+.event-preview-pill.reserved {
+    background-color: #e0f2fe;
+    color: #0369a1;
+    border-left-color: #0284c7; /* Borde azul reservado */
+}
+.event-preview-pill.completado,
+.event-preview-pill.completed {
+    background-color: var(--barbie-light);
+    color: var(--barbie-dark);
+    border-left-color: var(--barbie-pink);
+}
+
+/* Modificadores para tarjetas del listado de turnos */
+.appointment-card.provisional {
+    border: 2px dashed #d1d5db;
+    background-color: #f9fafb;
+}
+.appointment-card.provisional .appointment-time-start {
+    color: #6b7280;
+}
+.appointment-card.provisional:hover {
+    border-color: #9ca3af;
+}
+
+.appointment-card.reservado,
+.appointment-card.reserved {
+    border: 2px solid #7dd3fc;
+    background-color: #f0f9ff;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
+}
+.appointment-card.reservado .appointment-time-start,
+.appointment-card.reserved .appointment-time-start {
+    color: #0284c7;
+    font-weight: 700;
+}
+.appointment-card.reservado:hover,
+.appointment-card.reserved:hover {
+    border-color: #0284c7;
+}
+
+.appointment-card.completado,
+.appointment-card.completed {
+    border: 2px solid var(--barbie-pink);
+    background: linear-gradient(135deg, var(--white) 70%, var(--barbie-pale) 100%);
+}
+.appointment-card.completado .appointment-time-start,
+.appointment-card.completed .appointment-time-start {
+    color: var(--barbie-dark);
+}
+.appointment-card.completado:hover,
+.appointment-card.completed:hover {
+    border-color: var(--barbie-pink);
 }
 
 /* Tarjetas de Turnos */
