@@ -1646,17 +1646,9 @@ function renderDayAppointments() {
         const end = new Date(apt.horaFin);
         const timeStr = start.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
         
-        // Calcular duración
-        const diffMs = end - start;
-        const diffMins = Math.round(diffMs / 60000);
-        const durationStr = diffMins >= 60 
-            ? `${(diffMins / 60).toFixed(1).replace(".0", "")} h` 
-            : `${diffMins} min`;
-            
         card.innerHTML = `
             <div class="appointment-time-col">
                 <span class="appointment-time-start">${timeStr}</span>
-                <span class="appointment-time-duration"><i class="fa-regular fa-clock"></i> ${durationStr}</span>
             </div>
             <div class="appointment-info-col">
                 <div class="appointment-client-name">${escapeHtml(apt.cliente)}</div>
