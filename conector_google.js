@@ -777,14 +777,7 @@ function deleteExpense(id) {
 
 // Función de diagnóstico para forzar los permisos de Google Calendar
 function testCalendarAccess() {
-  const cal = getCalendar();
-  if (cal) {
-    Logger.log("Calendario obtenido con éxito: " + cal.getName());
-    const event = cal.createEvent("Prueba de Conexión", new Date(), new Date(new Date().getTime() + 30*60*1000));
-    Logger.log("Evento de prueba creado. ID: " + event.getId());
-    cal.deleteEvent(event);
-    Logger.log("Evento de prueba de Calendar ejecutado correctamente.");
-  } else {
-    Logger.log("No se pudo obtener el calendario.");
-  }
+  // Llamada directa sin try-catch para obligar a Apps Script a mostrar el cartel de autorización
+  const cal = CalendarApp.getDefaultCalendar();
+  Logger.log("Calendario obtenido con éxito: " + cal.getName());
 }
