@@ -665,9 +665,21 @@ function editAppointment(data) {
     return jsonResponse({ success: false, message: "La pestaña 'Turnos' no existe" });
   }
   
-  const rows = sheet.getDataRange().getValues();
+  const targetId = id ? id.toString().trim() : "";
+  const targetEventId = data.eventId ? data.eventId.toString().trim() : "";
+  const targetCliente = data.cliente ? data.cliente.toString().trim().toLowerCase() : "";
+
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] && rows[i][0].toString().trim() === id.toString().trim()) {
+    const rowId = rows[i][0] ? rows[i][0].toString().trim() : "";
+    const rowEventId = rows[i][8] ? rows[i][8].toString().trim() : "";
+    const rowCliente = rows[i][4] ? rows[i][4].toString().trim().toLowerCase() : "";
+    const rowFecha = rows[i][1] ? rows[i][1].toString().trim() : "";
+
+    const isMatch = (targetId && rowId === targetId) ||
+                    (targetEventId && rowEventId === targetEventId) ||
+                    (targetCliente && rowCliente === targetCliente && (!data.fecha || rowFecha === data.fecha));
+
+    if (isMatch) {
       const rowNum = i + 1;
       
       if (data.estado) {

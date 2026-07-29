@@ -2036,9 +2036,14 @@ let currentRescheduleAppointment = null;
 function openSenaModal(apt) {
     currentSenaAppointment = apt;
     const sub = document.getElementById("sena-modal-sub");
-    if (sub) sub.textContent = `Ingresa la seña recibida para confirmar la reserva de ${apt.cliente}:`;
+    if (sub) sub.textContent = `Modificar estado o cargar seña de ${apt.cliente}:`;
+    
+    const statusSelect = document.getElementById("sena-modal-status");
+    if (statusSelect) statusSelect.value = apt.estado || "Reservado";
+
     const amt = document.getElementById("sena-modal-amount");
-    if (amt) amt.value = "2500";
+    if (amt) amt.value = apt.precio ? apt.precio : "2500";
+    
     const modal = document.getElementById("sena-modal");
     if (modal) modal.classList.remove("hidden");
 }
@@ -2054,11 +2059,12 @@ async function handleSenaSubmit(e) {
     if (!currentSenaAppointment) return;
 
     const apt = currentSenaAppointment;
+    const newStatus = document.getElementById("sena-modal-status").value;
     const sena = Number(document.getElementById("sena-modal-amount").value) || 0;
     const metodo = document.querySelector('input[name="sena-modal-payment"]:checked').value;
 
     closeSenaModal();
-    showLoader(true, "Confirmando reserva y registrando seña en la nube...");
+    showLoader(true, "Actualizando turno en la nube...");
 
     try {
         const response = await fetch(CONFIG_SHEET_URL, {
@@ -2068,16 +2074,18 @@ async function handleSenaSubmit(e) {
             body: JSON.stringify({
                 action: "edit_appointment",
                 id: apt.id,
-                estado: "Reservado",
+                cliente: apt.cliente,
+                fecha: apt.fecha,
+                estado: newStatus,
                 precio: sena
             })
         });
         const data = await response.json();
         if (data.success) {
-            apt.estado = "Reservado";
+            apt.estado = newStatus;
             apt.precio = sena;
 
-            if (sena > 0) {
+            if (newStatus === "Reservado" && sena > 0) {
                 await registerServiceDirectly({
                     id: "serv_" + new Date().getTime(),
                     fecha: new Date().toISOString(),
@@ -2094,14 +2102,14 @@ async function handleSenaSubmit(e) {
 
             const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-            showToast("¡Turno reservado y seña cargada correctamente!", "success");
+            showToast(`¡Turno actualizado a "${newStatus}"!`, "success");
             renderCalendar();
             renderDayAppointments();
         } else {
-            showToast(data.message || "Error al confirmar reserva", "error");
+            showToast(data.message || "Error al actualizar turno", "error");
         }
     } catch (err) {
-        console.error("Error al confirmar reserva:", err);
+        console.error("Error al actualizar turno:", err);
         showToast("Error de conexión. Inténtalo de nuevo.", "error");
     } finally {
         showLoader(false);

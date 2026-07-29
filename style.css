@@ -1668,15 +1668,17 @@ input:focus::placeholder {
 
 /* Modificadores para pildoras del calendario según el estado */
 .event-preview-pill.provisional {
-    background-color: #f0f0f0;
-    color: #777777;
-    border-left-color: #bbbbbb;
+    background-color: #f3f4f6;
+    color: #4b5563;
+    border-left-color: #f59e0b; /* Borde ámbar/naranja provisional */
 }
+.event-preview-pill.reservado,
 .event-preview-pill.reserved {
-    background-color: #e3f2fd;
-    color: #0d47a1;
-    border-left-color: #1e88e5;
+    background-color: #e0f2fe;
+    color: #0369a1;
+    border-left-color: #0284c7; /* Borde azul reservado */
 }
+.event-preview-pill.completado,
 .event-preview-pill.completed {
     background-color: var(--barbie-light);
     color: var(--barbie-dark);
@@ -1685,34 +1687,42 @@ input:focus::placeholder {
 
 /* Modificadores para tarjetas del listado de turnos */
 .appointment-card.provisional {
-    border-color: #e0e0e0;
-    background-color: #fafafa;
+    border: 2px dashed #d1d5db;
+    background-color: #f9fafb;
 }
 .appointment-card.provisional .appointment-time-start {
-    color: var(--text-muted);
+    color: #6b7280;
 }
 .appointment-card.provisional:hover {
-    border-color: #bbbbbb;
+    border-color: #9ca3af;
 }
 
+.appointment-card.reservado,
 .appointment-card.reserved {
-    border-color: #b3d7ff;
-    background-color: #f7faff;
+    border: 2px solid #7dd3fc;
+    background-color: #f0f9ff;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
 }
+.appointment-card.reservado .appointment-time-start,
 .appointment-card.reserved .appointment-time-start {
-    color: #0056b3;
+    color: #0284c7;
+    font-weight: 700;
 }
+.appointment-card.reservado:hover,
 .appointment-card.reserved:hover {
-    border-color: #007bff;
+    border-color: #0284c7;
 }
 
+.appointment-card.completado,
 .appointment-card.completed {
-    border-color: var(--barbie-light);
+    border: 2px solid var(--barbie-pink);
     background: linear-gradient(135deg, var(--white) 70%, var(--barbie-pale) 100%);
 }
+.appointment-card.completado .appointment-time-start,
 .appointment-card.completed .appointment-time-start {
     color: var(--barbie-dark);
 }
+.appointment-card.completado:hover,
 .appointment-card.completed:hover {
     border-color: var(--barbie-pink);
 }
