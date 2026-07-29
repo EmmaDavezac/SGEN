@@ -576,6 +576,10 @@ button {
 
 .section-title h3 {
     font-size: 22px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
 }
 
 .section-title p {
