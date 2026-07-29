@@ -238,6 +238,17 @@ function setupEventListeners() {
     // Envío del formulario de agendar turno
     document.getElementById("schedule-form").addEventListener("submit", handleScheduleSubmit);
 
+    // Mostrar/ocultar campos de seña según estado del turno
+    document.getElementById("schedule-status").addEventListener("change", (e) => {
+        const senaFields = document.getElementById("schedule-sena-fields");
+        if (e.target.value === "Reservado") {
+            senaFields.classList.remove("hidden");
+        } else {
+            senaFields.classList.add("hidden");
+            document.getElementById("schedule-sena-amount").value = "0";
+        }
+    });
+
     // Envío del formulario de registrar gasto
     document.getElementById("expense-form").addEventListener("submit", handleExpenseSubmit);
 
@@ -545,7 +556,13 @@ function handleServiceSubmit(e) {
         return;
     }
 
-    // Estructura de transacción pre-cobrada por completo (seña=0, completado="Sí")
+    // Calcular si hay seña vinculada
+    let senaAmount = 0;
+    if (state.linkedAppointment && state.linkedAppointment.cliente === clientName) {
+        senaAmount = Number(state.linkedAppointment.precio) || 0;
+    }
+
+    // Estructura de transacción pre-cobrada por completo (seña=senaAmount, completado="Sí")
     const transaction = {
         id: "evt_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000),
         fecha: new Date().toISOString(),
@@ -554,7 +571,7 @@ function handleServiceSubmit(e) {
         servicio: serviceName,
         categoria: state.selectedCategory,
         precio: price,
-        seña: 0,
+        seña: senaAmount,
         metodoPago: paymentMethod,
         completado: "Sí"
     };
@@ -564,7 +581,14 @@ function handleServiceSubmit(e) {
 
     document.getElementById("confirm-client").textContent = transaction.cliente;
     document.getElementById("confirm-service").textContent = transaction.servicio;
-    document.getElementById("confirm-price").textContent = `$${transaction.precio.toLocaleString("es-AR")}`;
+    
+    if (senaAmount > 0) {
+        const netPrice = price - senaAmount;
+        document.getElementById("confirm-price").innerHTML = `Total: $${price.toLocaleString("es-AR")} <br> <span style="font-size: 11px; color: var(--text-muted);">Seña: -$${senaAmount.toLocaleString("es-AR")} | Neto: <strong>$${netPrice.toLocaleString("es-AR")}</strong></span>`;
+    } else {
+        document.getElementById("confirm-price").textContent = `$${transaction.precio.toLocaleString("es-AR")}`;
+    }
+    
     document.getElementById("confirm-payment").textContent = transaction.metodoPago;
 
     document.getElementById("confirm-modal").classList.remove("hidden");
@@ -612,6 +636,39 @@ async function confirmServiceRegistration() {
             saveServicesCache();
             updateClientAutocomplete(); // Recargar el autocompletado
             showToast("¡Servicio guardado con éxito!", "success");
+            
+            // Si el servicio estaba vinculado a un turno, eliminar el turno
+            if (state.linkedAppointment) {
+                const aptId = state.linkedAppointment.id;
+                state.linkedAppointment = null;
+                const banner = document.getElementById("checkout-sena-banner");
+                if (banner) banner.classList.add("hidden");
+                
+                // Borrar el turno de forma silenciosa de la nube
+                try {
+                    await fetch(CONFIG_SHEET_URL, {
+                        method: "POST",
+                        mode: "cors",
+                        headers: { "Content-Type": "text/plain" },
+                        body: JSON.stringify({
+                            action: "delete_appointment",
+                            id: aptId,
+                            email: state.currentUser.email
+                        })
+                    });
+                    
+                    // Remover de la lista local
+                    state.appointmentsList = state.appointmentsList.filter(x => x.id !== aptId);
+                    const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+                    localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+                    
+                    renderCalendar();
+                    renderDayAppointments();
+                } catch (delErr) {
+                    console.error("Error al remover el turno después de cobrar:", delErr);
+                }
+            }
+            
             renderHistoryList();
             calculateAndRenderStats();
             resetServiceForm();
@@ -625,6 +682,40 @@ async function confirmServiceRegistration() {
         showToast("Error de conexión. Se guardó localmente en tu iPhone y se subirá luego.", "warning");
         resetServiceForm();
     }
+}
+
+async function registerServiceDirectly(transaction) {
+    if (!CONFIG_SHEET_URL) {
+        showToast("Por favor configura la URL de tu Google Sheet en app.js para poder guardar.", "error");
+        return null;
+    }
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            body: JSON.stringify({
+                action: "add_service",
+                ...transaction
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            state.servicesList.unshift(data.service);
+            saveServicesCache();
+            updateClientAutocomplete();
+            renderHistoryList();
+            calculateAndRenderStats();
+            return data.service;
+        } else {
+            console.error("Error al registrar servicio directamente en Sheets:", data.message);
+        }
+    } catch (err) {
+        console.error("Error al registrar servicio directamente:", err);
+    }
+    return null;
 }
 
 function resetServiceForm() {
@@ -874,10 +965,13 @@ function calculateAndRenderStats() {
             const itemDateStr = item.fecha.substring(0, 10);
             if (itemDateStr >= todayStr) {
                 const precio = Number(item.precio) || 0;
+                const seña = Number(item.seña) || 0;
+                const neto = precio - seña;
+                
                 if (item.metodoPago === "Efectivo") {
-                    todayEfectivoIncome += precio;
+                    todayEfectivoIncome += neto;
                 } else if (item.metodoPago === "Transferencia") {
-                    todayMpIncome += precio;
+                    todayMpIncome += neto;
                 }
             }
         }
@@ -1056,6 +1150,93 @@ function calculateAndRenderStats() {
     }
 
     renderPopularServices(serviceCounts);
+    renderDebtorsList();
+}
+
+// Renderizar el listado dinámico de deudores (fiados)
+function renderDebtorsList() {
+    const debtors = state.servicesList.filter(item => item.metodoPago === "Fiado");
+    const panel = document.getElementById("debtors-panel");
+    const container = document.getElementById("debtors-list-container");
+    if (!panel || !container) return;
+    
+    if (debtors.length === 0) {
+        panel.classList.add("hidden");
+        return;
+    }
+    
+    panel.classList.remove("hidden");
+    container.innerHTML = "";
+    
+    debtors.forEach(debt => {
+        const card = document.createElement("div");
+        card.className = "appointment-card";
+        card.style.borderColor = "#ffb3b3";
+        card.style.background = "#fffefe";
+        
+        const dateStr = debt.fecha ? new Date(debt.fecha).toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' }) : "-";
+        
+        card.innerHTML = `
+            <div class="appointment-time-col" style="border-right-color: #ffcccc; min-width: 60px;">
+                <span class="appointment-time-start" style="color: #cc0000; font-size: 13px;">${dateStr}</span>
+            </div>
+            <div class="appointment-info-col">
+                <div class="appointment-client-name">${escapeHtml(debt.cliente)}</div>
+                <div class="appointment-service-name" style="color: #666;">
+                    ${escapeHtml(debt.servicio)} — <strong style="color: #cc0000;">$${debt.precio.toLocaleString("es-AR")}</strong>
+                </div>
+            </div>
+            <div class="appointment-actions-col">
+                <button class="btn-collect-debt btn btn-success" data-id="${debt.id}" style="width: auto; padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: var(--radius-sm); border: none; display: flex; align-items: center; gap: 4px; background: #2e7d32; color: white;">
+                    <i class="fa-solid fa-money-bill-wave"></i> Cobrar
+                </button>
+            </div>
+        `;
+        
+        card.querySelector(".btn-collect-debt").addEventListener("click", () => {
+            collectDebt(debt);
+        });
+        
+        container.appendChild(card);
+    });
+}
+
+// Cobrar una deuda pendiente (pasar de Fiado a Efectivo/Transferencia)
+async function collectDebt(debt) {
+    const metodo = confirm(`¿El cobro de la deuda de $${debt.precio} de ${debt.cliente} fue por transferencia / MercadoPago?\n(Aceptar = MercadoPago/Transferencia, Cancelar = Efectivo)`) ? "Transferencia" : "Efectivo";
+    
+    showLoader(true, "Registrando pago de deuda en la nube...");
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({
+                action: "edit_service",
+                id: debt.id,
+                metodoPago: metodo,
+                fecha: new Date().toISOString()
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            showToast("¡Deuda cobrada e ingresada a la caja correctamente!", "success");
+            
+            // Actualizar localmente el servicio
+            debt.metodoPago = metodo;
+            debt.fecha = new Date().toISOString();
+            
+            saveServicesCache();
+            calculateAndRenderStats();
+        } else {
+            showToast(data.message || "Error al cobrar la deuda", "error");
+        }
+    } catch (err) {
+        console.error("Error al cobrar la deuda:", err);
+        showToast("Error de conexión. Inténtalo de nuevo.", "error");
+    } finally {
+        showLoader(false);
+    }
 }
 
 function renderPopularServices(serviceCounts) {
@@ -1568,7 +1749,8 @@ function renderCalendar() {
             const maxVisible = 2;
             dayApts.slice(0, maxVisible).forEach(apt => {
                 const pill = document.createElement("div");
-                pill.className = "event-preview-pill";
+                const statusClass = (apt.estado || "Provisional").toLowerCase();
+                pill.className = `event-preview-pill ${statusClass}`;
                 pill.textContent = apt.cliente;
                 previewContainer.appendChild(pill);
             });
@@ -1640,7 +1822,8 @@ function renderDayAppointments() {
     
     dayApts.forEach(apt => {
         const card = document.createElement("div");
-        card.className = "appointment-card";
+        const statusClass = (apt.estado || "Provisional").toLowerCase();
+        card.className = `appointment-card ${statusClass}`;
         
         const start = new Date(apt.horaInicio);
         const end = new Date(apt.horaFin);
@@ -1654,10 +1837,20 @@ function renderDayAppointments() {
                 <div class="appointment-client-name">${escapeHtml(apt.cliente)}</div>
                 <div class="appointment-service-name">
                     <i class="fa-solid fa-sparkles" style="color: var(--barbie-pink); font-size: 9px;"></i> 
-                    ${escapeHtml(apt.servicio)} — <strong>$${apt.precio.toLocaleString("es-AR")}</strong>
+                    ${apt.estado === "Reservado" ? `Reservado (Seña: $${apt.precio.toLocaleString("es-AR")})` : `Provisional`}
                 </div>
             </div>
-            <div class="appointment-actions-col">
+            <div class="appointment-actions-col" style="display: flex; gap: 8px; align-items: center;">
+                ${apt.estado === "Provisional" ? `
+                    <button class="btn-confirm-appointment-sena" title="Cargar Seña" data-id="${apt.id}" style="background: #e3f2fd; color: #0d47a1; border: none; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
+                        <i class="fa-solid fa-check-double" style="font-size: 11px;"></i>
+                    </button>
+                ` : ''}
+                ${apt.estado === "Reservado" ? `
+                    <button class="btn-checkout-appointment" title="Cobrar Turno" data-id="${apt.id}" style="background: #e8f5e9; color: #2e7d32; border: none; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
+                        <i class="fa-solid fa-dollar-sign" style="font-size: 11px;"></i>
+                    </button>
+                ` : ''}
                 <button class="btn-delete-appointment" title="Cancelar Turno" data-id="${apt.id}">
                     <i class="fa-regular fa-trash-can"></i>
                 </button>
@@ -1668,12 +1861,114 @@ function renderDayAppointments() {
         card.querySelector(".btn-delete-appointment").addEventListener("click", () => {
             cancelAppointment(apt.id, apt.cliente);
         });
+
+        // Evento de confirmar reserva con seña
+        const btnSena = card.querySelector(".btn-confirm-appointment-sena");
+        if (btnSena) {
+            btnSena.addEventListener("click", async () => {
+                const senaStr = prompt(`Ingresa el monto de la seña ($) para confirmar la reserva de ${apt.cliente}:`, "2500");
+                if (senaStr === null) return;
+                const sena = Number(senaStr) || 0;
+                const metodo = confirm("¿El pago fue por transferencia / MercadoPago?\n(Aceptar = MercadoPago/Transferencia, Cancelar = Efectivo)") ? "Transferencia" : "Efectivo";
+                
+                showLoader(true, "Confirmando reserva y registrando seña en la nube...");
+                try {
+                    const response = await fetch(CONFIG_SHEET_URL, {
+                        method: "POST",
+                        mode: "cors",
+                        headers: { "Content-Type": "text/plain" },
+                        body: JSON.stringify({
+                            action: "edit_appointment",
+                            id: apt.id,
+                            estado: "Reservado",
+                            precio: sena
+                        })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        // Actualizar localmente el turno
+                        apt.estado = "Reservado";
+                        apt.precio = sena;
+                        
+                        // Guardar en la contabilidad
+                        if (sena > 0) {
+                            await registerServiceDirectly({
+                                id: "serv_" + new Date().getTime(),
+                                fecha: new Date().toISOString(),
+                                usuario: state.currentUser ? state.currentUser.email : "Evolet",
+                                cliente: apt.cliente,
+                                servicio: "Seña",
+                                categoria: "Manicuría",
+                                precio: sena,
+                                seña: 0,
+                                metodoPago: metodo,
+                                completado: false
+                            });
+                        }
+                        
+                        const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+                        localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+                        showToast("¡Turno reservado y seña cargada correctamente!", "success");
+                        renderCalendar();
+                        renderDayAppointments();
+                    } else {
+                        showToast(data.message || "Error al confirmar reserva", "error");
+                    }
+                } catch (err) {
+                    console.error("Error al confirmar reserva:", err);
+                    showToast("Error de conexión. Inténtalo de nuevo.", "error");
+                } finally {
+                    showLoader(false);
+                }
+            });
+        }
+
+        // Evento de cobrar turno
+        const btnCheckout = card.querySelector(".btn-checkout-appointment");
+        if (btnCheckout) {
+            btnCheckout.addEventListener("click", () => {
+                openCheckoutForAppointment(apt);
+            });
+        }
         
         container.appendChild(card);
     });
 }
 
-// Agendar Turno (Submit del formulario)
+// Abrir pantalla de registro pre-llenando los datos del turno y aplicando la seña
+function openCheckoutForAppointment(apt) {
+    state.linkedAppointment = apt;
+    switchTab("registrar");
+    
+    // Rellenar campos del formulario
+    document.getElementById("client-name").value = apt.cliente;
+    
+    // Crear o actualizar un banner informativo de seña en el formulario
+    let senaBanner = document.getElementById("checkout-sena-banner");
+    if (!senaBanner) {
+        senaBanner = document.createElement("div");
+        senaBanner.id = "checkout-sena-banner";
+        senaBanner.style.padding = "10px 14px";
+        senaBanner.style.background = "#e3f2fd";
+        senaBanner.style.color = "#0d47a1";
+        senaBanner.style.borderRadius = "var(--radius-sm)";
+        senaBanner.style.fontSize = "12px";
+        senaBanner.style.fontWeight = "600";
+        senaBanner.style.marginBottom = "15px";
+        senaBanner.style.display = "flex";
+        senaBanner.style.alignItems = "center";
+        senaBanner.style.gap = "8px";
+        
+        const form = document.getElementById("service-form");
+        form.insertBefore(senaBanner, form.firstChild);
+    }
+    senaBanner.innerHTML = `<i class="fa-solid fa-circle-info"></i> Turno Reservado. Seña de <strong>$${apt.precio}</strong> ya cobrada será descontada del total automáticamente.`;
+    senaBanner.classList.remove("hidden");
+    
+    showToast(`Cobrando turno de ${apt.cliente} (Seña: -$${apt.precio})`, "info");
+}
+
+// Envío del formulario de agendar turno
 async function handleScheduleSubmit(e) {
     e.preventDefault();
     
@@ -1691,7 +1986,12 @@ async function handleScheduleSubmit(e) {
         return;
     }
     
-    // Calcular horas ISO (Duración por defecto: 90 minutos, Servicio: "Turno", Precio: 0)
+    const statusVal = document.getElementById("schedule-status").value;
+    const senaAmount = Number(document.getElementById("schedule-sena-amount").value) || 0;
+    const paymentMethodEl = document.querySelector('input[name="schedule-payment"]:checked');
+    const senaPaymentMethod = paymentMethodEl ? paymentMethodEl.value : "Transferencia";
+
+    // Calcular horas ISO (Duración por defecto: 90 minutos, Servicio: "Turno", Precio: seña o 0)
     const start = new Date(`${dateVal}T${timeVal}`);
     const duration = 90;
     const end = new Date(start.getTime() + duration * 60000);
@@ -1704,10 +2004,14 @@ async function handleScheduleSubmit(e) {
         horaFin: end.toISOString(),
         cliente: cliente,
         servicio: "Turno",
-        precio: 0,
-        usuario: state.currentUser.email
+        precio: statusVal === "Reservado" ? senaAmount : 0,
+        usuario: state.currentUser.email,
+        estado: statusVal
     };
     
+    // Resetear formulario para siguientes llamadas
+    document.getElementById("schedule-form").reset();
+    document.getElementById("schedule-sena-fields").classList.add("hidden");
     document.getElementById("schedule-modal").classList.add("hidden");
     showLoader(true, "Agendando turno y sincronizando con Google Calendar...");
     
@@ -1733,6 +2037,23 @@ async function handleScheduleSubmit(e) {
             
             const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+            
+            if (statusVal === "Reservado" && senaAmount > 0) {
+                showLoader(true, "Registrando seña en la contabilidad...");
+                await registerServiceDirectly({
+                    id: "serv_" + new Date().getTime(),
+                    fecha: new Date().toISOString(), // Se registra con la fecha de hoy
+                    usuario: state.currentUser.email,
+                    cliente: cliente,
+                    servicio: "Seña",
+                    categoria: "Manicuría",
+                    precio: senaAmount,
+                    seña: 0,
+                    metodoPago: senaPaymentMethod,
+                    completado: false
+                });
+                showLoader(false);
+            }
             
             renderCalendar();
             renderDayAppointments();

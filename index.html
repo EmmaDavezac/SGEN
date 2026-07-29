@@ -180,6 +180,13 @@
                                     <span>Efectivo</span>
                                 </div>
                             </label>
+                            <label class="pay-btn">
+                                <input type="radio" name="payment-method" value="Fiado">
+                                <div class="pay-btn-content">
+                                    <span class="pay-icon"><i class="fa-solid fa-hand-holding-hand"></i></span>
+                                    <span>Fiado</span>
+                                </div>
+                            </label>
                         </div>
                     </div>
 
@@ -292,6 +299,17 @@
                             <span class="stat-label">Ticket Promedio</span>
                             <h2 id="stat-average-ticket">$0</h2>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Panel de Deudores (Fiados) - Oculto por defecto -->
+                <div id="debtors-panel" class="chart-section hidden" style="margin-top: 25px; border: 2px dashed #ffb3b3; background: #fffcfc;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <i class="fa-solid fa-hand-holding-hand" style="color: #ff4d4d; font-size: 18px;"></i>
+                        <h4 style="margin-bottom: 0; color: #cc0000;">Clientes que Deben (Fiados)</h4>
+                    </div>
+                    <div id="debtors-list-container" class="day-appointments-container">
+                        <!-- Lista de deudoras generada dinámicamente -->
                     </div>
                 </div>
 
@@ -660,6 +678,46 @@
                         <div class="input-wrapper">
                             <i class="fa-solid fa-clock input-icon"></i>
                             <input type="time" id="schedule-time" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="schedule-status">Estado del Turno</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-circle-info input-icon"></i>
+                        <select id="schedule-status" required>
+                            <option value="Provisional" selected>Provisional (A confirmar)</option>
+                            <option value="Reservado">Reservado con Seña</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="schedule-sena-fields" class="hidden">
+                    <div class="form-group">
+                        <label for="schedule-sena-amount">Monto de la Seña ($)</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-dollar-sign input-icon"></i>
+                            <input type="number" id="schedule-sena-amount" placeholder="0" min="0" value="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Método de Pago de la Seña</label>
+                        <div class="payment-method-selector">
+                            <label class="pay-btn">
+                                <input type="radio" name="schedule-payment" value="Efectivo" checked>
+                                <div class="pay-btn-content">
+                                    <i class="fa-solid fa-money-bill-wave pay-icon"></i>
+                                    Efectivo
+                                </div>
+                            </label>
+                            <label class="pay-btn">
+                                <input type="radio" name="schedule-payment" value="Transferencia">
+                                <div class="pay-btn-content">
+                                    <i class="fa-solid fa-mobile-screen-button pay-icon"></i>
+                                    Transferencia
+                                </div>
+                            </label>
                         </div>
                     </div>
                 </div>
