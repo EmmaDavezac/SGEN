@@ -665,6 +665,8 @@ function editAppointment(data) {
     return jsonResponse({ success: false, message: "La pestaña 'Turnos' no existe" });
   }
   
+  const rows = sheet.getDataRange().getValues();
+  
   const targetId = id ? id.toString().trim() : "";
   const targetEventId = data.eventId ? data.eventId.toString().trim() : "";
   const targetCliente = data.cliente ? data.cliente.toString().trim().toLowerCase() : "";
