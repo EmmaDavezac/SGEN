@@ -692,9 +692,9 @@ function editAppointment(data) {
         sheet.getRange(rowNum, 9).setValue(data.eventId);
       }
       
-      // Actualizar evento en Google Calendar si el estado cambió
+      // Actualizar evento en Google Calendar si existe rowEventId
       const rowEventId = rows[i][8];
-      if (rowEventId && data.estado) {
+      if (rowEventId) {
         try {
           const cal = getCalendar();
           if (cal) {
@@ -704,10 +704,14 @@ function editAppointment(data) {
               const servicio = data.servicio || rows[i][5];
               const precio = data.precio !== undefined ? Number(data.precio) : Number(rows[i][6]);
               const usuario = rows[i][7];
+              const estado = data.estado || rows[i][9] || "Provisional";
               
+              if (data.horaInicio && data.horaFin) {
+                event.setTime(new Date(data.horaInicio), new Date(data.horaFin));
+              }
               // Actualizar título y descripción
-              event.setTitle(cliente + (data.estado === "Provisional" ? " (Provisional)" : ""));
-              event.setDescription("Turno " + data.estado + " para: " + cliente + "\nServicio: " + servicio + "\nPrecio: $" + precio + "\nRegistrado por: " + usuario);
+              event.setTitle(cliente + (estado === "Provisional" ? " (Provisional)" : ""));
+              event.setDescription("Turno " + estado + " para: " + cliente + "\nServicio: " + servicio + "\nPrecio: $" + precio + "\nRegistrado por: " + usuario);
             }
           }
         } catch (e) {

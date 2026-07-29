@@ -750,6 +750,80 @@
         </div>
     </div>
 
+    <!-- VENTANA MODAL PARA CARGAR SEÑA EN TURNO PROVISIONAL -->
+    <div id="sena-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width: 400px; width: 95%;">
+            <h3>Cargar Seña y Reservar</h3>
+            <p id="sena-modal-sub" class="modal-sub">Ingresa la seña recibida para confirmar la reserva:</p>
+
+            <form id="sena-form" class="cute-form" style="margin-top: 15px;">
+                <div class="form-group">
+                    <label for="sena-modal-amount">Monto de la Seña ($)</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-dollar-sign input-icon"></i>
+                        <input type="number" id="sena-modal-amount" placeholder="2500" min="0" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Método de Pago de la Seña</label>
+                    <div class="payment-method-selector">
+                        <label class="pay-btn">
+                            <input type="radio" name="sena-modal-payment" value="Transferencia" checked>
+                            <div class="pay-btn-content">
+                                <i class="fa-solid fa-mobile-screen-button pay-icon"></i>
+                                Transferencia
+                            </div>
+                        </label>
+                        <label class="pay-btn">
+                            <input type="radio" name="sena-modal-payment" value="Efectivo">
+                            <div class="pay-btn-content">
+                                <i class="fa-solid fa-money-bill-wave pay-icon"></i>
+                                Efectivo
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 25px;">
+                    <button type="button" id="sena-modal-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+                    <button type="submit" id="sena-modal-btn-save" class="btn btn-primary"><i class="fa-solid fa-check"></i> Confirmar Reserva</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- VENTANA MODAL PARA REAGENDAR TURNO -->
+    <div id="reschedule-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width: 400px; width: 95%;">
+            <h3>Reagendar Turno</h3>
+            <p id="reschedule-modal-sub" class="modal-sub">Selecciona la nueva fecha y hora para el turno:</p>
+
+            <form id="reschedule-form" class="cute-form" style="margin-top: 15px;">
+                <div class="form-group" style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label for="reschedule-date">Nueva Fecha</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-calendar-day input-icon"></i>
+                            <input type="date" id="reschedule-date" required>
+                        </div>
+                    </div>
+                    <div style="flex: 1;">
+                        <label for="reschedule-time">Nueva Hora</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-clock input-icon"></i>
+                            <input type="time" id="reschedule-time" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 25px;">
+                    <button type="button" id="reschedule-modal-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+                    <button type="submit" id="reschedule-modal-btn-save" class="btn btn-primary"><i class="fa-solid fa-calendar-check"></i> Reagendar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script type="module" src="/app.js"></script>
 </body>
 

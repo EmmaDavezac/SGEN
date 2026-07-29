@@ -182,6 +182,12 @@ function setupEventListeners() {
     document.getElementById("history-search").addEventListener("input", filterHistory);
     document.getElementById("history-filter").addEventListener("change", filterHistory);
 
+    // Modales de Seña y Reagendamiento de Turnos
+    document.getElementById("sena-form").addEventListener("submit", handleSenaSubmit);
+    document.getElementById("sena-modal-btn-cancel").addEventListener("click", closeSenaModal);
+    document.getElementById("reschedule-form").addEventListener("submit", handleRescheduleSubmit);
+    document.getElementById("reschedule-modal-btn-cancel").addEventListener("click", closeRescheduleModal);
+
     // Ajustes de precios (Admin)
     document.getElementById("btn-edit-mode").addEventListener("click", () => {
         state.isEditingPrices = true;
@@ -1330,6 +1336,7 @@ async function collectDebt(debt) {
 
 function renderPopularServices(serviceCounts) {
     const listElement = document.getElementById("popular-services-list");
+    if (!listElement) return;
     listElement.innerHTML = "";
 
     const sorted = Object.entries(serviceCounts)
@@ -1968,6 +1975,9 @@ function renderDayAppointments() {
                 </div>
             </div>
             <div class="appointment-actions-col" style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn-reschedule-appointment" title="Reagendar Turno" data-id="${apt.id}" style="background: #fff3e0; color: #e65100; border: none; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <i class="fa-regular fa-calendar-plus" style="font-size: 11px;"></i>
+                </button>
                 ${apt.estado === "Provisional" ? `
                     <button class="btn-confirm-appointment-sena" title="Cargar Seña" data-id="${apt.id}" style="background: #e3f2fd; color: #0d47a1; border: none; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
                         <i class="fa-solid fa-check-double" style="font-size: 11px;"></i>
@@ -1989,64 +1999,19 @@ function renderDayAppointments() {
             cancelAppointment(apt.id, apt.cliente);
         });
 
-        // Evento de confirmar reserva con seña
+        // Evento de reagendar
+        const btnReschedule = card.querySelector(".btn-reschedule-appointment");
+        if (btnReschedule) {
+            btnReschedule.addEventListener("click", () => {
+                openRescheduleModal(apt);
+            });
+        }
+
+        // Evento de confirmar reserva con seña (Modal)
         const btnSena = card.querySelector(".btn-confirm-appointment-sena");
         if (btnSena) {
-            btnSena.addEventListener("click", async () => {
-                const senaStr = prompt(`Ingresa el monto de la seña ($) para confirmar la reserva de ${apt.cliente}:`, "2500");
-                if (senaStr === null) return;
-                const sena = Number(senaStr) || 0;
-                const metodo = confirm("¿El pago fue por transferencia / MercadoPago?\n(Aceptar = MercadoPago/Transferencia, Cancelar = Efectivo)") ? "Transferencia" : "Efectivo";
-                
-                showLoader(true, "Confirmando reserva y registrando seña en la nube...");
-                try {
-                    const response = await fetch(CONFIG_SHEET_URL, {
-                        method: "POST",
-                        mode: "cors",
-                        headers: { "Content-Type": "text/plain" },
-                        body: JSON.stringify({
-                            action: "edit_appointment",
-                            id: apt.id,
-                            estado: "Reservado",
-                            precio: sena
-                        })
-                    });
-                    const data = await response.json();
-                    if (data.success) {
-                        // Actualizar localmente el turno
-                        apt.estado = "Reservado";
-                        apt.precio = sena;
-                        
-                        // Guardar en la contabilidad
-                        if (sena > 0) {
-                            await registerServiceDirectly({
-                                id: "serv_" + new Date().getTime(),
-                                fecha: new Date().toISOString(),
-                                usuario: state.currentUser ? state.currentUser.email : "Evolet",
-                                cliente: apt.cliente,
-                                servicio: "Seña",
-                                categoria: "Manicuría",
-                                precio: sena,
-                                seña: 0,
-                                metodoPago: metodo,
-                                completado: false
-                            });
-                        }
-                        
-                        const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
-                        localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-                        showToast("¡Turno reservado y seña cargada correctamente!", "success");
-                        renderCalendar();
-                        renderDayAppointments();
-                    } else {
-                        showToast(data.message || "Error al confirmar reserva", "error");
-                    }
-                } catch (err) {
-                    console.error("Error al confirmar reserva:", err);
-                    showToast("Error de conexión. Inténtalo de nuevo.", "error");
-                } finally {
-                    showLoader(false);
-                }
+            btnSena.addEventListener("click", () => {
+                openSenaModal(apt);
             });
         }
 
@@ -2060,6 +2025,177 @@ function renderDayAppointments() {
         
         container.appendChild(card);
     });
+}
+
+// =========================================================================
+//                  MANEJO DE MODALES DE SEÑA Y REAGENDAMIENTO
+// =========================================================================
+let currentSenaAppointment = null;
+let currentRescheduleAppointment = null;
+
+function openSenaModal(apt) {
+    currentSenaAppointment = apt;
+    const sub = document.getElementById("sena-modal-sub");
+    if (sub) sub.textContent = `Ingresa la seña recibida para confirmar la reserva de ${apt.cliente}:`;
+    const amt = document.getElementById("sena-modal-amount");
+    if (amt) amt.value = "2500";
+    const modal = document.getElementById("sena-modal");
+    if (modal) modal.classList.remove("hidden");
+}
+
+function closeSenaModal() {
+    currentSenaAppointment = null;
+    const modal = document.getElementById("sena-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+async function handleSenaSubmit(e) {
+    e.preventDefault();
+    if (!currentSenaAppointment) return;
+
+    const apt = currentSenaAppointment;
+    const sena = Number(document.getElementById("sena-modal-amount").value) || 0;
+    const metodo = document.querySelector('input[name="sena-modal-payment"]:checked').value;
+
+    closeSenaModal();
+    showLoader(true, "Confirmando reserva y registrando seña en la nube...");
+
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({
+                action: "edit_appointment",
+                id: apt.id,
+                estado: "Reservado",
+                precio: sena
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            apt.estado = "Reservado";
+            apt.precio = sena;
+
+            if (sena > 0) {
+                await registerServiceDirectly({
+                    id: "serv_" + new Date().getTime(),
+                    fecha: new Date().toISOString(),
+                    usuario: state.currentUser ? state.currentUser.email : "Evolet",
+                    cliente: apt.cliente,
+                    servicio: "Seña",
+                    categoria: "Manicuría",
+                    precio: sena,
+                    seña: 0,
+                    metodoPago: metodo,
+                    completado: false
+                });
+            }
+
+            const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+            showToast("¡Turno reservado y seña cargada correctamente!", "success");
+            renderCalendar();
+            renderDayAppointments();
+        } else {
+            showToast(data.message || "Error al confirmar reserva", "error");
+        }
+    } catch (err) {
+        console.error("Error al confirmar reserva:", err);
+        showToast("Error de conexión. Inténtalo de nuevo.", "error");
+    } finally {
+        showLoader(false);
+    }
+}
+
+function openRescheduleModal(apt) {
+    currentRescheduleAppointment = apt;
+    const sub = document.getElementById("reschedule-modal-sub");
+    if (sub) sub.textContent = `Reagendar turno de ${apt.cliente} (Estado: ${apt.estado}):`;
+    
+    let dateStr = "";
+    let timeStr = "10:00";
+    if (apt.horaInicio) {
+        const d = new Date(apt.horaInicio);
+        if (!isNaN(d.getTime())) {
+            dateStr = d.toISOString().split('T')[0];
+            timeStr = d.toTimeString().substring(0, 5);
+        }
+    }
+    if (!dateStr && apt.fecha) {
+        dateStr = apt.fecha.substring(0, 10);
+    }
+    
+    document.getElementById("reschedule-date").value = dateStr;
+    document.getElementById("reschedule-time").value = timeStr;
+    const modal = document.getElementById("reschedule-modal");
+    if (modal) modal.classList.remove("hidden");
+}
+
+function closeRescheduleModal() {
+    currentRescheduleAppointment = null;
+    const modal = document.getElementById("reschedule-modal");
+    if (modal) modal.classList.add("hidden");
+}
+
+async function handleRescheduleSubmit(e) {
+    e.preventDefault();
+    if (!currentRescheduleAppointment) return;
+
+    const apt = currentRescheduleAppointment;
+    const newDate = document.getElementById("reschedule-date").value;
+    const newTime = document.getElementById("reschedule-time").value;
+
+    if (!newDate || !newTime) {
+        showToast("Selecciona fecha y hora para reagendar.", "error");
+        return;
+    }
+
+    const startIso = `${newDate}T${newTime}:00`;
+    const startDate = new Date(startIso);
+    const endDate = new Date(startDate.getTime() + (90 * 60 * 1000));
+    const endIso = endDate.toISOString();
+
+    closeRescheduleModal();
+    showLoader(true, "Reagendando turno en la nube y Google Calendar...");
+
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({
+                action: "edit_appointment",
+                id: apt.id,
+                fecha: newDate,
+                horaInicio: startDate.toISOString(),
+                horaFin: endIso
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            apt.fecha = newDate;
+            apt.horaInicio = startDate.toISOString();
+            apt.horaFin = endIso;
+
+            const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+            showToast("¡Turno reagendado con éxito!", "success");
+            
+            state.selectedCalendarDay = startDate;
+            state.calendarDate = startDate;
+            
+            renderCalendar();
+            renderDayAppointments();
+        } else {
+            showToast(data.message || "Error al reagendar el turno", "error");
+        }
+    } catch (err) {
+        console.error("Error al reagendar el turno:", err);
+        showToast("Error de conexión al reagendar.", "error");
+    } finally {
+        showLoader(false);
+    }
 }
 
 // Abrir pantalla de registro pre-llenando los datos del turno y aplicando la seña

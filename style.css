@@ -388,6 +388,18 @@ button {
     outline: none;
 }
 
+input::placeholder,
+select::placeholder {
+    color: #aaaaaa;
+    opacity: 0.8;
+    transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+input:focus::placeholder {
+    color: transparent !important;
+    opacity: 0 !important;
+}
+
 .form-row-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
