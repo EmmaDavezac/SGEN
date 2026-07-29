@@ -2208,6 +2208,9 @@ function renderDayAppointments() {
         const end = new Date(apt.horaFin);
         const timeStr = start.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
         
+        const isAdmin = state.currentUser && state.currentUser.rol === "admin";
+        const aptSena = Number(apt.precio) || 0;
+        
         card.innerHTML = `
             <div class="appointment-time-col">
                 <span class="appointment-time-start">${timeStr}</span>
@@ -2216,7 +2219,7 @@ function renderDayAppointments() {
                 <div class="appointment-client-name">${escapeHtml(apt.cliente)}</div>
                 <div class="appointment-service-name">
                     <i class="fa-solid fa-sparkles" style="color: var(--barbie-pink); font-size: 9px;"></i> 
-                    ${apt.estado === "Reservado" ? `Reservado (Seña: $${apt.precio.toLocaleString("es-AR")})` : `Provisional`}
+                    ${apt.estado === "Reservado" ? `Reservado (Seña: $${aptSena.toLocaleString("es-AR")})` : `Provisional`}
                 </div>
             </div>
             <div class="appointment-actions-col" style="display: flex; gap: 8px; align-items: center;">
@@ -2233,16 +2236,20 @@ function renderDayAppointments() {
                         <i class="fa-solid fa-dollar-sign" style="font-size: 11px;"></i>
                     </button>
                 ` : ''}
+                ${isAdmin ? `
                 <button class="btn-delete-appointment" title="Cancelar Turno" data-id="${apt.id}">
                     <i class="fa-regular fa-trash-can"></i>
                 </button>
+                ` : ''}
             </div>
         `;
         
         // Evento de eliminar
-        card.querySelector(".btn-delete-appointment").addEventListener("click", () => {
-            cancelAppointment(apt.id, apt.cliente);
-        });
+        if (isAdmin) {
+            card.querySelector(".btn-delete-appointment").addEventListener("click", () => {
+                cancelAppointment(apt.id, apt.cliente);
+            });
+        }
 
         // Evento de reagendar
         const btnReschedule = card.querySelector(".btn-reschedule-appointment");
@@ -2304,7 +2311,8 @@ async function handleSenaSubmit(e) {
     if (!currentSenaAppointment) return;
 
     const apt = currentSenaAppointment;
-    const newStatus = document.getElementById("sena-modal-status").value;
+    const statusEl = document.getElementById("sena-modal-status");
+    const newStatus = statusEl ? statusEl.value : "Reservado";
     const sena = Number(document.getElementById("sena-modal-amount").value) || 0;
     const metodo = document.querySelector('input[name="sena-modal-payment"]:checked').value;
 
@@ -2503,11 +2511,12 @@ function openCheckoutForAppointment(apt) {
         const form = document.getElementById("service-form");
         form.insertBefore(senaBanner, form.firstChild);
     }
-    senaBanner.innerHTML = `<i class="fa-solid fa-circle-info"></i> Turno Reservado. Seña de <strong>$${apt.precio}</strong> ya cobrada será descontada del total automáticamente.`;
+    const aptSena = Number(apt.precio) || 0;
+    senaBanner.innerHTML = `<i class="fa-solid fa-circle-info"></i> Turno Reservado. Seña de <strong>$${aptSena.toLocaleString("es-AR")}</strong> ya cobrada será descontada del total automáticamente.`;
     senaBanner.classList.remove("hidden");
     
     switchTab("registrar");
-    showToast(`Cobrando turno de ${apt.cliente} (Seña: -$${apt.precio})`, "info");
+    showToast(`Cobrando turno de ${apt.cliente} (Seña: -$${aptSena.toLocaleString("es-AR")})`, "info");
 }
 
 // Envío del formulario de agendar turno
@@ -2609,8 +2618,12 @@ async function handleScheduleSubmit(e) {
     }
 }
 
-// Cancelar Turno
+// Cancelar Turno (Solo Administradores)
 function cancelAppointment(id, clientName) {
+    if (!state.currentUser || state.currentUser.rol !== "admin") {
+        showToast("Solo los administradores pueden cancelar turnos.", "error");
+        return;
+    }
     showGenericConfirmModal(
         "Cancelar Turno",
         `¿Segura de que deseas cancelar el turno de ${clientName}? Se eliminará también de tu Google Calendar.`,
