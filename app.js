@@ -1237,36 +1237,35 @@ function calculateAndRenderStats() {
     const currentYear = now.getFullYear();
 
     // Obtener hoy local YYYY-MM-DD
-    const localDate = new Date();
-    const localY = localDate.getFullYear();
-    const localM = String(localDate.getMonth() + 1).padStart(2, '0');
-    const localD = String(localDate.getDate()).padStart(2, '0');
-    const todayStr = `${localY}-${localM}-${localD}`;
+    // Fecha de referencia desde la cual se cuentan los movimientos.
+    // Poné acá la fecha en la que se fijaron los saldos iniciales de abajo
+    // ($20.300 efectivo y $67.921,85 MP), en formato "YYYY-MM-DD".
+    const initialBalanceDate = "2026-07-01"; // <-- CAMBIAR por la fecha real
 
-    // Sumar ingresos (servicios) a partir de HOY por método de pago
-    let todayEfectivoIncome = 0;
-    let todayMpIncome = 0;
+    // Sumar ingresos (servicios) desde la fecha de referencia por método de pago
+    let periodEfectivoIncome = 0;
+    let periodMpIncome = 0;
 
     state.servicesList.forEach(item => {
         if (item.fecha) {
             const itemDateStr = item.fecha.substring(0, 10);
-            if (itemDateStr >= todayStr) {
+            if (itemDateStr >= initialBalanceDate) {
                 const precio = Number(item.precio) || 0;
                 const seña = Number(item.seña) || 0;
                 const neto = precio - seña;
 
                 if (item.metodoPago === "Efectivo") {
-                    todayEfectivoIncome += neto;
+                    periodEfectivoIncome += neto;
                 } else if (item.metodoPago === "Transferencia") {
-                    todayMpIncome += neto;
+                    periodMpIncome += neto;
                 }
             }
         }
     });
 
-    // Sumar egresos (gastos) a partir de HOY por método de pago
-    let todayEfectivoExpenses = 0;
-    let todayMpExpenses = 0;
+    // Sumar egresos (gastos) desde la fecha de referencia por método de pago
+    let periodEfectivoExpenses = 0;
+    let periodMpExpenses = 0;
 
     state.expensesList.forEach(item => {
         if (item.fecha) {
@@ -1274,22 +1273,23 @@ function calculateAndRenderStats() {
             if (itemDateStr >= initialBalanceDate) {
                 const monto = Number(item.monto) || 0;
                 if (item.metodoPago === "Efectivo") {
-                    todayEfectivoExpenses += monto;
+                    periodEfectivoExpenses += monto;
                 } else if (item.metodoPago === "Transferencia") {
-                    todayMpExpenses += monto;
+                    periodMpExpenses += monto;
                 }
             }
         }
     });
 
-    // Saldos iniciales fijos (no modificables)
+    // Saldos iniciales fijos (correspondientes a initialBalanceDate, no modificables)
     const initialEfectivo = 20300.00;
     const initialMp = 67921.85;
 
     // Calcular montos actuales
-    const currentEfectivo = initialEfectivo + todayEfectivoIncome - todayEfectivoExpenses;
-    const currentMp = initialMp + todayMpIncome - todayMpExpenses;
+    const currentEfectivo = initialEfectivo + periodEfectivoIncome - periodEfectivoExpenses;
+    const currentMp = initialMp + periodMpIncome - periodMpExpenses;
     const currentTotal = currentEfectivo + currentMp;
+
 
     // Pintar valores en el DOM
     const statCajaTotal = document.getElementById("stat-caja-total");
