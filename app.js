@@ -30,6 +30,7 @@ let SERVICES_CATALOG = {
         { name: "Esculpidas en Polygel Full", price: 19000 }
     ],
     remocion: [
+        { name: "Retiro Servicio Propio", price: 0 },
         { name: "Remoción Semipermanente", price: 4500 },
         { name: "Remoción Kapping", price: 5000 },
         { name: "Remoción Softgel", price: 5500 },
@@ -152,6 +153,22 @@ function setupEventListeners() {
 
     // Envío de Formulario de Servicio
     document.getElementById("service-form").addEventListener("submit", handleServiceSubmit);
+
+    // Mostrar/ocultar y manejar precios de retiro externo previo
+    document.getElementById("chk-external-removal").addEventListener("change", (e) => {
+        const container = document.getElementById("external-removal-options-container");
+        if (e.target.checked) {
+            populateExternalRemovalTypes();
+            container.classList.remove("hidden");
+        } else {
+            container.classList.add("hidden");
+        }
+        recalculateFinalServicePrice();
+    });
+
+    document.getElementById("select-external-removal-type").addEventListener("change", () => {
+        recalculateFinalServicePrice();
+    });
 
     // Modal de Confirmación de Registro
     document.getElementById("modal-btn-confirm").addEventListener("click", confirmServiceRegistration);
@@ -527,6 +544,20 @@ function selectSubService(service, buttonElement) {
     const nameInput = document.getElementById("service-name-input");
     const priceInput = document.getElementById("service-price");
 
+    // Ocultar checkbox de retiro externo si la categoría elegida es de remoción o personalizado
+    const extWrapper = document.getElementById("external-removal-wrapper");
+    const chk = document.getElementById("chk-external-removal");
+    const opts = document.getElementById("external-removal-options-container");
+    if (extWrapper && chk && opts) {
+        if (state.selectedCategory === "remocion" || state.selectedCategory === "personalizado") {
+            extWrapper.style.display = "none";
+        } else {
+            extWrapper.style.display = "block";
+        }
+        chk.checked = false;
+        opts.classList.add("hidden");
+    }
+
     if (state.selectedCategory === "personalizado") {
         nameInput.value = "";
         nameInput.readOnly = false;
@@ -538,6 +569,49 @@ function selectSubService(service, buttonElement) {
         nameInput.value = service.name;
         nameInput.readOnly = true;
         priceInput.value = service.price;
+    }
+}
+
+// Cargar de forma dinámica las opciones de retiro externo
+function populateExternalRemovalTypes() {
+    const select = document.getElementById("select-external-removal-type");
+    if (!select) return;
+    select.innerHTML = "";
+    
+    // Obtener las remociones de SERVICES_CATALOG.remocion, excluyendo "Retiro Servicio Propio"
+    const rems = SERVICES_CATALOG.remocion || [];
+    rems.forEach(rem => {
+        if (rem.name !== "Retiro Servicio Propio") {
+            const opt = document.createElement("option");
+            opt.value = rem.name;
+            opt.textContent = `${rem.name} (+$${rem.price.toLocaleString("es-AR")})`;
+            opt.setAttribute("data-price", rem.price);
+            select.appendChild(opt);
+        }
+    });
+}
+
+// Recalcular el precio sumando el retiro previo si está marcado
+function recalculateFinalServicePrice() {
+    const priceInput = document.getElementById("service-price");
+    if (!priceInput || !state.selectedService) return;
+    
+    let basePrice = Number(state.selectedService.price) || 0;
+    
+    if (state.selectedCategory === "personalizado") {
+        return;
+    }
+    
+    const chk = document.getElementById("chk-external-removal");
+    if (chk && chk.checked) {
+        const select = document.getElementById("select-external-removal-type");
+        const selectedOpt = select.options[select.selectedIndex];
+        if (selectedOpt) {
+            const extraPrice = Number(selectedOpt.getAttribute("data-price")) || 0;
+            priceInput.value = basePrice + extraPrice;
+        }
+    } else {
+        priceInput.value = basePrice;
     }
 }
 
@@ -553,7 +627,15 @@ function handleServiceSubmit(e) {
     }
 
     const clientName = document.getElementById("client-name").value.trim();
-    const serviceName = document.getElementById("service-name-input").value.trim();
+    let serviceName = document.getElementById("service-name-input").value.trim();
+    const chk = document.getElementById("chk-external-removal");
+    if (chk && chk.checked) {
+        const select = document.getElementById("select-external-removal-type");
+        const selectedOpt = select.options[select.selectedIndex];
+        if (selectedOpt) {
+            serviceName = `${serviceName} + ${selectedOpt.value}`;
+        }
+    }
     const price = Number(document.getElementById("service-price").value) || 0;
 
     const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;

@@ -162,6 +162,24 @@
                         </div>
                     </div>
 
+                    <!-- Retiro de servicio previo externo (Condicional) -->
+                    <div class="form-group" id="external-removal-wrapper" style="margin-top: 10px;">
+                        <label class="cute-checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-dark);">
+                            <input type="checkbox" id="chk-external-removal" style="accent-color: var(--barbie-pink); width: 16px; height: 16px;">
+                            <span>¿Tiene retiro de servicio previo externo?</span>
+                        </label>
+                    </div>
+
+                    <div id="external-removal-options-container" class="hidden" style="margin-top: 10px; margin-bottom: 15px; padding: 12px; border: 1.5px dashed var(--barbie-light); border-radius: var(--radius-sm); background: #fffbfb;">
+                        <label for="select-external-removal-type" style="font-size: 12px; font-weight: 700; color: var(--barbie-dark);">Tipo de Retiro Externo</label>
+                        <div class="input-wrapper" style="margin-top: 5px;">
+                            <i class="fa-solid fa-hand-holding-hand input-icon" style="color: var(--barbie-pink);"></i>
+                            <select id="select-external-removal-type" style="padding-left: 35px; height: 42px;">
+                                <!-- Se carga dinámicamente -->
+                            </select>
+                        </div>
+                    </div>
+
                     <!-- Método de Pago (Transferencia por defecto, Efectivo) -->
                     <div class="form-group">
                         <label><i class="fa-solid fa-money-bill-transfer"></i> Método de Pago</label>
