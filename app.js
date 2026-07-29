@@ -193,7 +193,7 @@ function setupEventListeners() {
     if (globalReloadBtn) {
         globalReloadBtn.addEventListener("click", () => refreshAllData(true));
     }
-    
+
     const refreshCalBtn = document.getElementById("btn-refresh-calendar");
     if (refreshCalBtn) {
         refreshCalBtn.addEventListener("click", () => loadAppointments(true));
@@ -365,11 +365,11 @@ function setupEventListeners() {
 function updateFiadoPaymentVisibility() {
     const fiadoWrapper = document.getElementById("pay-btn-fiado-wrapper");
     const chkFiado = document.getElementById("chk-allow-fiado");
-    
+
     if (chkFiado) {
         chkFiado.checked = !!state.allowFiado;
     }
-    
+
     if (fiadoWrapper) {
         if (state.allowFiado) {
             fiadoWrapper.style.display = "block";
@@ -719,7 +719,7 @@ function updateCombinedServiceCalculation() {
 
     const count1 = parseInt(count1El.value) || 7;
     const count2 = 10 - count1;
-    
+
     count2El.innerHTML = `<option value="${count2}" selected>${count2} ${count2 === 1 ? 'uña' : 'uñas'}</option>`;
 
     const opt1 = sel1.options[sel1.selectedIndex];
@@ -755,12 +755,12 @@ function populateExternalRemovalTypes() {
     const grid = document.getElementById("external-removal-buttons-grid");
     if (!grid) return;
     grid.innerHTML = "";
-    
+
     const rems = SERVICES_CATALOG.remocion || [];
     const validRems = rems.filter(rem => rem.name !== "Retiro Servicio Propio");
-    
+
     state.selectedExternalRemoval = null;
-    
+
     validRems.forEach((rem, idx) => {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -769,7 +769,7 @@ function populateExternalRemovalTypes() {
             <span>${escapeHtml(rem.name)}</span>
             <span class="price-tag">+$${rem.price.toLocaleString("es-AR")}</span>
         `;
-        
+
         btn.addEventListener("click", () => {
             const allBtns = grid.querySelectorAll(".btn-ext-removal");
             allBtns.forEach(b => b.classList.remove("active"));
@@ -777,9 +777,9 @@ function populateExternalRemovalTypes() {
             state.selectedExternalRemoval = rem;
             recalculateFinalServicePrice();
         });
-        
+
         grid.appendChild(btn);
-        
+
         if (idx === 0) {
             btn.classList.add("active");
             state.selectedExternalRemoval = rem;
@@ -792,9 +792,9 @@ function populateExternalRemovalTypes() {
 function recalculateFinalServicePrice() {
     const priceInput = document.getElementById("service-price");
     if (!priceInput || !state.selectedService) return;
-    
+
     let basePrice = Number(state.selectedService.price) || 0;
-    
+
     const chk = document.getElementById("chk-external-removal");
     if (chk && chk.checked && state.selectedExternalRemoval) {
         const extraPrice = Number(state.selectedExternalRemoval.price) || 0;
@@ -855,14 +855,14 @@ function handleServiceSubmit(e) {
 
     document.getElementById("confirm-client").textContent = transaction.cliente;
     document.getElementById("confirm-service").textContent = transaction.servicio;
-    
+
     if (senaAmount > 0) {
         const netPrice = price - senaAmount;
         document.getElementById("confirm-price").innerHTML = `Total: $${price.toLocaleString("es-AR")} <br> <span style="font-size: 11px; color: var(--text-muted);">Seña: -$${senaAmount.toLocaleString("es-AR")} | Neto: <strong>$${netPrice.toLocaleString("es-AR")}</strong></span>`;
     } else {
         document.getElementById("confirm-price").textContent = `$${transaction.precio.toLocaleString("es-AR")}`;
     }
-    
+
     document.getElementById("confirm-payment").textContent = transaction.metodoPago;
 
     document.getElementById("confirm-modal").classList.remove("hidden");
@@ -911,11 +911,11 @@ async function confirmServiceRegistration() {
             saveServicesCache();
             updateClientAutocomplete(); // Recargar el autocompletado
             showToast("¡Servicio guardado con éxito!", "success");
-            
+
             // Si el servicio estaba vinculado a un turno, eliminar el turno
             if (state.linkedAppointment) {
                 const aptId = state.linkedAppointment.id;
-                
+
                 // Borrar el turno de forma silenciosa de la nube
                 try {
                     await fetch(CONFIG_SHEET_URL, {
@@ -928,19 +928,19 @@ async function confirmServiceRegistration() {
                             email: state.currentUser.email
                         })
                     });
-                    
+
                     // Remover de la lista local
                     state.appointmentsList = state.appointmentsList.filter(x => x.id !== aptId);
                     const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
                     localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-                    
+
                     renderCalendar();
                     renderDayAppointments();
                 } catch (delErr) {
                     console.error("Error al remover el turno después de cobrar:", delErr);
                 }
             }
-            
+
             clearCheckoutState();
             renderHistoryList();
             calculateAndRenderStats();
@@ -1254,7 +1254,7 @@ function calculateAndRenderStats() {
                 const precio = Number(item.precio) || 0;
                 const seña = Number(item.seña) || 0;
                 const neto = precio - seña;
-                
+
                 if (item.metodoPago === "Efectivo") {
                     todayEfectivoIncome += neto;
                 } else if (item.metodoPago === "Transferencia") {
@@ -1271,7 +1271,7 @@ function calculateAndRenderStats() {
     state.expensesList.forEach(item => {
         if (item.fecha) {
             const itemDateStr = item.fecha.substring(0, 10);
-            if (itemDateStr >= todayStr) {
+            if (itemDateStr >= initialBalanceDate) {
                 const monto = Number(item.monto) || 0;
                 if (item.metodoPago === "Efectivo") {
                     todayEfectivoExpenses += monto;
@@ -1368,10 +1368,10 @@ function calculateAndRenderStats() {
 
     document.getElementById("stat-month-income").textContent = `$${totalMonthIncome.toLocaleString("es-AR")}`;
     document.getElementById("stat-month-expenses").textContent = `$${totalMonthExpenses.toLocaleString("es-AR")}`;
-    
+
     const balanceEl = document.getElementById("stat-net-balance");
     balanceEl.textContent = `${netBalance < 0 ? '-' : ''}$${Math.abs(netBalance).toLocaleString("es-AR")}`;
-    
+
     const netBalanceCard = document.getElementById("net-balance-card");
     if (netBalanceCard) {
         if (netBalance >= 0) {
@@ -1405,12 +1405,12 @@ function calculateAndRenderStats() {
     const catStatsContainer = document.getElementById("category-expenses-stats");
     if (catStatsContainer) {
         catStatsContainer.innerHTML = "";
-        
+
         // Ordenar categorías de mayor a menor gasto
         const sortedCats = Object.entries(categorySums)
             .map(([name, sum]) => ({ name, sum }))
             .sort((a, b) => b.sum - a.sum);
-            
+
         const catIcons = {
             "Insumos": '<i class="fa-solid fa-box-open" style="color: var(--barbie-pink);"></i>',
             "Servicios": '<i class="fa-solid fa-bolt" style="color: #FFD700;"></i>',
@@ -1418,11 +1418,11 @@ function calculateAndRenderStats() {
             "Gasto propio": '<i class="fa-solid fa-user-tag" style="color: #9370DB;"></i>',
             "Otro": '<i class="fa-solid fa-circle-question" style="color: var(--text-light);"></i>'
         };
-        
+
         sortedCats.forEach(cat => {
             const pct = totalMonthExpenses > 0 ? Math.round((cat.sum / totalMonthExpenses) * 100) : 0;
             const icon = catIcons[cat.name] || catIcons["Otro"];
-            
+
             const row = document.createElement("div");
             row.className = "payment-stat-row";
             row.innerHTML = `
@@ -1446,23 +1446,23 @@ function renderDebtorsList() {
     const panel = document.getElementById("debtors-panel");
     const container = document.getElementById("debtors-list-container");
     if (!panel || !container) return;
-    
+
     if (debtors.length === 0) {
         panel.classList.add("hidden");
         return;
     }
-    
+
     panel.classList.remove("hidden");
     container.innerHTML = "";
-    
+
     debtors.forEach(debt => {
         const card = document.createElement("div");
         card.className = "appointment-card";
         card.style.borderColor = "#ffb3b3";
         card.style.background = "#fffefe";
-        
+
         const dateStr = debt.fecha ? new Date(debt.fecha).toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' }) : "-";
-        
+
         card.innerHTML = `
             <div class="appointment-time-col" style="border-right-color: #ffcccc; min-width: 60px;">
                 <span class="appointment-time-start" style="color: #cc0000; font-size: 13px;">${dateStr}</span>
@@ -1479,11 +1479,11 @@ function renderDebtorsList() {
                 </button>
             </div>
         `;
-        
+
         card.querySelector(".btn-collect-debt").addEventListener("click", () => {
             collectDebt(debt);
         });
-        
+
         container.appendChild(card);
     });
 }
@@ -1491,7 +1491,7 @@ function renderDebtorsList() {
 // Cobrar una deuda pendiente (pasar de Fiado a Efectivo/Transferencia)
 async function collectDebt(debt) {
     const metodo = confirm(`¿El cobro de la deuda de $${debt.precio} de ${debt.cliente} fue por transferencia / MercadoPago?\n(Aceptar = MercadoPago/Transferencia, Cancelar = Efectivo)`) ? "Transferencia" : "Efectivo";
-    
+
     showLoader(true, "Registrando pago de deuda en la nube...");
     try {
         const response = await fetch(CONFIG_SHEET_URL, {
@@ -1508,11 +1508,11 @@ async function collectDebt(debt) {
         const data = await response.json();
         if (data.success) {
             showToast("¡Deuda cobrada e ingresada a la caja correctamente!", "success");
-            
+
             // Actualizar localmente el servicio
             debt.metodoPago = metodo;
             debt.fecha = new Date().toISOString();
-            
+
             saveServicesCache();
             calculateAndRenderStats();
         } else {
@@ -1978,7 +1978,7 @@ function showGenericConfirmModal(title, subtitle, onConfirm) {
 // Cargar turnos de la nube con protección offline
 async function loadAppointments(showNotification = false) {
     if (!state.currentUser) return;
-    
+
     // Carga inicial del caché local (PWA Offline)
     const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
     const cached = localStorage.getItem(cacheKey);
@@ -1989,24 +1989,24 @@ async function loadAppointments(showNotification = false) {
             console.error("Error al parsear caché local de turnos:", e);
         }
     }
-    
+
     // Renderizar lo que hay en memoria/cache de inmediato para que NUNCA quede vacía la agenda
     const activeTab = document.querySelector(".nav-item.active");
     if (activeTab && activeTab.getAttribute("data-tab") === "calendario") {
         renderCalendar();
         renderDayAppointments();
     }
-    
+
     if (!CONFIG_SHEET_URL) return;
-    
+
     try {
         const response = await fetch(`${CONFIG_SHEET_URL}?action=get_appointments`);
         const data = await response.json();
-        
+
         if (data.success && data.appointments) {
             state.appointmentsList = data.appointments;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-            
+
             const currentTab = document.querySelector(".nav-item.active");
             if (currentTab && currentTab.getAttribute("data-tab") === "calendario") {
                 renderCalendar();
@@ -2031,12 +2031,12 @@ async function loadAppointments(showNotification = false) {
 // Función global para forzar recarga/sincronización de todos los datos
 async function refreshAllData(showLoaderToast = true) {
     if (!state.currentUser) return;
-    
+
     const icon = document.querySelector("#btn-global-reload i");
     if (icon) icon.classList.add("fa-spin");
-    
+
     if (showLoaderToast) showLoader(true, "Sincronizando datos con la nube...");
-    
+
     try {
         await Promise.all([
             loadAppointments(),
@@ -2059,25 +2059,25 @@ function renderCalendar() {
     const monthYearEl = document.getElementById("calendar-month-year");
     const gridEl = document.getElementById("calendar-days-grid");
     if (!monthYearEl || !gridEl) return;
-    
+
     const date = state.calendarDate;
     const year = date.getFullYear();
     const month = date.getMonth();
-    
+
     // Mostrar título del mes
     const monthNames = [
         "enero", "febrero", "marzo", "abril", "mayo", "junio",
         "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
     ];
     monthYearEl.textContent = `${monthNames[month]} ${year}`;
-    
+
     gridEl.innerHTML = "";
-    
+
     // Primer día del mes
     const firstDayIndex = new Date(year, month, 1).getDay();
     // Ajustar para empezar en Lunes (JS: 0=Domingo, 1=Lunes...) -> Nuevo: 0=Lunes, 6=Domingo
     const startPadding = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
-    
+
     // Días del mes anterior (padding)
     const prevLastDay = new Date(year, month, 0).getDate();
     for (let i = startPadding; i > 0; i--) {
@@ -2086,44 +2086,44 @@ function renderCalendar() {
         dayDiv.textContent = prevLastDay - i + 1;
         gridEl.appendChild(dayDiv);
     }
-    
+
     // Días del mes actual
     const lastDay = new Date(year, month + 1, 0).getDate();
     const today = new Date();
-    
+
     for (let day = 1; day <= lastDay; day++) {
         const dayBtn = document.createElement("div");
         dayBtn.className = "calendar-day";
-        
+
         const numberSpan = document.createElement("span");
         numberSpan.className = "day-number";
         numberSpan.textContent = day;
         dayBtn.appendChild(numberSpan);
-        
+
         const thisDate = new Date(year, month, day);
-        
+
         // Es hoy?
         if (thisDate.toDateString() === today.toDateString()) {
             dayBtn.classList.add("today");
         }
-        
+
         // Es seleccionado?
         if (thisDate.toDateString() === state.selectedCalendarDay.toDateString()) {
             dayBtn.classList.add("selected");
         }
-        
+
         // Filtrar citas de este día
         const dayApts = state.appointmentsList.filter(apt => {
             const aptDate = new Date(apt.horaInicio);
             return aptDate.getFullYear() === year && aptDate.getMonth() === month && aptDate.getDate() === day;
         });
-        
+
         if (dayApts.length > 0) {
             dayBtn.classList.add("has-appointments");
-            
+
             const previewContainer = document.createElement("div");
             previewContainer.className = "day-events-preview";
-            
+
             // Mostrar hasta 2 píldoras
             const maxVisible = 2;
             dayApts.slice(0, maxVisible).forEach(apt => {
@@ -2133,7 +2133,7 @@ function renderCalendar() {
                 pill.textContent = apt.cliente;
                 previewContainer.appendChild(pill);
             });
-            
+
             // Mostrar "+N" si hay más
             if (dayApts.length > maxVisible) {
                 const morePill = document.createElement("div");
@@ -2141,10 +2141,10 @@ function renderCalendar() {
                 morePill.textContent = `+${dayApts.length - maxVisible}`;
                 previewContainer.appendChild(morePill);
             }
-            
+
             dayBtn.appendChild(previewContainer);
         }
-        
+
         // Click en el día
         dayBtn.addEventListener("click", () => {
             if (state.selectedCalendarDay.toDateString() === thisDate.toDateString()) {
@@ -2155,7 +2155,7 @@ function renderCalendar() {
                 renderDayAppointments();
             }
         });
-        
+
         gridEl.appendChild(dayBtn);
     }
 }
@@ -2166,23 +2166,23 @@ function renderDayAppointments() {
     const dateTitle = document.getElementById("selected-day-date");
     const title = document.getElementById("selected-day-title");
     if (!container || !dateTitle || !title) return;
-    
+
     const selDate = state.selectedCalendarDay;
     const yyyy = selDate.getFullYear();
     const mm = String(selDate.getMonth() + 1).padStart(2, '0');
     const dd = String(selDate.getDate()).padStart(2, '0');
     dateTitle.textContent = `${dd}/${mm}/${yyyy}`;
-    
+
     title.textContent = `Turnos del ${selDate.toLocaleDateString("es-AR", { day: 'numeric', month: 'long' })}`;
-    
+
     container.innerHTML = "";
-    
+
     // Filtrar citas del día
     const dayApts = state.appointmentsList.filter(apt => {
         const aptDate = new Date(apt.horaInicio);
         return aptDate.getFullYear() === yyyy && aptDate.getMonth() === selDate.getMonth() && aptDate.getDate() === selDate.getDate();
     });
-    
+
     if (dayApts.length === 0) {
         container.innerHTML = `
             <div class="no-appointments-placeholder" style="cursor: pointer;" id="btn-empty-schedule">
@@ -2198,19 +2198,19 @@ function renderDayAppointments() {
         });
         return;
     }
-    
+
     dayApts.forEach(apt => {
         const card = document.createElement("div");
         const statusClass = (apt.estado || "Provisional").toLowerCase();
         card.className = `appointment-card ${statusClass}`;
-        
+
         const start = new Date(apt.horaInicio);
         const end = new Date(apt.horaFin);
         const timeStr = start.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
-        
+
         const isAdmin = state.currentUser && state.currentUser.rol === "admin";
         const aptSena = Number(apt.precio) || 0;
-        
+
         card.innerHTML = `
             <div class="appointment-time-col">
                 <span class="appointment-time-start">${timeStr}</span>
@@ -2243,7 +2243,7 @@ function renderDayAppointments() {
                 ` : ''}
             </div>
         `;
-        
+
         // Evento de eliminar
         if (isAdmin) {
             card.querySelector(".btn-delete-appointment").addEventListener("click", () => {
@@ -2274,7 +2274,7 @@ function renderDayAppointments() {
                 openCheckoutForAppointment(apt);
             });
         }
-        
+
         container.appendChild(card);
     });
 }
@@ -2289,13 +2289,13 @@ function openSenaModal(apt) {
     currentSenaAppointment = apt;
     const sub = document.getElementById("sena-modal-sub");
     if (sub) sub.textContent = `Modificar estado o cargar seña de ${apt.cliente}:`;
-    
+
     const statusSelect = document.getElementById("sena-modal-status");
     if (statusSelect) statusSelect.value = apt.estado || "Reservado";
 
     const amt = document.getElementById("sena-modal-amount");
     if (amt) amt.value = apt.precio ? apt.precio : "2500";
-    
+
     const modal = document.getElementById("sena-modal");
     if (modal) modal.classList.remove("hidden");
 }
@@ -2373,7 +2373,7 @@ function openRescheduleModal(apt) {
     currentRescheduleAppointment = apt;
     const sub = document.getElementById("reschedule-modal-sub");
     if (sub) sub.textContent = `Reagendar turno de ${apt.cliente} (Estado: ${apt.estado}):`;
-    
+
     let dateStr = "";
     let timeStr = "10:00";
     if (apt.horaInicio) {
@@ -2386,7 +2386,7 @@ function openRescheduleModal(apt) {
     if (!dateStr && apt.fecha) {
         dateStr = apt.fecha.substring(0, 10);
     }
-    
+
     document.getElementById("reschedule-date").value = dateStr;
     document.getElementById("reschedule-time").value = timeStr;
     const modal = document.getElementById("reschedule-modal");
@@ -2442,10 +2442,10 @@ async function handleRescheduleSubmit(e) {
             const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
             showToast("¡Turno reagendado con éxito!", "success");
-            
+
             state.selectedCalendarDay = startDate;
             state.calendarDate = startDate;
-            
+
             renderCalendar();
             renderDayAppointments();
         } else {
@@ -2464,10 +2464,10 @@ function clearCheckoutState() {
     state.linkedAppointment = null;
     const senaBanner = document.getElementById("checkout-sena-banner");
     if (senaBanner) senaBanner.classList.add("hidden");
-    
+
     const cancelCheckoutBtn = document.getElementById("btn-cancel-checkout");
     if (cancelCheckoutBtn) cancelCheckoutBtn.classList.add("hidden");
-    
+
     const clientInput = document.getElementById("client-name");
     if (clientInput) {
         clientInput.readOnly = false;
@@ -2484,14 +2484,14 @@ function cancelCheckoutAndReturnToAgenda() {
 // Abrir pantalla de registro pre-llenando los datos del turno y haciendo el nombre readonly
 function openCheckoutForAppointment(apt) {
     state.linkedAppointment = apt;
-    
+
     const clientInput = document.getElementById("client-name");
     clientInput.value = apt.cliente;
     clientInput.readOnly = true;
-    
+
     const cancelCheckoutBtn = document.getElementById("btn-cancel-checkout");
     if (cancelCheckoutBtn) cancelCheckoutBtn.classList.remove("hidden");
-    
+
     // Crear o actualizar un banner informativo de seña en el formulario
     let senaBanner = document.getElementById("checkout-sena-banner");
     if (!senaBanner) {
@@ -2507,14 +2507,14 @@ function openCheckoutForAppointment(apt) {
         senaBanner.style.display = "flex";
         senaBanner.style.alignItems = "center";
         senaBanner.style.gap = "8px";
-        
+
         const form = document.getElementById("service-form");
         form.insertBefore(senaBanner, form.firstChild);
     }
     const aptSena = Number(apt.precio) || 0;
     senaBanner.innerHTML = `<i class="fa-solid fa-circle-info"></i> Turno Reservado. Seña de <strong>$${aptSena.toLocaleString("es-AR")}</strong> ya cobrada será descontada del total automáticamente.`;
     senaBanner.classList.remove("hidden");
-    
+
     switchTab("registrar");
     showToast(`Cobrando turno de ${apt.cliente} (Seña: -$${aptSena.toLocaleString("es-AR")})`, "info");
 }
@@ -2522,21 +2522,21 @@ function openCheckoutForAppointment(apt) {
 // Envío del formulario de agendar turno
 async function handleScheduleSubmit(e) {
     e.preventDefault();
-    
+
     if (!state.currentUser) {
         showToast("Debes iniciar sesión para agendar turnos.", "error");
         return;
     }
-    
+
     const cliente = document.getElementById("schedule-client-name").value.trim();
     const dateVal = document.getElementById("schedule-date").value;
     const timeVal = document.getElementById("schedule-time").value;
-    
+
     if (!cliente || !dateVal || !timeVal) {
         showToast("Por favor, completa todos los campos obligatorios.", "error");
         return;
     }
-    
+
     const statusVal = document.getElementById("schedule-status").value;
     const senaAmount = Number(document.getElementById("schedule-sena-amount").value) || 0;
     const paymentMethodEl = document.querySelector('input[name="schedule-payment"]:checked');
@@ -2546,7 +2546,7 @@ async function handleScheduleSubmit(e) {
     const start = new Date(`${dateVal}T${timeVal}`);
     const duration = 90;
     const end = new Date(start.getTime() + duration * 60000);
-    
+
     const appointmentData = {
         action: "add_appointment",
         id: "app_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000),
@@ -2559,13 +2559,13 @@ async function handleScheduleSubmit(e) {
         usuario: state.currentUser.email,
         estado: statusVal
     };
-    
+
     // Resetear formulario para siguientes llamadas
     document.getElementById("schedule-form").reset();
     document.getElementById("schedule-sena-fields").classList.add("hidden");
     document.getElementById("schedule-modal").classList.add("hidden");
     showLoader(true, "Agendando turno y sincronizando con Google Calendar...");
-    
+
     try {
         const response = await fetch(CONFIG_SHEET_URL, {
             method: "POST",
@@ -2575,20 +2575,20 @@ async function handleScheduleSubmit(e) {
             },
             body: JSON.stringify(appointmentData)
         });
-        
+
         const data = await response.json();
         showLoader(false);
-        
+
         if (data.success) {
             showToast("¡Turno agendado y sincronizado con éxito!", "success");
-            
+
             // Añadir localmente, ordenar y recargar
             state.appointmentsList.push(data.appointment || appointmentData);
             state.appointmentsList.sort((a, b) => new Date(a.horaInicio) - new Date(b.horaInicio));
-            
+
             const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-            
+
             if (statusVal === "Reservado" && senaAmount > 0) {
                 showLoader(true, "Registrando seña en la contabilidad...");
                 await registerServiceDirectly({
@@ -2605,7 +2605,7 @@ async function handleScheduleSubmit(e) {
                 });
                 showLoader(false);
             }
-            
+
             renderCalendar();
             renderDayAppointments();
         } else {
@@ -2642,19 +2642,19 @@ function cancelAppointment(id, clientName) {
                         email: state.currentUser.email
                     })
                 });
-                
+
                 const data = await response.json();
                 showLoader(false);
-                
+
                 if (data.success) {
                     showToast("Turno cancelado correctamente.", "success");
-                    
+
                     // Remover de la lista local
                     state.appointmentsList = state.appointmentsList.filter(apt => apt.id !== id);
-                    
+
                     const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
                     localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-                    
+
                     renderCalendar();
                     renderDayAppointments();
                 } else {
@@ -2676,25 +2676,25 @@ function openScheduleModalForDate(date) {
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
     dateInput.value = `${yyyy}-${mm}-${dd}`;
-    
+
     // Resetear campos del formulario
     document.getElementById("schedule-client-name").value = "";
     document.getElementById("schedule-time").value = "14:00"; // Hora por defecto
-    
+
     document.getElementById("schedule-modal").classList.remove("hidden");
 }
 
 // Invocar la acción en la nube para importar servicios ya cobrados
 async function importHistoryServices() {
     if (!state.currentUser) return;
-    
+
     if (!CONFIG_SHEET_URL) {
         showToast("Configuración incorrecta.", "error");
         return;
     }
-    
+
     showLoader(true, "Importando cobrados y sincronizando en Google Calendar...");
-    
+
     try {
         const response = await fetch(CONFIG_SHEET_URL, {
             method: "POST",
@@ -2707,13 +2707,13 @@ async function importHistoryServices() {
                 email: state.currentUser.email
             })
         });
-        
+
         const data = await response.json();
         showLoader(false);
-        
+
         if (data.success) {
             showToast(data.message || `¡Sincronización completada!`, "success");
-            
+
             // Recargar turnos de la nube
             await loadAppointments();
         } else {
@@ -2729,7 +2729,7 @@ async function importHistoryServices() {
 // Cargar gastos de la nube
 async function loadExpenses() {
     if (!state.currentUser) return;
-    
+
     const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
@@ -2739,17 +2739,17 @@ async function loadExpenses() {
             renderExpensesList();
         }
     }
-    
+
     if (!CONFIG_SHEET_URL) return;
-    
+
     try {
         const response = await fetch(`${CONFIG_SHEET_URL}?action=get_expenses`);
         const data = await response.json();
-        
+
         if (data.success && data.expenses) {
             state.expensesList = data.expenses;
             localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
-            
+
             const activeTab = document.querySelector(".nav-item.active");
             if (activeTab && activeTab.getAttribute("data-tab") === "gastos") {
                 renderExpensesList();
@@ -2769,24 +2769,24 @@ function renderExpensesList() {
     const container = document.getElementById("expenses-list");
     const totalEl = document.getElementById("expense-month-total");
     if (!container || !totalEl) return;
-    
+
     container.innerHTML = "";
-    
+
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    
+
     // Filtrar los gastos del mes actual
     const monthExpenses = state.expensesList.filter(item => {
         const date = new Date(item.fecha + "T00:00:00");
         return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
     });
-    
+
     // Ordenar de más nuevo a más viejo
     monthExpenses.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-    
+
     let totalSum = 0;
-    
+
     if (monthExpenses.length === 0) {
         container.innerHTML = `
             <div class="no-appointments-placeholder">
@@ -2797,14 +2797,14 @@ function renderExpensesList() {
         totalEl.textContent = "$0";
         return;
     }
-    
+
     monthExpenses.forEach(exp => {
         totalSum += exp.monto;
-        
+
         const date = new Date(exp.fecha + "T00:00:00");
         const day = String(date.getDate()).padStart(2, '0');
         const monthStr = String(date.getMonth() + 1).padStart(2, '0');
-        
+
         const card = document.createElement("div");
         card.className = "appointment-card";
         const isAdmin = state.currentUser && state.currentUser.rol === "admin";
@@ -2832,7 +2832,7 @@ function renderExpensesList() {
             </div>
             ` : ''}
         `;
-        
+
         if (isAdmin) {
             const deleteBtn = card.querySelector(".btn-delete-expense");
             if (deleteBtn) {
@@ -2841,33 +2841,33 @@ function renderExpensesList() {
                 });
             }
         }
-        
+
         container.appendChild(card);
     });
-    
+
     totalEl.textContent = `$${totalSum.toLocaleString("es-AR")}`;
 }
 
 // Registrar gasto (Submit de formulario)
 async function handleExpenseSubmit(e) {
     e.preventDefault();
-    
+
     if (!state.currentUser) {
         showToast("Inicia sesión para registrar gastos.", "error");
         return;
     }
-    
+
     const concepto = document.getElementById("expense-concept").value.trim();
     const monto = Number(document.getElementById("expense-amount").value);
     const fecha = document.getElementById("expense-date").value;
     const metodoPago = document.querySelector('input[name="expense-payment"]:checked').value;
     const categoria = document.getElementById("expense-category").value;
-    
+
     if (!concepto || !monto || !fecha || !metodoPago || !categoria) {
         showToast("Por favor, completa todos los campos del gasto.", "error");
         return;
     }
-    
+
     const expenseData = {
         action: "add_expense",
         id: "exp_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000),
@@ -2878,9 +2878,9 @@ async function handleExpenseSubmit(e) {
         categoria: categoria,
         usuario: state.currentUser.email
     };
-    
+
     showLoader(true, "Registrando gasto en la planilla...");
-    
+
     try {
         const response = await fetch(CONFIG_SHEET_URL, {
             method: "POST",
@@ -2890,23 +2890,23 @@ async function handleExpenseSubmit(e) {
             },
             body: JSON.stringify(expenseData)
         });
-        
+
         const data = await response.json();
         showLoader(false);
-        
+
         if (data.success) {
             showToast("¡Gasto registrado con éxito!", "success");
-            
+
             // Limpiar formulario
             document.getElementById("expense-concept").value = "";
             document.getElementById("expense-amount").value = "";
-            
+
             // Añadir localmente
             state.expensesList.push(data.expense || expenseData);
-            
+
             const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
-            
+
             renderExpensesList();
             calculateAndRenderStats();
         } else {
@@ -2916,17 +2916,17 @@ async function handleExpenseSubmit(e) {
         showLoader(false);
         console.error("Error al registrar gasto:", error);
         showToast("Error de conexión al registrar. Se guardó offline.", "error");
-        
+
         // Guardar offline
         const queueKey = `evolet_offline_expenses_v4_${state.currentUser.email}`;
         const queue = JSON.parse(localStorage.getItem(queueKey) || "[]");
         queue.push(expenseData);
         localStorage.setItem(queueKey, JSON.stringify(queue));
-        
+
         state.expensesList.push(expenseData);
         const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
         localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
-        
+
         renderExpensesList();
         calculateAndRenderStats();
     }
@@ -2943,7 +2943,7 @@ function deleteExpenseRecord(id, concepto) {
         `¿Segura de que deseas eliminar el gasto por "${concepto}"?`,
         async () => {
             showLoader(true, "Eliminando gasto...");
-            
+
             try {
                 const response = await fetch(CONFIG_SHEET_URL, {
                     method: "POST",
@@ -2956,20 +2956,20 @@ function deleteExpenseRecord(id, concepto) {
                         id: id
                     })
                 });
-                
+
                 const data = await response.json();
                 showLoader(false);
-                
+
                 if (data.success) {
                     showToast("Gasto eliminado correctamente.", "success");
-                    
+
                     state.expensesList = state.expensesList.filter(exp => exp.id !== id);
                     const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
                     localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
-                    
+
                     renderExpensesList();
                     calculateAndRenderStats();
-                    
+
                     // Si estamos viendo el historial de gastos, recargar también
                     const activeTab = document.querySelector(".nav-item.active");
                     if (activeTab && activeTab.getAttribute("data-tab") === "gastos") {
@@ -2994,11 +2994,11 @@ function deleteExpenseRecord(id, concepto) {
 function renderExpensesHistoryList() {
     const listElement = document.getElementById("expenses-history-list");
     if (!listElement) return;
-    
+
     listElement.innerHTML = "";
-    
+
     const filteredList = getFilteredExpensesHistory();
-    
+
     if (filteredList.length === 0) {
         listElement.innerHTML = `
             <div class="card-info-box" style="text-align: center;">
@@ -3007,21 +3007,21 @@ function renderExpensesHistoryList() {
         `;
         return;
     }
-    
+
     filteredList.forEach(item => {
         const card = document.createElement("div");
         card.className = "history-card";
-        
+
         const dateObj = new Date(item.fecha + "T00:00:00");
         const formattedDate = dateObj.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' });
-        
+
         const payIcons = {
             Transferencia: '<i class="fa-solid fa-mobile-screen-button"></i>',
             Efectivo: '<i class="fa-solid fa-money-bill-wave"></i>'
         };
         const payIcon = payIcons[item.metodoPago] || '<i class="fa-solid fa-receipt"></i>';
         const totalFormatted = `$${Number(item.monto).toLocaleString("es-AR")}`;
-        
+
         const isAdmin = state.currentUser && state.currentUser.rol === "admin";
 
         card.innerHTML = `
@@ -3042,7 +3042,7 @@ function renderExpensesHistoryList() {
             </button>
             ` : ''}
         `;
-        
+
         if (isAdmin) {
             const deleteBtn = card.querySelector(".btn-delete-expense-history");
             if (deleteBtn) {
@@ -3051,7 +3051,7 @@ function renderExpensesHistoryList() {
                 });
             }
         }
-        
+
         listElement.appendChild(card);
     });
 }
@@ -3061,39 +3061,39 @@ function getFilteredExpensesHistory() {
     const searchInput = document.getElementById("expense-search");
     const filterSelect = document.getElementById("expense-filter");
     if (!searchInput || !filterSelect) return state.expensesList;
-    
+
     const searchVal = searchInput.value.toLowerCase().trim();
     const filterVal = filterSelect.value;
-    
+
     // Clonar y ordenar del más nuevo al más viejo
     const list = [...state.expensesList];
     list.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-    
+
     return list.filter(item => {
         const matchesSearch = item.concepto.toLowerCase().includes(searchVal) ||
             item.metodoPago.toLowerCase().includes(searchVal);
-            
+
         if (!matchesSearch) return false;
-        
+
         if (filterVal === "todos") return true;
-        
+
         const date = new Date(item.fecha + "T00:00:00");
         const now = new Date();
-        
+
         if (filterVal === "hoy") {
             return date.toDateString() === now.toDateString();
         }
-        
+
         if (filterVal === "semana") {
             const oneWeekAgo = new Date();
             oneWeekAgo.setDate(now.getDate() - 7);
             return date >= oneWeekAgo;
         }
-        
+
         if (filterVal === "mes") {
             return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         }
-        
+
         return true;
     });
 }
