@@ -961,6 +961,8 @@ function renderHistoryList() {
 
         const totalFormatted = `$${Number(item.precio).toLocaleString("es-AR")}`;
 
+        const isAdmin = state.currentUser && state.currentUser.rol === "admin";
+
         card.innerHTML = `
             <div class="card-details">
                 <div class="card-client">${escapeHtml(item.cliente)}</div>
@@ -973,9 +975,11 @@ function renderHistoryList() {
             <div class="card-amount-box">
                 <div class="card-price" style="font-size: 18px; color: var(--barbie-dark);">${totalFormatted}</div>
             </div>
+            ${isAdmin ? `
             <button class="btn-delete-card" onclick="app.deleteServiceRecord('${item.id}')" title="Eliminar Registro">
                 <i class="fa-solid fa-trash-can"></i>
             </button>
+            ` : ''}
         `;
 
         listElement.appendChild(card);
@@ -1019,8 +1023,12 @@ function filterHistory() {
     renderHistoryList();
 }
 
-// Eliminar un registro (Usando el modal personalizado)
+// Eliminar un registro (Usando el modal personalizado - Solo Administradores)
 function deleteServiceRecord(id) {
+    if (!state.currentUser || state.currentUser.rol !== "admin") {
+        showToast("Solo los administradores pueden eliminar registros.", "error");
+        return;
+    }
     state.pendingDeleteId = id;
     document.getElementById("delete-modal").classList.remove("hidden");
 }
@@ -2571,6 +2579,8 @@ function renderExpensesList() {
         
         const card = document.createElement("div");
         card.className = "appointment-card";
+        const isAdmin = state.currentUser && state.currentUser.rol === "admin";
+
         card.innerHTML = `
             <div class="appointment-time-col">
                 <span class="appointment-time-start">${day}/${monthStr}</span>
@@ -2586,17 +2596,23 @@ function renderExpensesList() {
                     </span>
                 </div>
             </div>
+            ${isAdmin ? `
             <div class="appointment-actions-col">
                 <button class="btn-delete-expense btn-delete-appointment" title="Eliminar Gasto" data-id="${exp.id}">
                     <i class="fa-regular fa-trash-can"></i>
                 </button>
             </div>
+            ` : ''}
         `;
         
-        // Asignar el listener de eliminación
-        card.querySelector(".btn-delete-expense").addEventListener("click", () => {
-            deleteExpenseRecord(exp.id, exp.concepto);
-        });
+        if (isAdmin) {
+            const deleteBtn = card.querySelector(".btn-delete-expense");
+            if (deleteBtn) {
+                deleteBtn.addEventListener("click", () => {
+                    deleteExpenseRecord(exp.id, exp.concepto);
+                });
+            }
+        }
         
         container.appendChild(card);
     });
@@ -2688,8 +2704,12 @@ async function handleExpenseSubmit(e) {
     }
 }
 
-// Eliminar registro de gasto
+// Eliminar registro de gasto (Solo Administradores)
 function deleteExpenseRecord(id, concepto) {
+    if (!state.currentUser || state.currentUser.rol !== "admin") {
+        showToast("Solo los administradores pueden eliminar gastos.", "error");
+        return;
+    }
     showGenericConfirmModal(
         "Eliminar Gasto",
         `¿Segura de que deseas eliminar el gasto por "${concepto}"?`,
@@ -2774,6 +2794,8 @@ function renderExpensesHistoryList() {
         const payIcon = payIcons[item.metodoPago] || '<i class="fa-solid fa-receipt"></i>';
         const totalFormatted = `$${Number(item.monto).toLocaleString("es-AR")}`;
         
+        const isAdmin = state.currentUser && state.currentUser.rol === "admin";
+
         card.innerHTML = `
             <div class="card-details">
                 <div class="card-client">${escapeHtml(item.concepto)}</div>
@@ -2786,14 +2808,21 @@ function renderExpensesHistoryList() {
             <div class="card-amount-box">
                 <div class="card-price" style="font-size: 18px; color: var(--barbie-dark);">${totalFormatted}</div>
             </div>
-            <button class="btn-delete-card" title="Eliminar Gasto">
+            ${isAdmin ? `
+            <button class="btn-delete-card btn-delete-expense-history" title="Eliminar Gasto">
                 <i class="fa-solid fa-trash-can"></i>
             </button>
+            ` : ''}
         `;
         
-        card.querySelector(".btn-delete-card").addEventListener("click", () => {
-            deleteExpenseRecord(item.id, item.concepto);
-        });
+        if (isAdmin) {
+            const deleteBtn = card.querySelector(".btn-delete-expense-history");
+            if (deleteBtn) {
+                deleteBtn.addEventListener("click", () => {
+                    deleteExpenseRecord(item.id, item.concepto);
+                });
+            }
+        }
         
         listElement.appendChild(card);
     });
