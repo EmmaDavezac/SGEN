@@ -112,9 +112,14 @@
 
             <!-- PESTAÑA 1: REGISTRAR SERVICIO -->
             <div id="tab-registrar" class="tab-pane active">
-                <div class="section-title">
-                    <h3>Registrar Servicio</h3>
-                    <p>Agrega un nuevo trabajo realizado en segundos.</p>
+                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <div>
+                        <h3>Registrar Servicio</h3>
+                        <p>Agrega un nuevo trabajo realizado en segundos.</p>
+                    </div>
+                    <button type="button" id="btn-cancel-checkout" class="btn btn-secondary btn-sm hidden" style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                        <i class="fa-solid fa-arrow-left"></i> Volver a Agenda
+                    </button>
                 </div>
 
                 <form id="service-form" class="cute-form">
@@ -600,7 +605,7 @@
 
         <!-- MENU DE NAVEGACION FLOTANTE INFERIOR -->
         <nav class="app-nav">
-            <button class="nav-item active" data-tab="registrar">
+            <button class="nav-item active" data-tab="registrar" id="nav-btn-registrar">
                 <span class="nav-icon"><i class="fa-solid fa-circle-plus"></i></span>
                 <span class="nav-text">Registrar</span>
             </button>

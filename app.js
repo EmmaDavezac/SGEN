@@ -188,6 +188,12 @@ function setupEventListeners() {
     document.getElementById("reschedule-form").addEventListener("submit", handleRescheduleSubmit);
     document.getElementById("reschedule-modal-btn-cancel").addEventListener("click", closeRescheduleModal);
 
+    // Cancelar cobro de turno y volver a Agenda
+    const cancelCheckoutBtn = document.getElementById("btn-cancel-checkout");
+    if (cancelCheckoutBtn) {
+        cancelCheckoutBtn.addEventListener("click", cancelCheckoutAndReturnToAgenda);
+    }
+
     // Opciones de Cobro (Fiado toggle)
     const chkFiado = document.getElementById("chk-allow-fiado");
     if (chkFiado) {
@@ -775,6 +781,7 @@ async function confirmServiceRegistration() {
         showLoader(false);
 
         if (data.success) {
+            const wasLinked = !!state.linkedAppointment;
             state.servicesList.unshift(data.service);
             saveServicesCache();
             updateClientAutocomplete(); // Recargar el autocompletado
@@ -783,9 +790,6 @@ async function confirmServiceRegistration() {
             // Si el servicio estaba vinculado a un turno, eliminar el turno
             if (state.linkedAppointment) {
                 const aptId = state.linkedAppointment.id;
-                state.linkedAppointment = null;
-                const banner = document.getElementById("checkout-sena-banner");
-                if (banner) banner.classList.add("hidden");
                 
                 // Borrar el turno de forma silenciosa de la nube
                 try {
@@ -812,9 +816,16 @@ async function confirmServiceRegistration() {
                 }
             }
             
+            clearCheckoutState();
             renderHistoryList();
             calculateAndRenderStats();
             resetServiceForm();
+
+            // Si fue un cobro de turno o la manicurista no es admin, regresar a la Agenda
+            const isAdmin = state.currentUser && state.currentUser.rol === "admin";
+            if (wasLinked || !isAdmin) {
+                switchTab("calendario");
+            }
         } else {
             showToast(data.message || "Error al registrar en Google Sheets", "error");
         }
@@ -862,7 +873,7 @@ async function registerServiceDirectly(transaction) {
 }
 
 function resetServiceForm() {
-    document.getElementById("client-name").value = "";
+    clearCheckoutState();
     selectCategory(state.selectedCategory);
     document.querySelector(".app-content").scrollTop = 0;
 }
@@ -1626,6 +1637,7 @@ async function loadPricesFromCloud() {
 function checkAdminAccess() {
     const configBtn = document.getElementById("nav-btn-config");
     const syncBtn = document.getElementById("btn-sync-history");
+    const registrarBtn = document.getElementById("nav-btn-registrar");
     const isAdmin = state.currentUser && state.currentUser.rol === "admin";
 
     if (configBtn) {
@@ -1635,7 +1647,7 @@ function checkAdminAccess() {
             configBtn.classList.add("hidden");
             const activeTabBtn = document.querySelector(".nav-item.active");
             if (activeTabBtn && activeTabBtn.getAttribute("data-tab") === "configuracion") {
-                switchTab("registrar");
+                switchTab("calendario");
             }
         }
     }
@@ -1645,6 +1657,18 @@ function checkAdminAccess() {
             syncBtn.classList.remove("hidden");
         } else {
             syncBtn.classList.add("hidden");
+        }
+    }
+
+    if (registrarBtn) {
+        if (isAdmin) {
+            registrarBtn.classList.remove("hidden");
+        } else {
+            registrarBtn.classList.add("hidden");
+            const activeTabBtn = document.querySelector(".nav-item.active");
+            if (activeTabBtn && activeTabBtn.getAttribute("data-tab") === "registrar" && !state.linkedAppointment) {
+                switchTab("calendario");
+            }
         }
     }
 }
@@ -2262,13 +2286,38 @@ async function handleRescheduleSubmit(e) {
     }
 }
 
-// Abrir pantalla de registro pre-llenando los datos del turno y aplicando la seña
+// Limpiar estado de cobro de turno
+function clearCheckoutState() {
+    state.linkedAppointment = null;
+    const senaBanner = document.getElementById("checkout-sena-banner");
+    if (senaBanner) senaBanner.classList.add("hidden");
+    
+    const cancelCheckoutBtn = document.getElementById("btn-cancel-checkout");
+    if (cancelCheckoutBtn) cancelCheckoutBtn.classList.add("hidden");
+    
+    const clientInput = document.getElementById("client-name");
+    if (clientInput) {
+        clientInput.readOnly = false;
+        clientInput.value = "";
+    }
+}
+
+function cancelCheckoutAndReturnToAgenda() {
+    clearCheckoutState();
+    switchTab("calendario");
+    showToast("Cobro cancelado. De vuelta en la Agenda.", "info");
+}
+
+// Abrir pantalla de registro pre-llenando los datos del turno y haciendo el nombre readonly
 function openCheckoutForAppointment(apt) {
     state.linkedAppointment = apt;
-    switchTab("registrar");
     
-    // Rellenar campos del formulario
-    document.getElementById("client-name").value = apt.cliente;
+    const clientInput = document.getElementById("client-name");
+    clientInput.value = apt.cliente;
+    clientInput.readOnly = true;
+    
+    const cancelCheckoutBtn = document.getElementById("btn-cancel-checkout");
+    if (cancelCheckoutBtn) cancelCheckoutBtn.classList.remove("hidden");
     
     // Crear o actualizar un banner informativo de seña en el formulario
     let senaBanner = document.getElementById("checkout-sena-banner");
@@ -2292,6 +2341,7 @@ function openCheckoutForAppointment(apt) {
     senaBanner.innerHTML = `<i class="fa-solid fa-circle-info"></i> Turno Reservado. Seña de <strong>$${apt.precio}</strong> ya cobrada será descontada del total automáticamente.`;
     senaBanner.classList.remove("hidden");
     
+    switchTab("registrar");
     showToast(`Cobrando turno de ${apt.cliente} (Seña: -$${apt.precio})`, "info");
 }
 
