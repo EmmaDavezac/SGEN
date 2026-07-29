@@ -55,7 +55,8 @@ const state = {
     expensesList: [],           // Lista de gastos registrados
     calendarDate: new Date(),   // Mes visible en el calendario
     selectedCalendarDay: new Date(), // Día seleccionado en el calendario
-    selectedExternalRemoval: null // Objeto de remoción externa seleccionada
+    selectedExternalRemoval: null, // Objeto de remoción externa seleccionada
+    allowFiado: localStorage.getItem("evolet_allow_fiado") === "true" // Opción de cobro fiado
 };
 
 // =========================================================================
@@ -187,6 +188,18 @@ function setupEventListeners() {
     document.getElementById("reschedule-form").addEventListener("submit", handleRescheduleSubmit);
     document.getElementById("reschedule-modal-btn-cancel").addEventListener("click", closeRescheduleModal);
 
+    // Opciones de Cobro (Fiado toggle)
+    const chkFiado = document.getElementById("chk-allow-fiado");
+    if (chkFiado) {
+        chkFiado.addEventListener("change", (e) => {
+            state.allowFiado = e.target.checked;
+            localStorage.setItem("evolet_allow_fiado", state.allowFiado ? "true" : "false");
+            updateFiadoPaymentVisibility();
+            showToast(state.allowFiado ? "Modo Fiado habilitado" : "Modo Fiado deshabilitado", "info");
+        });
+    }
+    updateFiadoPaymentVisibility();
+
     // Ajustes de precios (Admin)
     document.getElementById("btn-edit-mode").addEventListener("click", () => {
         state.isEditingPrices = true;
@@ -312,6 +325,30 @@ function setupEventListeners() {
     document.getElementById("expense-filter").addEventListener("change", () => {
         renderExpensesHistoryList();
     });
+}
+
+// Controlar visibilidad del método de pago Fiado según configuración
+function updateFiadoPaymentVisibility() {
+    const fiadoWrapper = document.getElementById("pay-btn-fiado-wrapper");
+    const chkFiado = document.getElementById("chk-allow-fiado");
+    
+    if (chkFiado) {
+        chkFiado.checked = !!state.allowFiado;
+    }
+    
+    if (fiadoWrapper) {
+        if (state.allowFiado) {
+            fiadoWrapper.style.display = "block";
+        } else {
+            fiadoWrapper.style.display = "none";
+            // Si estaba seleccionado Fiado y se deshabilitó, pasar a Transferencia
+            const fiadoRadio = document.querySelector('input[name="payment-method"][value="Fiado"]');
+            if (fiadoRadio && fiadoRadio.checked) {
+                const transRadio = document.querySelector('input[name="payment-method"][value="Transferencia"]');
+                if (transRadio) transRadio.checked = true;
+            }
+        }
+    }
 }
 
 // =========================================================================

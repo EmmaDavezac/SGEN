@@ -164,9 +164,10 @@
 
                     <!-- Retiro de servicio previo externo (Toggle Switch y Grid de Botones) -->
                     <div class="form-group" id="external-removal-wrapper" style="margin-top: 10px;">
-                        <div class="cute-toggle-card" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--white); border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
-                            <span style="font-size: 13px; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
-                                <i class="fa-solid fa-hand-holding-hand" style="color: var(--barbie-pink);"></i>
+                        <div class="cute-toggle-card"
+                            style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--white); border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
+                            <span
+                                style="font-size: 13px; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
                                 ¿Tiene retiro previo externo?
                             </span>
                             <label class="switch-toggle">
@@ -176,11 +177,13 @@
                         </div>
                     </div>
 
-                    <div id="external-removal-options-container" class="hidden" style="margin-top: 10px; margin-bottom: 15px; padding: 12px; border: 2px dashed var(--barbie-pink); border-radius: var(--radius-md); background: #fffbfb;">
-                        <label style="font-size: 12px; font-weight: 700; color: var(--barbie-dark); margin-bottom: 8px; display: block;">
-                            <i class="fa-solid fa-sparkles" style="color: var(--barbie-pink);"></i> Elige el Tipo de Retiro Externo:
-                        </label>
-                        <div id="external-removal-buttons-grid" class="sub-services-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px;">
+                    <div id="external-removal-options-container" class="hidden"
+                        style="margin-top: 8px; margin-bottom: 12px; padding: 4px 0;">
+                        <span style="font-size: 12px; font-weight: 700; color: var(--text-color); margin-bottom: 8px; display: block;">
+                            Tipo de Retiro:
+                        </span>
+                        <div id="external-removal-buttons-grid" class="sub-services-grid"
+                            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px;">
                             <!-- Botones renderizados dinámicamente con estética btn-service -->
                         </div>
                     </div>
@@ -203,7 +206,7 @@
                                     <span>Efectivo</span>
                                 </div>
                             </label>
-                            <label class="pay-btn">
+                            <label class="pay-btn" id="pay-btn-fiado-wrapper">
                                 <input type="radio" name="payment-method" value="Fiado">
                                 <div class="pay-btn-content">
                                     <span class="pay-icon"><i class="fa-solid fa-hand-holding-hand"></i></span>
@@ -326,7 +329,8 @@
                 </div>
 
                 <!-- Panel de Deudores (Fiados) - Oculto por defecto -->
-                <div id="debtors-panel" class="chart-section hidden" style="margin-top: 25px; border: 2px dashed #ffb3b3; background: #fffcfc;">
+                <div id="debtors-panel" class="chart-section hidden"
+                    style="margin-top: 25px; border: 2px dashed #ffb3b3; background: #fffcfc;">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
                         <i class="fa-solid fa-hand-holding-hand" style="color: #ff4d4d; font-size: 18px;"></i>
                         <h4 style="margin-bottom: 0; color: #cc0000;">Clientes que Deben (Fiados)</h4>
@@ -572,6 +576,20 @@
                     <div id="prices-editor-container" class="prices-editor-container">
                         <!-- Cargado dinámicamente con JS -->
                     </div>
+                <div class="chart-section" style="margin-top: 15px;">
+                    <h4 style="margin-bottom: 6px;">Opciones de Cobro</h4>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Configura qué métodos de pago están habilitados en el formulario de servicios.</p>
+                    
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--white); border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
+                        <span style="font-size: 13px; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-hand-holding-hand" style="color: #ff4d4d;"></i>
+                            Habilitar Cobro en Modo Fiado
+                        </span>
+                        <label class="switch-toggle">
+                            <input type="checkbox" id="chk-allow-fiado">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -790,8 +808,10 @@
                 </div>
 
                 <div class="modal-actions" style="margin-top: 25px;">
-                    <button type="button" id="sena-modal-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Cancelar</button>
-                    <button type="submit" id="sena-modal-btn-save" class="btn btn-primary"><i class="fa-solid fa-check"></i> Confirmar Reserva</button>
+                    <button type="button" id="sena-modal-btn-cancel" class="btn btn-secondary"><i
+                            class="fa-solid fa-xmark"></i> Cancelar</button>
+                    <button type="submit" id="sena-modal-btn-save" class="btn btn-primary"><i
+                            class="fa-solid fa-check"></i> Confirmar Reserva</button>
                 </div>
             </form>
         </div>
@@ -822,8 +842,10 @@
                 </div>
 
                 <div class="modal-actions" style="margin-top: 25px;">
-                    <button type="button" id="reschedule-modal-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Cancelar</button>
-                    <button type="submit" id="reschedule-modal-btn-save" class="btn btn-primary"><i class="fa-solid fa-calendar-check"></i> Reagendar</button>
+                    <button type="button" id="reschedule-modal-btn-cancel" class="btn btn-secondary"><i
+                            class="fa-solid fa-xmark"></i> Cancelar</button>
+                    <button type="submit" id="reschedule-modal-btn-save" class="btn btn-primary"><i
+                            class="fa-solid fa-calendar-check"></i> Reagendar</button>
                 </div>
             </form>
         </div>
