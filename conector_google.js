@@ -516,7 +516,7 @@ function addAppointment(data) {
     const cal = getCalendar();
     if (cal) {
       const event = cal.createEvent(
-        "Evolet Nails: " + cliente + " (" + servicio + ")",
+        cliente,
         new Date(horaInicio),
         new Date(horaFin),
         {
@@ -657,7 +657,7 @@ function importServicesToAppointments() {
     if (cal) {
       try {
         const event = cal.createEvent(
-          "Evolet Nails: " + cliente + " (" + servicio + ") [Cobrado]",
+          cliente,
           start,
           end,
           {
