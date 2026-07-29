@@ -194,6 +194,15 @@ function setupEventListeners() {
         cancelCheckoutBtn.addEventListener("click", cancelCheckoutAndReturnToAgenda);
     }
 
+    // Listeners del constructor de servicio combinado (Categoría Otro)
+    const selComb1 = document.getElementById("combined-service-1");
+    const selComb2 = document.getElementById("combined-service-2");
+    const cntComb1 = document.getElementById("combined-count-1");
+
+    if (selComb1) selComb1.addEventListener("change", updateCombinedServiceCalculation);
+    if (selComb2) selComb2.addEventListener("change", updateCombinedServiceCalculation);
+    if (cntComb1) cntComb1.addEventListener("change", updateCombinedServiceCalculation);
+
     // Opciones de Cobro (Fiado toggle)
     const chkFiado = document.getElementById("chk-allow-fiado");
     if (chkFiado) {
@@ -543,7 +552,26 @@ function selectCategory(catKey) {
         }
     });
 
-    renderSubServicesGrid(catKey);
+    const gridWrapper = document.getElementById("services-grid-wrapper");
+    const builder = document.getElementById("combined-service-builder");
+    const extWrapper = document.getElementById("external-removal-wrapper");
+
+    if (catKey === "personalizado") {
+        if (gridWrapper) gridWrapper.classList.add("hidden");
+        if (builder) builder.classList.remove("hidden");
+        if (extWrapper) extWrapper.style.display = "block";
+        populateCombinedServiceDropdowns();
+        updateCombinedServiceCalculation();
+    } else {
+        if (gridWrapper) gridWrapper.classList.remove("hidden");
+        if (builder) builder.classList.add("hidden");
+        if (catKey === "remocion") {
+            if (extWrapper) extWrapper.style.display = "none";
+        } else {
+            if (extWrapper) extWrapper.style.display = "block";
+        }
+        renderSubServicesGrid(catKey);
+    }
 }
 
 function renderSubServicesGrid(catKey) {
@@ -621,6 +649,87 @@ function selectSubService(service, buttonElement) {
     }
 }
 
+// Poblar de forma dinámica los selectores del constructor de servicio combinado
+function populateCombinedServiceDropdowns() {
+    const sel1 = document.getElementById("combined-service-1");
+    const sel2 = document.getElementById("combined-service-2");
+    if (!sel1 || !sel2) return;
+
+    if (sel1.options.length > 0 && sel2.options.length > 0) return;
+
+    sel1.innerHTML = "";
+    sel2.innerHTML = "";
+
+    const categoriesToInclude = ["kapping", "softgel", "esculpidas", "semi"];
+
+    categoriesToInclude.forEach(cat => {
+        const services = SERVICES_CATALOG[cat] || [];
+        services.forEach(s => {
+            const opt1 = document.createElement("option");
+            opt1.value = s.name;
+            opt1.textContent = `${s.name} ($${s.price.toLocaleString("es-AR")})`;
+            opt1.setAttribute("data-price", s.price);
+            sel1.appendChild(opt1);
+
+            const opt2 = document.createElement("option");
+            opt2.value = s.name;
+            opt2.textContent = `${s.name} ($${s.price.toLocaleString("es-AR")})`;
+            opt2.setAttribute("data-price", s.price);
+            sel2.appendChild(opt2);
+        });
+    });
+
+    if (sel1.options.length > 0) sel1.selectedIndex = 0;
+    if (sel2.options.length > 1) {
+        const idxEsculpidas = Array.from(sel2.options).findIndex(opt => opt.value.toLowerCase().includes("esculpida"));
+        sel2.selectedIndex = idxEsculpidas !== -1 ? idxEsculpidas : (sel2.options.length - 1);
+    }
+}
+
+// Recalcular la combinación de los 2 servicios (10 uñas en total)
+function updateCombinedServiceCalculation() {
+    if (state.selectedCategory !== "personalizado") return;
+
+    const sel1 = document.getElementById("combined-service-1");
+    const sel2 = document.getElementById("combined-service-2");
+    const count1El = document.getElementById("combined-count-1");
+    const count2El = document.getElementById("combined-count-2");
+
+    if (!sel1 || !sel2 || !count1El || !count2El) return;
+
+    const count1 = parseInt(count1El.value) || 7;
+    const count2 = 10 - count1;
+    
+    count2El.innerHTML = `<option value="${count2}" selected>${count2} ${count2 === 1 ? 'uña' : 'uñas'}</option>`;
+
+    const opt1 = sel1.options[sel1.selectedIndex];
+    const opt2 = sel2.options[sel2.selectedIndex];
+
+    if (!opt1 || !opt2) return;
+
+    const name1 = opt1.value;
+    const price1 = Number(opt1.getAttribute("data-price")) || 0;
+
+    const name2 = opt2.value;
+    const price2 = Number(opt2.getAttribute("data-price")) || 0;
+
+    const combinedName = `${name1} (${count1} ${count1 === 1 ? 'uña' : 'uñas'}) + ${name2} (${count2} ${count2 === 1 ? 'uña' : 'uñas'})`;
+    const baseCombinedPrice = Math.round(((price1 * count1) + (price2 * count2)) / 10);
+
+    state.selectedService = {
+        name: combinedName,
+        price: baseCombinedPrice
+    };
+
+    const nameInput = document.getElementById("service-name-input");
+    if (nameInput) {
+        nameInput.value = combinedName;
+        nameInput.readOnly = true;
+    }
+
+    recalculateFinalServicePrice();
+}
+
 // Cargar de forma dinámica las opciones de retiro externo como botones btn-service
 function populateExternalRemovalTypes() {
     const grid = document.getElementById("external-removal-buttons-grid");
@@ -665,10 +774,6 @@ function recalculateFinalServicePrice() {
     if (!priceInput || !state.selectedService) return;
     
     let basePrice = Number(state.selectedService.price) || 0;
-    
-    if (state.selectedCategory === "personalizado") {
-        return;
-    }
     
     const chk = document.getElementById("chk-external-removal");
     if (chk && chk.checked && state.selectedExternalRemoval) {

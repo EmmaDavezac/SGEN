@@ -147,10 +147,58 @@
                     </div>
 
                     <!-- Grid de Subservicios (Se actualiza dinámicamente con JS) -->
-                    <div class="form-group">
+                    <div class="form-group" id="services-grid-wrapper">
                         <label id="services-grid-label">Servicio Específico</label>
                         <div id="services-grid" class="services-grid">
                             <!-- Los botones se renderizan con JS -->
+                        </div>
+                    </div>
+
+                    <!-- Panel de Servicio Combinado (Categoría "Otro") -->
+                    <div id="combined-service-builder" class="hidden" style="margin-bottom: 15px; padding: 14px; background: #fff8f9; border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
+                        <div style="font-size: 13px; font-weight: 700; color: var(--barbie-dark); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-puzzle-piece" style="color: var(--barbie-pink);"></i>
+                            Combinación de 2 Servicios (10 uñas en total)
+                        </div>
+
+                        <!-- Servicio 1 -->
+                        <div class="form-row-2" style="margin-bottom: 10px; align-items: end;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 11px;">Servicio 1 (Principal)</label>
+                                <select id="combined-service-1" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
+                                    <!-- Se puebla con opciones -->
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 11px;">Uñas Serv. 1</label>
+                                <select id="combined-count-1" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
+                                    <option value="1">1 uña</option>
+                                    <option value="2">2 uñas</option>
+                                    <option value="3">3 uñas</option>
+                                    <option value="4">4 uñas</option>
+                                    <option value="5">5 uñas</option>
+                                    <option value="6">6 uñas</option>
+                                    <option value="7" selected>7 uñas</option>
+                                    <option value="8">8 uñas</option>
+                                    <option value="9">9 uñas</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Servicio 2 -->
+                        <div class="form-row-2" style="align-items: end;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 11px;">Servicio 2 (Secundario)</label>
+                                <select id="combined-service-2" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
+                                    <!-- Se puebla con opciones -->
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 11px;">Uñas Serv. 2</label>
+                                <select id="combined-count-2" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%; background: #f3f4f6;" disabled>
+                                    <option value="3" selected>3 uñas</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
