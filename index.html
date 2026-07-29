@@ -162,21 +162,26 @@
                         </div>
                     </div>
 
-                    <!-- Retiro de servicio previo externo (Condicional) -->
+                    <!-- Retiro de servicio previo externo (Toggle Switch y Grid de Botones) -->
                     <div class="form-group" id="external-removal-wrapper" style="margin-top: 10px;">
-                        <label class="cute-checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-dark);">
-                            <input type="checkbox" id="chk-external-removal" style="accent-color: var(--barbie-pink); width: 16px; height: 16px;">
-                            <span>¿Tiene retiro de servicio previo externo?</span>
-                        </label>
+                        <div class="cute-toggle-card" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--white); border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
+                            <span style="font-size: 13px; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-hand-holding-hand" style="color: var(--barbie-pink);"></i>
+                                ¿Tiene retiro previo externo?
+                            </span>
+                            <label class="switch-toggle">
+                                <input type="checkbox" id="chk-external-removal">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
                     </div>
 
-                    <div id="external-removal-options-container" class="hidden" style="margin-top: 10px; margin-bottom: 15px; padding: 12px; border: 1.5px dashed var(--barbie-light); border-radius: var(--radius-sm); background: #fffbfb;">
-                        <label for="select-external-removal-type" style="font-size: 12px; font-weight: 700; color: var(--barbie-dark);">Tipo de Retiro Externo</label>
-                        <div class="input-wrapper" style="margin-top: 5px;">
-                            <i class="fa-solid fa-hand-holding-hand input-icon" style="color: var(--barbie-pink);"></i>
-                            <select id="select-external-removal-type" style="padding-left: 35px; height: 42px;">
-                                <!-- Se carga dinámicamente -->
-                            </select>
+                    <div id="external-removal-options-container" class="hidden" style="margin-top: 10px; margin-bottom: 15px; padding: 12px; border: 2px dashed var(--barbie-pink); border-radius: var(--radius-md); background: #fffbfb;">
+                        <label style="font-size: 12px; font-weight: 700; color: var(--barbie-dark); margin-bottom: 8px; display: block;">
+                            <i class="fa-solid fa-sparkles" style="color: var(--barbie-pink);"></i> Elige el Tipo de Retiro Externo:
+                        </label>
+                        <div id="external-removal-buttons-grid" class="sub-services-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px;">
+                            <!-- Botones renderizados dinámicamente con estética btn-service -->
                         </div>
                     </div>
 
@@ -757,16 +762,6 @@
             <p id="sena-modal-sub" class="modal-sub">Ingresa la seña recibida para confirmar la reserva:</p>
 
             <form id="sena-form" class="cute-form" style="margin-top: 15px;">
-                <div class="form-group">
-                    <label for="sena-modal-status">Estado del Turno</label>
-                    <div class="input-wrapper">
-                        <i class="fa-solid fa-tag input-icon"></i>
-                        <select id="sena-modal-status">
-                            <option value="Reservado" selected>Reservado (Confirmado)</option>
-                            <option value="Provisional">Provisional (Sin Seña / Pendiente)</option>
-                        </select>
-                    </div>
-                </div>
                 <div class="form-group">
                     <label for="sena-modal-amount">Monto de la Seña ($)</label>
                     <div class="input-wrapper">

@@ -54,7 +54,8 @@ const state = {
     appointmentsList: [],       // Lista de turnos agendados en la nube
     expensesList: [],           // Lista de gastos registrados
     calendarDate: new Date(),   // Mes visible en el calendario
-    selectedCalendarDay: new Date() // Día seleccionado en el calendario
+    selectedCalendarDay: new Date(), // Día seleccionado en el calendario
+    selectedExternalRemoval: null // Objeto de remoción externa seleccionada
 };
 
 // =========================================================================
@@ -166,9 +167,7 @@ function setupEventListeners() {
         recalculateFinalServicePrice();
     });
 
-    document.getElementById("select-external-removal-type").addEventListener("change", () => {
-        recalculateFinalServicePrice();
-    });
+
 
     // Modal de Confirmación de Registro
     document.getElementById("modal-btn-confirm").addEventListener("click", confirmServiceRegistration);
@@ -562,6 +561,7 @@ function selectSubService(service, buttonElement) {
         }
         chk.checked = false;
         opts.classList.add("hidden");
+        state.selectedExternalRemoval = null;
     }
 
     if (state.selectedCategory === "personalizado") {
@@ -578,23 +578,42 @@ function selectSubService(service, buttonElement) {
     }
 }
 
-// Cargar de forma dinámica las opciones de retiro externo
+// Cargar de forma dinámica las opciones de retiro externo como botones btn-service
 function populateExternalRemovalTypes() {
-    const select = document.getElementById("select-external-removal-type");
-    if (!select) return;
-    select.innerHTML = "";
+    const grid = document.getElementById("external-removal-buttons-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
     
-    // Obtener las remociones de SERVICES_CATALOG.remocion, excluyendo "Retiro Servicio Propio"
     const rems = SERVICES_CATALOG.remocion || [];
-    rems.forEach(rem => {
-        if (rem.name !== "Retiro Servicio Propio") {
-            const opt = document.createElement("option");
-            opt.value = rem.name;
-            opt.textContent = `${rem.name} (+$${rem.price.toLocaleString("es-AR")})`;
-            opt.setAttribute("data-price", rem.price);
-            select.appendChild(opt);
+    const validRems = rems.filter(rem => rem.name !== "Retiro Servicio Propio");
+    
+    state.selectedExternalRemoval = null;
+    
+    validRems.forEach((rem, idx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn-service btn-ext-removal";
+        btn.innerHTML = `
+            <span>${escapeHtml(rem.name)}</span>
+            <span class="price-tag">+$${rem.price.toLocaleString("es-AR")}</span>
+        `;
+        
+        btn.addEventListener("click", () => {
+            const allBtns = grid.querySelectorAll(".btn-ext-removal");
+            allBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            state.selectedExternalRemoval = rem;
+            recalculateFinalServicePrice();
+        });
+        
+        grid.appendChild(btn);
+        
+        if (idx === 0) {
+            btn.classList.add("active");
+            state.selectedExternalRemoval = rem;
         }
     });
+    recalculateFinalServicePrice();
 }
 
 // Recalcular el precio sumando el retiro previo si está marcado
@@ -609,13 +628,9 @@ function recalculateFinalServicePrice() {
     }
     
     const chk = document.getElementById("chk-external-removal");
-    if (chk && chk.checked) {
-        const select = document.getElementById("select-external-removal-type");
-        const selectedOpt = select.options[select.selectedIndex];
-        if (selectedOpt) {
-            const extraPrice = Number(selectedOpt.getAttribute("data-price")) || 0;
-            priceInput.value = basePrice + extraPrice;
-        }
+    if (chk && chk.checked && state.selectedExternalRemoval) {
+        const extraPrice = Number(state.selectedExternalRemoval.price) || 0;
+        priceInput.value = basePrice + extraPrice;
     } else {
         priceInput.value = basePrice;
     }
@@ -635,12 +650,8 @@ function handleServiceSubmit(e) {
     const clientName = document.getElementById("client-name").value.trim();
     let serviceName = document.getElementById("service-name-input").value.trim();
     const chk = document.getElementById("chk-external-removal");
-    if (chk && chk.checked) {
-        const select = document.getElementById("select-external-removal-type");
-        const selectedOpt = select.options[select.selectedIndex];
-        if (selectedOpt) {
-            serviceName = `${serviceName} + ${selectedOpt.value}`;
-        }
+    if (chk && chk.checked && state.selectedExternalRemoval) {
+        serviceName = `${serviceName} + ${state.selectedExternalRemoval.name}`;
     }
     const price = Number(document.getElementById("service-price").value) || 0;
 
