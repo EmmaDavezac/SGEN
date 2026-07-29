@@ -103,7 +103,8 @@
                 </div>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
-                <button id="btn-global-reload" class="btn-logout" title="Actualizar Todos los Datos" style="background: var(--barbie-pale); color: var(--barbie-dark);">
+                <button id="btn-global-reload" class="btn-logout" title="Actualizar Todos los Datos"
+                    style="background: var(--barbie-pale); color: var(--barbie-dark);">
                     <i class="fa-solid fa-rotate-right"></i>
                 </button>
                 <button id="btn-logout" class="btn-logout" title="Cerrar Sesión">
@@ -117,12 +118,14 @@
 
             <!-- PESTAÑA 1: REGISTRAR SERVICIO -->
             <div id="tab-registrar" class="tab-pane active">
-                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                <div class="section-title"
+                    style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
                     <div>
                         <h3>Registrar Servicio</h3>
                         <p>Agrega un nuevo trabajo realizado en segundos.</p>
                     </div>
-                    <button type="button" id="btn-cancel-checkout" class="btn btn-secondary btn-sm hidden" style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                    <button type="button" id="btn-cancel-checkout" class="btn btn-secondary btn-sm hidden"
+                        style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
                         <i class="fa-solid fa-arrow-left"></i> Volver a Agenda
                     </button>
                 </div>
@@ -160,8 +163,10 @@
                     </div>
 
                     <!-- Panel de Servicio Combinado (Categoría "Otro") -->
-                    <div id="combined-service-builder" class="hidden" style="margin-bottom: 15px; padding: 14px; background: #fff8f9; border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
-                        <div style="font-size: 13px; font-weight: 700; color: var(--barbie-dark); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                    <div id="combined-service-builder" class="hidden"
+                        style="margin-bottom: 15px; padding: 14px; background: #fff8f9; border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
+                        <div
+                            style="font-size: 13px; font-weight: 700; color: var(--barbie-dark); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
                             <i class="fa-solid fa-puzzle-piece" style="color: var(--barbie-pink);"></i>
                             Combinación de 2 Servicios (10 uñas en total)
                         </div>
@@ -170,13 +175,15 @@
                         <div class="form-row-2" style="margin-bottom: 10px; align-items: end;">
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label style="font-size: 11px;">Servicio 1 (Principal)</label>
-                                <select id="combined-service-1" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
+                                <select id="combined-service-1" class="filter-select"
+                                    style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
                                     <!-- Se puebla con opciones -->
                                 </select>
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label style="font-size: 11px;">Uñas Serv. 1</label>
-                                <select id="combined-count-1" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
+                                <select id="combined-count-1" class="filter-select"
+                                    style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
                                     <option value="1">1 uña</option>
                                     <option value="2">2 uñas</option>
                                     <option value="3">3 uñas</option>
@@ -194,13 +201,16 @@
                         <div class="form-row-2" style="align-items: end;">
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label style="font-size: 11px;">Servicio 2 (Secundario)</label>
-                                <select id="combined-service-2" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
+                                <select id="combined-service-2" class="filter-select"
+                                    style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%;">
                                     <!-- Se puebla con opciones -->
                                 </select>
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label style="font-size: 11px;">Uñas Serv. 2</label>
-                                <select id="combined-count-2" class="filter-select" style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%; background: #f3f4f6;" disabled>
+                                <select id="combined-count-2" class="filter-select"
+                                    style="height: 40px; font-size: 12px; padding: 4px 8px; width: 100%; background: #f3f4f6;"
+                                    disabled>
                                     <option value="3" selected>3 uñas</option>
                                 </select>
                             </div>
@@ -237,7 +247,8 @@
 
                     <div id="external-removal-options-container" class="hidden"
                         style="margin-top: 8px; margin-bottom: 12px; padding: 4px 0;">
-                        <span style="font-size: 12px; font-weight: 700; color: var(--text-color); margin-bottom: 8px; display: block;">
+                        <span
+                            style="font-size: 12px; font-weight: 700; color: var(--text-color); margin-bottom: 8px; display: block;">
                             Tipo de Retiro:
                         </span>
                         <div id="external-removal-buttons-grid" class="sub-services-grid"
@@ -638,26 +649,29 @@
                     <div id="prices-editor-container" class="prices-editor-container">
                         <!-- Cargado dinámicamente con JS -->
                     </div>
-                <div class="chart-section" style="margin-top: 15px;">
-                    <h4 style="margin-bottom: 6px;">Opciones de Cobro</h4>
-                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Configura qué métodos de pago están habilitados en el formulario de servicios.</p>
-                    
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--white); border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
-                        <span style="font-size: 13px; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
-                            <i class="fa-solid fa-hand-holding-hand" style="color: #ff4d4d;"></i>
-                            Habilitar Cobro en Modo Fiado
-                        </span>
-                        <label class="switch-toggle">
-                            <input type="checkbox" id="chk-allow-fiado">
-                            <span class="slider round"></span>
-                        </label>
+                    <div class="chart-section" style="margin-top: 15px;">
+                        <h4 style="margin-bottom: 6px;">Opciones de Cobro</h4>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Configura qué métodos
+                            de pago están habilitados en el formulario de servicios.</p>
+
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--white); border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
+                            <span
+                                style="font-size: 13px; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-hand-holding-hand" style="color: #ff4d4d;"></i>
+                                Habilitar Cobro en Modo Fiado
+                            </span>
+                            <label class="switch-toggle">
+                                <input type="checkbox" id="chk-allow-fiado">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="credits-footer app-credits">
-                Desarrollado con <i class="fa-solid fa-heart text-primary"></i> por Emmanuel Davezac
-            </div>
+                <div class="credits-footer app-credits">
+                    Desarrollado con <i class="fa-solid fa-heart text-primary"></i> por Emmanuel Davezac
+                </div>
         </main>
 
         <!-- MENU DE NAVEGACION FLOTANTE INFERIOR -->

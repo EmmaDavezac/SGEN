@@ -1350,9 +1350,11 @@ function calculateAndRenderStats() {
         "Otro": 0
     };
 
+    const currentYearMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+
     state.expensesList.forEach(item => {
-        const date = new Date(item.fecha + "T00:00:00");
-        if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
+        if (!item.fecha) return;
+        if (item.fecha.substring(0, 7) === currentYearMonth) {
             const monto = Number(item.monto) || 0;
             totalMonthExpenses += monto;
             const cat = item.categoria || "Otro";
@@ -1363,6 +1365,7 @@ function calculateAndRenderStats() {
             }
         }
     });
+
 
     const netBalance = totalMonthIncome - totalMonthExpenses;
 
@@ -2775,15 +2778,18 @@ function renderExpensesList() {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
+    const currentYearMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
 
-    // Filtrar los gastos del mes actual
+    // Filtrar los gastos del mes actual (comparando solo "YYYY-MM", sin construir un Date)
     const monthExpenses = state.expensesList.filter(item => {
-        const date = new Date(item.fecha + "T00:00:00");
-        return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+        if (!item.fecha) return false;
+        return item.fecha.substring(0, 7) === currentYearMonth;
     });
 
     // Ordenar de más nuevo a más viejo
     monthExpenses.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+
 
     let totalSum = 0;
 
