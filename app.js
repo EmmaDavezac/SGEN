@@ -65,11 +65,12 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initApp() {
-    // Registrar Service Worker para PWA Offline
+    // Registrar Service Worker para PWA Offline (Forzar chequeo de actualización de red)
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
             .then(reg => {
                 console.log('Service Worker registrado con éxito');
+                reg.update(); // Forzar verificación de nueva versión en cada carga
                 reg.onupdatefound = () => {
                     const installingWorker = reg.installing;
                     if (installingWorker) {
@@ -89,6 +90,12 @@ function initApp() {
             })
             .catch(err => console.warn('Error al registrar Service Worker:', err));
     }
+
+    // Escuchar cuando el navegador vuelve a tener conexión para sincronizar de inmediato
+    window.addEventListener("online", () => {
+        showToast("Conexión de red restablecida. Sincronizando datos offline...", "info");
+        checkAndSyncOfflineTransactions();
+    });
 
     // Verificar Sesión Activa (v4)
     const savedSession = localStorage.getItem("evolet_session_v4");
@@ -1281,40 +1288,78 @@ function saveOfflineTransaction(transaction) {
 async function checkAndSyncOfflineTransactions() {
     if (!navigator.onLine || !CONFIG_SHEET_URL || !state.currentUser) return;
 
-    const queueKey = `evolet_offline_v4_${state.currentUser.email}`;
-    const offlineQueue = JSON.parse(localStorage.getItem(queueKey) || "[]");
+    // 1. Sincronizar Servicios (Ventas)
+    const servicesKey = `evolet_offline_v4_${state.currentUser.email}`;
+    const servicesQueue = JSON.parse(localStorage.getItem(servicesKey) || "[]");
 
-    if (offlineQueue.length === 0) return;
-
-    console.log(`Sincronizando ${offlineQueue.length} registros offline...`);
-
-    const failedQueue = [];
-
-    for (const transaction of offlineQueue) {
-        try {
-            const response = await fetch(CONFIG_SHEET_URL, {
-                method: "POST",
-                mode: "cors",
-                body: JSON.stringify({
-                    action: "add_service",
-                    ...transaction
-                })
-            });
-            const data = await response.json();
-            if (!data.success) {
-                failedQueue.push(transaction);
+    if (servicesQueue.length > 0) {
+        console.log(`Sincronizando ${servicesQueue.length} servicios offline...`);
+        const failedServices = [];
+        for (const transaction of servicesQueue) {
+            try {
+                const response = await fetch(CONFIG_SHEET_URL, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: JSON.stringify({
+                        action: "add_service",
+                        ...transaction
+                    })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    failedServices.push(transaction);
+                }
+            } catch (e) {
+                failedServices.push(transaction);
             }
-        } catch (e) {
-            failedQueue.push(transaction);
+        }
+        if (failedServices.length === 0) {
+            localStorage.removeItem(servicesKey);
+            showToast("¡Servicios guardados offline sincronizados con éxito!", "success");
+            loadServicesData();
+        } else {
+            localStorage.setItem(servicesKey, JSON.stringify(failedServices));
         }
     }
 
-    if (failedQueue.length === 0) {
-        localStorage.removeItem(queueKey);
-        showToast("¡Todos los registros offline fueron sincronizados!", "success");
-        loadServicesData();
-    } else {
-        localStorage.setItem(queueKey, JSON.stringify(failedQueue));
+    // 2. Sincronizar Gastos
+    const expensesKey = `evolet_offline_expenses_v4_${state.currentUser.email}`;
+    const expensesQueue = JSON.parse(localStorage.getItem(expensesKey) || "[]");
+
+    if (expensesQueue.length > 0) {
+        console.log(`Sincronizando ${expensesQueue.length} gastos offline...`);
+        const failedExpenses = [];
+        for (const expenseData of expensesQueue) {
+            try {
+                const response = await fetch(CONFIG_SHEET_URL, {
+                    method: "POST",
+                    mode: "cors",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: JSON.stringify({
+                        action: "add_expense",
+                        ...expenseData
+                    })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    failedExpenses.push(expenseData);
+                }
+            } catch (e) {
+                failedExpenses.push(expenseData);
+            }
+        }
+        if (failedExpenses.length === 0) {
+            localStorage.removeItem(expensesKey);
+            showToast("¡Gastos guardados offline sincronizados con éxito!", "success");
+            loadExpensesData();
+        } else {
+            localStorage.setItem(expensesKey, JSON.stringify(failedExpenses));
+        }
     }
 }
 
