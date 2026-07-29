@@ -102,9 +102,14 @@
                     <h2 id="user-display-name" class="user-name">Manicurista</h2>
                 </div>
             </div>
-            <button id="btn-logout" class="btn-logout" title="Cerrar Sesión">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i>
-            </button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button id="btn-global-reload" class="btn-logout" title="Actualizar Todos los Datos" style="background: var(--barbie-pale); color: var(--barbie-dark);">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+                <button id="btn-logout" class="btn-logout" title="Cerrar Sesión">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </button>
+            </div>
         </header>
 
         <!-- CONTENIDO PRINCIPAL SCROLLABLE -->
@@ -404,6 +409,10 @@
                         <p>Visualiza y organiza tus citas sincronizadas en la nube.</p>
                     </div>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button id="btn-refresh-calendar" class="btn btn-secondary btn-sm"
+                            style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
+                            <i class="fa-solid fa-rotate-right"></i> Actualizar
+                        </button>
                         <button id="btn-sync-history" class="btn btn-secondary btn-sm hidden"
                             style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
                             <i class="fa-solid fa-rotate"></i> Importar Cobrados

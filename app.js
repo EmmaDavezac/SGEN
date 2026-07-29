@@ -188,6 +188,25 @@ function setupEventListeners() {
     document.getElementById("reschedule-form").addEventListener("submit", handleRescheduleSubmit);
     document.getElementById("reschedule-modal-btn-cancel").addEventListener("click", closeRescheduleModal);
 
+    // Botones de Recarga/Sincronización (Solución Móvil)
+    const globalReloadBtn = document.getElementById("btn-global-reload");
+    if (globalReloadBtn) {
+        globalReloadBtn.addEventListener("click", () => refreshAllData(true));
+    }
+    
+    const refreshCalBtn = document.getElementById("btn-refresh-calendar");
+    if (refreshCalBtn) {
+        refreshCalBtn.addEventListener("click", () => loadAppointments(true));
+    }
+
+    // Escuchar cuando la app vuelve a estar visible en pantalla en celulares
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && state.currentUser) {
+            console.log("Pantalla encendida/App en primer plano, sincronizando turnos...");
+            loadAppointments(false);
+        }
+    });
+
     // Cancelar cobro de turno y volver a Agenda
     const cancelCheckoutBtn = document.getElementById("btn-cancel-checkout");
     if (cancelCheckoutBtn) {
@@ -435,6 +454,7 @@ function executeSwitchTab(tabId) {
     } else if (tabId === "calendario") {
         renderCalendar();
         renderDayAppointments();
+        loadAppointments();
     } else if (tabId === "gastos") {
         const expDateInput = document.getElementById("expense-date");
         if (expDateInput) {
@@ -1955,21 +1975,26 @@ function showGenericConfirmModal(title, subtitle, onConfirm) {
 //                   GESTIÓN DE TURNOS Y CALENDARIO
 // =========================================================================
 
-// Cargar turnos de la nube
-async function loadAppointments() {
+// Cargar turnos de la nube con protección offline
+async function loadAppointments(showNotification = false) {
     if (!state.currentUser) return;
     
     // Carga inicial del caché local (PWA Offline)
     const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
-        state.appointmentsList = JSON.parse(cached);
-        // Si estamos en la pestaña calendario, re-renderizar
-        const activeTab = document.querySelector(".nav-item.active");
-        if (activeTab && activeTab.getAttribute("data-tab") === "calendario") {
-            renderCalendar();
-            renderDayAppointments();
+        try {
+            state.appointmentsList = JSON.parse(cached);
+        } catch (e) {
+            console.error("Error al parsear caché local de turnos:", e);
         }
+    }
+    
+    // Renderizar lo que hay en memoria/cache de inmediato para que NUNCA quede vacía la agenda
+    const activeTab = document.querySelector(".nav-item.active");
+    if (activeTab && activeTab.getAttribute("data-tab") === "calendario") {
+        renderCalendar();
+        renderDayAppointments();
     }
     
     if (!CONFIG_SHEET_URL) return;
@@ -1978,19 +2003,54 @@ async function loadAppointments() {
         const response = await fetch(`${CONFIG_SHEET_URL}?action=get_appointments`);
         const data = await response.json();
         
-        if (data.success) {
+        if (data.success && data.appointments) {
             state.appointmentsList = data.appointments;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
             
-            // Re-renderizar si estamos en la pestaña del calendario
-            const activeTab = document.querySelector(".nav-item.active");
-            if (activeTab && activeTab.getAttribute("data-tab") === "calendario") {
+            const currentTab = document.querySelector(".nav-item.active");
+            if (currentTab && currentTab.getAttribute("data-tab") === "calendario") {
                 renderCalendar();
                 renderDayAppointments();
+            }
+            if (showNotification) {
+                showToast("Agenda actualizada desde la nube.", "success");
+            }
+        } else {
+            if (showNotification) {
+                showToast(data.message || "No se pudieron obtener los turnos", "error");
             }
         }
     } catch (error) {
         console.warn("No se pudieron cargar los turnos de la nube, usando caché local.", error);
+        if (showNotification) {
+            showToast("Sin conexión a la nube. Mostrando turnos guardados localmente.", "warning");
+        }
+    }
+}
+
+// Función global para forzar recarga/sincronización de todos los datos
+async function refreshAllData(showLoaderToast = true) {
+    if (!state.currentUser) return;
+    
+    const icon = document.querySelector("#btn-global-reload i");
+    if (icon) icon.classList.add("fa-spin");
+    
+    if (showLoaderToast) showLoader(true, "Sincronizando datos con la nube...");
+    
+    try {
+        await Promise.all([
+            loadAppointments(),
+            loadServicesData(),
+            loadPricesFromCloud(),
+            loadExpenses()
+        ]);
+        showToast("¡Datos sincronizados correctamente!", "success");
+    } catch (err) {
+        console.error("Error al sincronizar datos:", err);
+        showToast("Sin conexión. Mostrando datos locales.", "warning");
+    } finally {
+        if (icon) icon.classList.remove("fa-spin");
+        if (showLoaderToast) showLoader(false);
     }
 }
 
