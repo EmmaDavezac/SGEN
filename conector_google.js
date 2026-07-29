@@ -523,6 +523,12 @@ function addAppointment(data) {
           description: "Turno agendado para: " + cliente + "\nServicio: " + servicio + "\nPrecio: $" + precio + "\nRegistrado por: " + usuario
         }
       );
+      try {
+        event.removeAllReminders();
+        event.addPopupReminder(30);
+      } catch (remErr) {
+        console.error("Error al configurar recordatorio: " + remErr.toString());
+      }
       eventId = event.getId();
     }
   } catch (e) {
@@ -664,6 +670,12 @@ function importServicesToAppointments() {
             description: "Turno importado de servicio ya cobrado.\nCliente: " + cliente + "\nServicio: " + servicio + "\nPrecio: $" + precio + "\nRegistrado por: " + email
           }
         );
+        try {
+          event.removeAllReminders();
+          event.addPopupReminder(30);
+        } catch (remErr) {
+          console.error("Error al configurar recordatorio: " + remErr.toString());
+        }
         eventId = event.getId();
       } catch (e) {
         console.error("Error importando evento a Calendar: " + e.toString());
