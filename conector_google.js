@@ -1041,9 +1041,28 @@ function getExpenses() {
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row[0]) continue; // Fila vacía
+    // Normalizar la fecha: soportar objetos Date en la hoja o cadenas
+    let fechaVal = "";
+    if (row[1]) {
+      try {
+        if (row[1] instanceof Date) {
+          fechaVal = Utilities.formatDate(row[1], Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        } else {
+          const parsed = new Date(row[1].toString().trim());
+          if (!isNaN(parsed.getTime())) {
+            fechaVal = Utilities.formatDate(parsed, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+          } else {
+            fechaVal = row[1].toString().trim();
+          }
+        }
+      } catch (e) {
+        fechaVal = row[1].toString().trim();
+      }
+    }
+
     expenses.push({
       id: row[0].toString().trim(),
-      fecha: row[1] ? row[1].toString().trim() : "",
+      fecha: fechaVal,
       concepto: row[2] ? row[2].toString().trim() : "",
       monto: Number(row[3]) || 0,
       metodoPago: row[4] ? row[4].toString().trim() : "",
@@ -1214,7 +1233,15 @@ function addExpense(data) {
   }
   
   const id = data.id || "exp_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000);
-  const fecha = data.fecha || new Date().toISOString().split('T')[0];
+  // Guardar la fecha como objeto Date para que Sheets la almacene correctamente.
+  // Si se provee `data.fecha`, intentar parsearla; si es inválida, usar hoy.
+  let fecha;
+  if (data.fecha) {
+    const parsed = new Date(data.fecha);
+    fecha = isNaN(parsed.getTime()) ? new Date() : parsed;
+  } else {
+    fecha = new Date();
+  }
   const concepto = data.concepto || "Varios";
   const monto = Number(data.monto) || 0;
   const metodoPago = data.metodoPago || "Efectivo";
