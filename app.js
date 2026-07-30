@@ -8,6 +8,22 @@
  */
 const CONFIG_SHEET_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEET_URL) || 'https://script.google.com/macros/s/AKfycbxZT_wSTPClKAN78_TYAEnxBUj_b7BWPmQz2pwiKm4dkff5CgH_96xOLuj30IFdc0uUVg/exec';
 
+function getYearMonthStr(fechaValue) {
+    if (!fechaValue) return "";
+
+    // Si ya es un string con pinta de fecha ISO ("YYYY-MM-DD..."), usamos los primeros 7 caracteres
+    if (typeof fechaValue === "string" && /^\d{4}-\d{2}/.test(fechaValue)) {
+        return fechaValue.substring(0, 7);
+    }
+
+    // Para cualquier otro caso (Date, número/timestamp, u otro string raro):
+    // construimos un Date y extraemos año y mes de forma segura
+    const d = new Date(fechaValue);
+    if (isNaN(d.getTime())) return "";
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+
 // Catálogo de Servicios oficial extraído del PDF
 let SERVICES_CATALOG = {
     semi: [
@@ -1236,8 +1252,7 @@ function calculateAndRenderStats() {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    // Obtener hoy local YYYY-MM-DD
-    // Fecha de referencia desde la cual se cuentan los movimientos.
+    // Fecha de referencia desde la cual se cuentan los movimientos de Caja Total.
     // Poné acá la fecha en la que se fijaron los saldos iniciales de abajo
     // ($20.300 efectivo y $67.921,85 MP), en formato "YYYY-MM-DD".
     const initialBalanceDate = "2026-07-01"; // <-- CAMBIAR por la fecha real
@@ -1290,7 +1305,6 @@ function calculateAndRenderStats() {
     const currentMp = initialMp + periodMpIncome - periodMpExpenses;
     const currentTotal = currentEfectivo + currentMp;
 
-
     // Pintar valores en el DOM
     const statCajaTotal = document.getElementById("stat-caja-total");
     const consolidatedBreakdown = document.getElementById("cajas-consolidated-breakdown");
@@ -1326,7 +1340,6 @@ function calculateAndRenderStats() {
             totalMonthIncome += precio;
             servicesCountMonth++;
 
-            // Frecuencia de servicios
             serviceCounts[item.servicio] = (serviceCounts[item.servicio] || 0) + 1;
 
             if (item.metodoPago === "Efectivo") cashSum += precio;
@@ -1353,8 +1366,7 @@ function calculateAndRenderStats() {
     const currentYearMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
 
     state.expensesList.forEach(item => {
-        if (!item.fecha) return;
-        if (item.fecha.substring(0, 7) === currentYearMonth) {
+        if (getYearMonthStr(item.fecha) === currentYearMonth) {
             const monto = Number(item.monto) || 0;
             totalMonthExpenses += monto;
             const cat = item.categoria || "Otro";
@@ -1365,7 +1377,6 @@ function calculateAndRenderStats() {
             }
         }
     });
-
 
     const netBalance = totalMonthIncome - totalMonthExpenses;
 
@@ -1409,7 +1420,6 @@ function calculateAndRenderStats() {
     if (catStatsContainer) {
         catStatsContainer.innerHTML = "";
 
-        // Ordenar categorías de mayor a menor gasto
         const sortedCats = Object.entries(categorySums)
             .map(([name, sum]) => ({ name, sum }))
             .sort((a, b) => b.sum - a.sum);
@@ -2782,9 +2792,9 @@ function renderExpensesList() {
 
     // Filtrar los gastos del mes actual (comparando solo "YYYY-MM", sin construir un Date)
     const monthExpenses = state.expensesList.filter(item => {
-        if (!item.fecha) return false;
-        return item.fecha.substring(0, 7) === currentYearMonth;
+        return getYearMonthStr(item.fecha) === currentYearMonth;
     });
+
 
     // Ordenar de más nuevo a más viejo
     monthExpenses.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
