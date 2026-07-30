@@ -906,6 +906,98 @@ async function confirmServiceRegistration() {
     showLoader(true, "Registrando servicio en la nube...");
 
     try {
+        // Si estamos cobrando un turno vinculado, intentar actualizar una seña existente
+        if (state.linkedAppointment) {
+            const apt = state.linkedAppointment;
+            // Buscar servicio tipo 'Seña' no completado para este cliente/usuario
+            const senaCandidate = state.servicesList.find(s => s && s.servicio && s.servicio.toString().toLowerCase().includes('seña') &&
+                s.cliente === transaction.cliente &&
+                (s.usuario ? s.usuario.toString().toLowerCase() : '') === (state.currentUser ? state.currentUser.email.toString().toLowerCase() : '') &&
+                (!s.completado || s.completado.toString().toLowerCase() !== 'sí' && s.completado.toString().toLowerCase() !== 'si')
+            );
+
+            if (senaCandidate) {
+                // Actualizar la fila de servicio existente en lugar de crear una nueva
+                const editPayload = {
+                    action: 'edit_service',
+                    id: senaCandidate.id,
+                    precio: transaction.precio,
+                    metodoPago: transaction.metodoPago || senaCandidate.metodoPago,
+                    completado: 'Sí'
+                };
+
+                const resp = await fetch(CONFIG_SHEET_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(editPayload)
+                });
+                const respData = await resp.json();
+                showLoader(false);
+
+                if (respData && respData.success) {
+                    // Actualizar cache local del servicio editado
+                    const idx = state.servicesList.findIndex(x => x.id === senaCandidate.id);
+                    if (idx !== -1) {
+                        state.servicesList[idx].precio = transaction.precio;
+                        state.servicesList[idx].metodoPago = transaction.metodoPago || state.servicesList[idx].metodoPago;
+                        state.servicesList[idx].completado = 'Sí';
+                        saveServicesCache();
+                        renderHistoryList();
+                        calculateAndRenderStats();
+                        updateClientAutocomplete();
+                    }
+
+                    showToast('Cobro registrado actualizando la seña existente', 'success');
+
+                    // Marcar el turno vinculado como completado en la nube
+                    const aptId = apt.id;
+                    try {
+                        await fetch(CONFIG_SHEET_URL, {
+                            method: 'POST',
+                            mode: 'cors',
+                            headers: { 'Content-Type': 'text/plain' },
+                            body: JSON.stringify({
+                                action: 'edit_appointment',
+                                id: aptId,
+                                estado: 'Completado',
+                                precio: transaction.precio,
+                                servicio: apt.servicio,
+                                fecha: apt.fecha,
+                                horaInicio: apt.horaInicio,
+                                horaFin: apt.horaFin,
+                                eventId: apt.eventId
+                            })
+                        });
+
+                        state.appointmentsList = state.appointmentsList.map(x => {
+                            if (x.id === aptId) {
+                                return { ...x, estado: 'Completado', precio: transaction.precio };
+                            }
+                            return x;
+                        });
+                        const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+                        localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+                        renderCalendar();
+                        renderDayAppointments();
+                    } catch (editErr) {
+                        console.error('Error al actualizar el turno después de cobrar:', editErr);
+                    }
+
+                    clearCheckoutState();
+                    resetServiceForm();
+                    const isAdmin = state.currentUser && state.currentUser.rol === 'admin';
+                    if (!isAdmin) switchTab('calendario');
+                    return;
+                } else {
+                    showToast(respData.message || 'Error al actualizar la seña en Google Sheets', 'error');
+                    showLoader(false);
+                    return;
+                }
+            }
+        }
+
+        // Si no se actualizó una seña existente, crear un nuevo servicio como antes
         const response = await fetch(CONFIG_SHEET_URL, {
             method: "POST",
             mode: "cors",
@@ -928,32 +1020,41 @@ async function confirmServiceRegistration() {
             updateClientAutocomplete(); // Recargar el autocompletado
             showToast("¡Servicio guardado con éxito!", "success");
 
-            // Si el servicio estaba vinculado a un turno, eliminar el turno
+            // Si el servicio estaba vinculado a un turno, marcarlo como completado
             if (state.linkedAppointment) {
                 const aptId = state.linkedAppointment.id;
 
-                // Borrar el turno de forma silenciosa de la nube
                 try {
                     await fetch(CONFIG_SHEET_URL, {
                         method: "POST",
                         mode: "cors",
                         headers: { "Content-Type": "text/plain" },
                         body: JSON.stringify({
-                            action: "delete_appointment",
+                            action: "edit_appointment",
                             id: aptId,
-                            email: state.currentUser.email
+                            estado: "Completado",
+                            precio: transaction.precio,
+                            servicio: state.linkedAppointment.servicio,
+                            fecha: state.linkedAppointment.fecha,
+                            horaInicio: state.linkedAppointment.horaInicio,
+                            horaFin: state.linkedAppointment.horaFin,
+                            eventId: state.linkedAppointment.eventId
                         })
                     });
 
-                    // Remover de la lista local
-                    state.appointmentsList = state.appointmentsList.filter(x => x.id !== aptId);
+                    state.appointmentsList = state.appointmentsList.map(x => {
+                        if (x.id === aptId) {
+                            return { ...x, estado: "Completado", precio: transaction.precio };
+                        }
+                        return x;
+                    });
                     const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
                     localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
 
                     renderCalendar();
                     renderDayAppointments();
-                } catch (delErr) {
-                    console.error("Error al remover el turno después de cobrar:", delErr);
+                } catch (updateErr) {
+                    console.error("Error al actualizar el turno después de cobrar:", updateErr);
                 }
             }
 
@@ -1988,6 +2089,146 @@ function showGenericConfirmModal(title, subtitle, onConfirm) {
 //                   GESTIÓN DE TURNOS Y CALENDARIO
 // =========================================================================
 
+function createStableAppointmentId(apt) {
+    const seed = [
+        apt?.id || "",
+        apt?.fecha || "",
+        apt?.horaInicio || "",
+        apt?.horaFin || "",
+        apt?.cliente || "",
+        apt?.servicio || "",
+        apt?.precio || "",
+        apt?.estado || ""
+    ].join("|");
+
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+        hash |= 0;
+    }
+
+    return `app_${Math.abs(hash)}`;
+}
+
+function normalizeAppointmentRecord(apt) {
+    if (!apt || typeof apt !== "object") return null;
+
+    const normalized = { ...apt };
+    if (!normalized.id) {
+        normalized.id = createStableAppointmentId(normalized);
+    }
+    if (normalized.estado && typeof normalized.estado === "string") {
+        normalized.estado = normalized.estado.toString().trim();
+    }
+    if (!normalized.estado) {
+        normalized.estado = "Provisional";
+    }
+    if (normalized.estado && typeof normalized.estado === "string") {
+        // Aceptar mayúsculas/minúsculas y normalizar valores comunes.
+        const lower = normalized.estado.toLowerCase();
+        if (lower === "completed" || lower === "completado" || lower === "cobrado" || lower === "pagado") normalized.estado = "Completado";
+        else if (lower === "reservado") normalized.estado = "Reservado";
+        else if (lower === "provisional") normalized.estado = "Provisional";
+    }
+    if (normalized.precio === undefined || normalized.precio === null) {
+        normalized.precio = 0;
+    }
+    if (!normalized.horaInicio && normalized.fecha) {
+        normalized.horaInicio = normalized.fecha;
+    }
+    if (!normalized.horaFin && normalized.horaInicio) {
+        normalized.horaFin = normalized.horaInicio;
+    }
+    return normalized;
+}
+
+function normalizeCalendarDate(date) {
+    const normalized = new Date(date);
+    if (isNaN(normalized.getTime())) return new Date();
+    normalized.setHours(12, 0, 0, 0);
+    return normalized;
+}
+
+function getAppointmentDateParts(apt) {
+    if (!apt) return null;
+
+    const candidateDates = [];
+    if (typeof apt.horaInicio === "string") candidateDates.push(apt.horaInicio);
+    if (typeof apt.horaFin === "string") candidateDates.push(apt.horaFin);
+    if (typeof apt.fecha === "string") candidateDates.push(apt.fecha);
+
+    for (const value of candidateDates) {
+        if (!value) continue;
+        const parsed = new Date(value);
+        if (!isNaN(parsed.getTime())) {
+            return {
+                year: parsed.getFullYear(),
+                month: parsed.getMonth(),
+                day: parsed.getDate()
+            };
+        }
+    }
+
+    return null;
+}
+
+function normalizeAppointmentList(appointments, fallbackAppointments = []) {
+    const normalized = [];
+    const seenKeys = new Set();
+
+    const pushUnique = (item) => {
+        const record = normalizeAppointmentRecord(item);
+        if (!record) return;
+
+        const key = record.id || `${record.horaInicio || ""}-${record.cliente || ""}-${record.servicio || ""}`;
+        if (!key || seenKeys.has(key)) return;
+
+        seenKeys.add(key);
+        normalized.push(record);
+    };
+
+    if (Array.isArray(appointments)) {
+        appointments.forEach(pushUnique);
+    }
+
+    if (Array.isArray(fallbackAppointments) && normalized.length < fallbackAppointments.length) {
+        fallbackAppointments.forEach(pushUnique);
+    }
+
+    return normalized.sort((a, b) => {
+        const aTime = new Date(a.horaInicio || a.fecha || 0).getTime();
+        const bTime = new Date(b.horaInicio || b.fecha || 0).getTime();
+        return aTime - bTime;
+    });
+}
+
+function mergeAppointmentLists(localAppointments, cloudAppointments) {
+    const merged = [];
+    const byId = new Map();
+
+    const addRecord = (record) => {
+        const normalized = normalizeAppointmentRecord(record);
+        if (!normalized) return;
+        const key = normalized.id;
+        const existing = byId.get(key);
+        if (existing) {
+            byId.set(key, { ...existing, ...normalized });
+        } else {
+            byId.set(key, normalized);
+            merged.push(normalized);
+        }
+    };
+
+    (Array.isArray(localAppointments) ? localAppointments : []).forEach(addRecord);
+    (Array.isArray(cloudAppointments) ? cloudAppointments : []).forEach(addRecord);
+
+    return merged.sort((a, b) => {
+        const aTime = new Date(a.horaInicio || a.fecha || 0).getTime();
+        const bTime = new Date(b.horaInicio || b.fecha || 0).getTime();
+        return aTime - bTime;
+    });
+}
+
 // Cargar turnos de la nube con protección offline
 async function loadAppointments(showNotification = false) {
     if (!state.currentUser) return;
@@ -1997,10 +2238,14 @@ async function loadAppointments(showNotification = false) {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
         try {
-            state.appointmentsList = JSON.parse(cached);
+            const parsed = JSON.parse(cached);
+            state.appointmentsList = normalizeAppointmentList(parsed);
         } catch (e) {
             console.error("Error al parsear caché local de turnos:", e);
+            state.appointmentsList = [];
         }
+    } else {
+        state.appointmentsList = [];
     }
 
     // Renderizar lo que hay en memoria/cache de inmediato para que NUNCA quede vacía la agenda
@@ -2013,11 +2258,21 @@ async function loadAppointments(showNotification = false) {
     if (!CONFIG_SHEET_URL) return;
 
     try {
-        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_appointments`);
+        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_appointments&email=${encodeURIComponent(state.currentUser.email)}`);
         const data = await response.json();
 
-        if (data.success && data.appointments) {
-            state.appointmentsList = data.appointments;
+        if (data.success && Array.isArray(data.appointments)) {
+            const hasCloudData = data.appointments.length > 0;
+            const hasLocalData = state.appointmentsList.length > 0;
+
+            if (hasCloudData && hasLocalData) {
+                state.appointmentsList = mergeAppointmentLists(state.appointmentsList, data.appointments);
+            } else if (hasCloudData) {
+                state.appointmentsList = normalizeAppointmentList(data.appointments);
+            } else {
+                state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
+            }
+
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
 
             const currentTab = document.querySelector(".nav-item.active");
@@ -2029,12 +2284,16 @@ async function loadAppointments(showNotification = false) {
                 showToast("Agenda actualizada desde la nube.", "success");
             }
         } else {
+            state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
+            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
             if (showNotification) {
                 showToast(data.message || "No se pudieron obtener los turnos", "error");
             }
         }
     } catch (error) {
         console.warn("No se pudieron cargar los turnos de la nube, usando caché local.", error);
+        state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
+        localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
         if (showNotification) {
             showToast("Sin conexión a la nube. Mostrando turnos guardados localmente.", "warning");
         }
@@ -2127,8 +2386,9 @@ function renderCalendar() {
 
         // Filtrar citas de este día
         const dayApts = state.appointmentsList.filter(apt => {
-            const aptDate = new Date(apt.horaInicio);
-            return aptDate.getFullYear() === year && aptDate.getMonth() === month && aptDate.getDate() === day;
+            const parts = getAppointmentDateParts(apt);
+            if (!parts) return false;
+            return parts.year === year && parts.month === month && parts.day === day;
         });
 
         if (dayApts.length > 0) {
@@ -2192,8 +2452,9 @@ function renderDayAppointments() {
 
     // Filtrar citas del día
     const dayApts = state.appointmentsList.filter(apt => {
-        const aptDate = new Date(apt.horaInicio);
-        return aptDate.getFullYear() === yyyy && aptDate.getMonth() === selDate.getMonth() && aptDate.getDate() === selDate.getDate();
+        const parts = getAppointmentDateParts(apt);
+        if (!parts) return false;
+        return parts.year === yyyy && parts.month === selDate.getMonth() && parts.day === selDate.getDate();
     });
 
     if (dayApts.length === 0) {
@@ -2232,7 +2493,7 @@ function renderDayAppointments() {
                 <div class="appointment-client-name">${escapeHtml(apt.cliente)}</div>
                 <div class="appointment-service-name">
                     <i class="fa-solid fa-sparkles" style="color: var(--barbie-pink); font-size: 9px;"></i> 
-                    ${apt.estado === "Reservado" ? `Reservado (Seña: $${aptSena.toLocaleString("es-AR")})` : `Provisional`}
+                    ${apt.estado === "Reservado" ? `Reservado (Seña: $${aptSena.toLocaleString("es-AR")})` : apt.estado === "Completado" || apt.estado === "completed" ? `Cobrado` : `Provisional`}
                 </div>
             </div>
             <div class="appointment-actions-col" style="display: flex; gap: 8px; align-items: center;">
@@ -2350,6 +2611,7 @@ async function handleSenaSubmit(e) {
         if (data.success) {
             apt.estado = newStatus;
             apt.precio = sena;
+            state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
 
             if (newStatus === "Reservado" && sena > 0) {
                 await registerServiceDirectly({
@@ -2368,6 +2630,10 @@ async function handleSenaSubmit(e) {
 
             const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+            const targetDate = normalizeCalendarDate(apt.horaInicio || apt.fecha || new Date());
+            state.selectedCalendarDay = targetDate;
+            state.calendarDate = targetDate;
+            await loadAppointments(false);
             showToast(`¡Turno actualizado a "${newStatus}"!`, "success");
             renderCalendar();
             renderDayAppointments();
@@ -2595,12 +2861,25 @@ async function handleScheduleSubmit(e) {
         if (data.success) {
             showToast("¡Turno agendado y sincronizado con éxito!", "success");
 
+            const normalizedAppointment = {
+                ...(data.appointment || appointmentData),
+                estado: statusVal,
+                precio: statusVal === "Reservado" ? senaAmount : 0
+            };
+
             // Añadir localmente, ordenar y recargar
-            state.appointmentsList.push(data.appointment || appointmentData);
-            state.appointmentsList.sort((a, b) => new Date(a.horaInicio) - new Date(b.horaInicio));
+            state.appointmentsList = normalizeAppointmentList([
+                ...state.appointmentsList,
+                normalizedAppointment
+            ]);
+
+            const normalizedStart = normalizeCalendarDate(start);
+            state.selectedCalendarDay = normalizedStart;
+            state.calendarDate = normalizedStart;
 
             const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+            localStorage.removeItem(`evolet_appointments_v4_${state.currentUser.email}_last_sync`);
 
             if (statusVal === "Reservado" && senaAmount > 0) {
                 showLoader(true, "Registrando seña en la contabilidad...");
@@ -2619,6 +2898,7 @@ async function handleScheduleSubmit(e) {
                 showLoader(false);
             }
 
+            await loadAppointments(false);
             renderCalendar();
             renderDayAppointments();
         } else {
@@ -2662,8 +2942,10 @@ function cancelAppointment(id, clientName) {
                 if (data.success) {
                     showToast("Turno cancelado correctamente.", "success");
 
-                    // Remover de la lista local
-                    state.appointmentsList = state.appointmentsList.filter(apt => apt.id !== id);
+                    // Remover de la lista local sin perder el resto de turnos
+                    state.appointmentsList = normalizeAppointmentList(
+                        state.appointmentsList.filter(apt => apt.id !== id)
+                    );
 
                     const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
                     localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));

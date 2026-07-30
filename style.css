@@ -1725,9 +1725,9 @@ input:focus::placeholder {
 }
 .event-preview-pill.completado,
 .event-preview-pill.completed {
-    background-color: var(--barbie-light);
-    color: var(--barbie-dark);
-    border-left-color: var(--barbie-pink);
+    background-color: #e8f5e9; /* verde suave */
+    color: #1b5e20; /* verde oscuro */
+    border-left-color: #2e7d32; /* borde verde */
 }
 
 /* Modificadores para tarjetas del listado de turnos */
@@ -1760,16 +1760,16 @@ input:focus::placeholder {
 
 .appointment-card.completado,
 .appointment-card.completed {
-    border: 2px solid var(--barbie-pink);
-    background: linear-gradient(135deg, var(--white) 70%, var(--barbie-pale) 100%);
+    border: 2px solid #2e7d32; /* verde */
+    background: linear-gradient(135deg, #f1f8ee 70%, #e8f5e9 100%);
 }
 .appointment-card.completado .appointment-time-start,
 .appointment-card.completed .appointment-time-start {
-    color: var(--barbie-dark);
+    color: #1b5e20; /* verde oscuro */
 }
 .appointment-card.completado:hover,
 .appointment-card.completed:hover {
-    border-color: var(--barbie-pink);
+    border-color: #2e7d32;
 }
 
 /* Tarjetas de Turnos */
