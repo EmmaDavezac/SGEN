@@ -265,6 +265,16 @@ function addService(data) {
   if (!sheet) {
     return jsonResponse({ success: false, message: "La pestaña 'Servicios' no existe" });
   }
+  // Asegurar que exista la columna "Vuelto" (columna 11) para registrar cambios
+  try {
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headers.length < 11 || headers[10] !== "Vuelto") {
+      sheet.getRange(1, 11).setValue("Vuelto");
+    }
+  } catch (e) {
+    // no crítico
+    console.error('Error asegurando encabezado Vuelto en Servicios: ' + e.toString());
+  }
   
   const id = data.id || "evt_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000);
   const fecha = data.fecha || new Date().toISOString();
@@ -276,6 +286,7 @@ function addService(data) {
   const seña = Number(data.seña) || 0;
   const metodoPago = data.metodoPago || "Efectivo";
   const completado = normalizeCompletado(data.completado); // "Sí" o "No"
+  const vuelto = data.vuelto !== undefined ? Number(data.vuelto) : 0;
   
   // Prevención de duplicados: buscar un servicio muy similar registrado recientemente
   try {
@@ -307,7 +318,8 @@ function addService(data) {
             precio: r[6],
             seña: r[7],
             metodoPago: r[8],
-            completado: r[9]
+            completado: r[9],
+            vuelto: r[10] !== undefined ? Number(r[10]) : 0
           }
         });
       }
@@ -326,7 +338,8 @@ function addService(data) {
             precio: r[6],
             seña: r[7],
             metodoPago: r[8],
-            completado: r[9]
+            completado: r[9],
+            vuelto: r[10] !== undefined ? Number(r[10]) : 0
           }
         });
       }
@@ -346,13 +359,14 @@ function addService(data) {
     precio,
     seña,
     metodoPago,
-    completado
+    completado,
+    vuelto
   ]);
   
   return jsonResponse({
     success: true,
     message: "Servicio registrado correctamente en la nube",
-    service: { id, fecha, usuario, cliente, servicio, categoria, precio, seña, metodoPago, completado }
+    service: { id, fecha, usuario, cliente, servicio, categoria, precio, seña, metodoPago, completado, vuelto }
   });
 }
 
@@ -393,7 +407,8 @@ function getServices(email) {
         precio: Number(row[6]) || 0,
         seña: Number(row[7]) || 0,
         metodoPago: row[8],
-        completado: row[9]
+        completado: row[9],
+        vuelto: row[10] !== undefined ? Number(row[10]) || 0 : 0
       });
     }
   }
@@ -469,6 +484,10 @@ function editService(data) {
       // Si se provee una seña (opcional)
       if (data.seña !== undefined) {
         sheet.getRange(rowNum, 8).setValue(Number(data.seña));
+      }
+      // Si se provee un vuelto (cambio entregado al cliente)
+      if (data.vuelto !== undefined) {
+        sheet.getRange(rowNum, 11).setValue(Number(data.vuelto));
       }
       // Si se marca como completado
       if (data.completado !== undefined) {

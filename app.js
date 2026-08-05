@@ -23,6 +23,70 @@ function getYearMonthStr(fechaValue) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function updateCashActionsVisibility() {
+    const val = document.querySelector('input[name="payment-method"]:checked') ? document.querySelector('input[name="payment-method"]:checked').value : null;
+    const cashActions = document.getElementById('cash-actions');
+    if (cashActions) cashActions.style.display = (val === 'Efectivo') ? 'block' : 'none';
+}
+
+function openCashModal() {
+    const modal = document.getElementById('cash-modal');
+    if (!modal) return;
+    const amountInput = document.getElementById('cash-amount-given');
+    if (amountInput && state.pendingTransaction) {
+        amountInput.value = (state.pendingTransaction.amountGiven !== undefined) ? state.pendingTransaction.amountGiven : (state.pendingTransaction.precio || '');
+    }
+    modal.classList.remove('hidden');
+}
+
+function closeCashModal() {
+    const modal = document.getElementById('cash-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+}
+
+function handleCashModalConfirm() {
+    const amountInput = document.getElementById('cash-amount-given');
+    const amountNum = amountInput ? Number(amountInput.value) || 0 : 0;
+    const returnMethodEl = document.querySelector('input[name="cash-return-method"]:checked');
+    const returnMethod = returnMethodEl ? returnMethodEl.value : 'Efectivo';
+
+    if (!state.pendingTransaction) {
+        closeCashModal();
+        showToast('No hay transacción en espera.', 'error');
+        return;
+    }
+
+    const price = Number(state.pendingTransaction.precio) || 0;
+    const vuelto = Math.max(0, Number((amountNum - price).toFixed(2)));
+    state.pendingTransaction.vuelto = vuelto;
+    state.pendingTransaction.vueltoReturnMethod = returnMethod;
+    state.pendingTransaction.amountGiven = amountNum;
+
+    closeCashModal();
+
+    // Ahora abrir modal de confirmación con los datos actualizados
+    document.getElementById("confirm-client").textContent = state.pendingTransaction.cliente;
+    document.getElementById("confirm-service").textContent = state.pendingTransaction.servicio;
+
+    const senaAmount = Number(state.pendingTransaction.seña) || 0;
+    if (senaAmount > 0) {
+        const netPrice = Number(state.pendingTransaction.precio) - senaAmount;
+        document.getElementById("confirm-price").innerHTML = `Total: $${Number(state.pendingTransaction.precio).toLocaleString("es-AR")} <br> <span style="font-size: 11px; color: var(--text-muted);">Seña: -$${senaAmount.toLocaleString("es-AR")} | Neto: <strong>$${netPrice.toLocaleString("es-AR")}</strong></span>`;
+    } else {
+        document.getElementById("confirm-price").textContent = `$${Number(state.pendingTransaction.precio).toLocaleString("es-AR")}`;
+    }
+
+    // Añadir info de vuelto si existe
+    if (state.pendingTransaction.vuelto && Number(state.pendingTransaction.vuelto) > 0) {
+        document.getElementById("confirm-payment").textContent = `${state.pendingTransaction.metodoPago} (Vuelto: $${Number(state.pendingTransaction.vuelto).toLocaleString("es-AR")})`;
+    } else {
+        document.getElementById("confirm-payment").textContent = state.pendingTransaction.metodoPago;
+    }
+
+    document.getElementById("confirm-modal").classList.remove("hidden");
+}
+
 
 // Catálogo de Servicios oficial extraído del PDF
 let SERVICES_CATALOG = {
@@ -134,6 +198,8 @@ function initApp() {
     // Renderizar categorías y servicios iniciales en el formulario
     renderCategories();
     selectCategory("semi");
+    // Ajustar visibilidad de controles extra para efectivo
+    updateCashActionsVisibility();
 }
 
 // =========================================================================
@@ -189,6 +255,27 @@ function setupEventListeners() {
     // Modal de Confirmación de Registro
     document.getElementById("modal-btn-confirm").addEventListener("click", confirmServiceRegistration);
     document.getElementById("modal-btn-cancel").addEventListener("click", cancelServiceRegistration);
+
+    // Mostrar controles extra para efectivo cuando aplique
+    const paymentRadios = document.querySelectorAll('input[name="payment-method"]');
+    paymentRadios.forEach(r => r.addEventListener('change', updateCashActionsVisibility));
+
+    // Botón Pago Justo (abre modal)
+    const btnPago = document.getElementById('btn-pago-justo');
+    if (btnPago) btnPago.addEventListener('click', () => {
+        // Si hay una transacción pendiente (desde submit), usamos esa; sino preparamos una temporal
+        if (!state.pendingTransaction) {
+            showToast('Primero completa los datos del servicio y presiona Registrar.', 'info');
+            return;
+        }
+        openCashModal();
+    });
+
+    // Cash modal handlers
+    const cashCancel = document.getElementById('cash-modal-cancel');
+    const cashConfirm = document.getElementById('cash-modal-confirm');
+    if (cashCancel) cashCancel.addEventListener('click', closeCashModal);
+    if (cashConfirm) cashConfirm.addEventListener('click', handleCashModalConfirm);
 
     // Modal de Confirmación de Eliminación
     document.getElementById("delete-btn-confirm").addEventListener("click", confirmDeleteServiceRecord);
@@ -866,9 +953,16 @@ function handleServiceSubmit(e) {
         completado: "Sí"
     };
 
-    // Guardar en espera y desplegar modal de confirmación
+    // Guardar en espera
     state.pendingTransaction = transaction;
 
+    // Si el pago es en efectivo, abrir modal de 'Pago justo' antes de confirmar
+    if (paymentMethod === "Efectivo") {
+        openCashModal();
+        return;
+    }
+
+    // Mostrar modal de confirmación normal
     document.getElementById("confirm-client").textContent = transaction.cliente;
     document.getElementById("confirm-service").textContent = transaction.servicio;
 
@@ -1019,6 +1113,38 @@ async function confirmServiceRegistration() {
             saveServicesCache();
             updateClientAutocomplete(); // Recargar el autocompletado
             showToast("¡Servicio guardado con éxito!", "success");
+
+            // Si hubo vuelto, registrar un gasto para que se descuente de la caja
+            if (transaction && transaction.vuelto && Number(transaction.vuelto) > 0) {
+                try {
+                    const expensePayload = {
+                        action: 'add_expense',
+                        concepto: `Vuelto - ${transaction.cliente} - ${transaction.servicio}`,
+                        monto: Number(transaction.vuelto),
+                        metodoPago: transaction.vueltoReturnMethod ? transaction.vueltoReturnMethod : transaction.metodoPago,
+                        usuario: state.currentUser ? state.currentUser.email : '',
+                        categoria: 'Vuelto'
+                    };
+
+                    fetch(CONFIG_SHEET_URL, {
+                        method: 'POST',
+                        mode: 'cors',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify(expensePayload)
+                    }).then(res => res.json()).then(expData => {
+                        if (expData && expData.success) {
+                            showToast('Vuelto registrado en Gastos para ajustar caja', 'info');
+                            // Recargar lista de gastos en background
+                            loadExpenses();
+                            calculateAndRenderStats();
+                        } else {
+                            console.warn('No se pudo registrar el vuelto como gasto:', expData && expData.message);
+                        }
+                    }).catch(err => console.error('Error registrando gasto por vuelto:', err));
+                } catch (err) {
+                    console.error('Error preparando payload de gasto por vuelto:', err);
+                }
+            }
 
             // Si el servicio estaba vinculado a un turno, marcarlo como completado
             if (state.linkedAppointment) {
