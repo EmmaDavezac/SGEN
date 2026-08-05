@@ -23,6 +23,53 @@ function getYearMonthStr(fechaValue) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function normalizeDateValue(fechaValue) {
+    if (!fechaValue) return null;
+
+    if (fechaValue instanceof Date) {
+        return isNaN(fechaValue.getTime()) ? null : fechaValue;
+    }
+
+    if (typeof fechaValue === "number") {
+        const parsed = new Date(fechaValue);
+        return isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    if (typeof fechaValue === "string") {
+        const trimmed = fechaValue.toString().trim();
+        if (!trimmed) return null;
+
+        if (/^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/.test(trimmed)) {
+            const normalized = trimmed.includes("T") ? trimmed : `${trimmed}T00:00:00`;
+            const parsed = new Date(normalized);
+            if (!isNaN(parsed.getTime())) return parsed;
+        }
+
+        const parsed = new Date(trimmed);
+        if (!isNaN(parsed.getTime())) return parsed;
+    }
+
+    return null;
+}
+
+function getMonthWindowRange(referenceDate = new Date()) {
+    const endDate = new Date(referenceDate);
+    endDate.setHours(23, 59, 59, 999);
+
+    const startDate = new Date(referenceDate.getFullYear(), referenceDate.getMonth() - 1, referenceDate.getDate());
+    startDate.setHours(0, 0, 0, 0);
+
+    return { startDate, endDate };
+}
+
+function isWithinMonthWindow(fechaValue, referenceDate = new Date()) {
+    const dateValue = normalizeDateValue(fechaValue);
+    if (!dateValue) return false;
+
+    const { startDate, endDate } = getMonthWindowRange(referenceDate);
+    return dateValue >= startDate && dateValue <= endDate;
+}
+
 function updateCashActionsVisibility() {
     const val = document.querySelector('input[name="payment-method"]:checked') ? document.querySelector('input[name="payment-method"]:checked').value : null;
     const cashActions = document.getElementById('cash-actions');
@@ -1476,6 +1523,8 @@ async function confirmDeleteServiceRecord() {
 // =========================================================================
 function calculateAndRenderStats() {
     const now = new Date();
+    const { startDate, endDate } = getMonthWindowRange(now);
+
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
@@ -1557,11 +1606,11 @@ function calculateAndRenderStats() {
     const serviceCounts = {};
 
     state.servicesList.forEach(item => {
-        const date = new Date(item.fecha);
+        const date = normalizeDateValue(item.fecha);
         const precio = Number(item.precio) || 0;
 
-        const isThisMonth = date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-        const isThisWeek = date >= startOfWeek;
+        const isThisMonth = date && date >= startDate && date <= endDate;
+        const isThisWeek = date && date >= startOfWeek;
 
         if (isThisMonth) {
             totalMonthIncome += precio;
@@ -1590,10 +1639,9 @@ function calculateAndRenderStats() {
         "Otro": 0
     };
 
-    const currentYearMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-
     state.expensesList.forEach(item => {
-        if (getYearMonthStr(item.fecha) === currentYearMonth) {
+        const date = normalizeDateValue(item.fecha);
+        if (date && date >= startDate && date <= endDate) {
             const monto = Number(item.monto) || 0;
             totalMonthExpenses += monto;
             const cat = item.categoria || "Otro";
@@ -3194,18 +3242,24 @@ function renderExpensesList() {
     container.innerHTML = "";
 
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const currentYearMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+    const { startDate, endDate } = getMonthWindowRange(now);
 
-    // Filtrar los gastos del mes actual (comparando solo "YYYY-MM", sin construir un Date)
+    // Filtrar los gastos del periodo desde el día equivalente del mes anterior hasta hoy
     const monthExpenses = state.expensesList.filter(item => {
-        return getYearMonthStr(item.fecha) === currentYearMonth;
+        const date = normalizeDateValue(item.fecha);
+        return date && date >= startDate && date <= endDate;
     });
 
 
     // Ordenar de más nuevo a más viejo
-    monthExpenses.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    monthExpenses.sort((a, b) => {
+        const dateA = normalizeDateValue(a.fecha);
+        const dateB = normalizeDateValue(b.fecha);
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateB - dateA;
+    });
 
 
 
@@ -3225,7 +3279,7 @@ function renderExpensesList() {
     monthExpenses.forEach(exp => {
         totalSum += exp.monto;
 
-        const date = new Date(exp.fecha + "T00:00:00");
+        const date = normalizeDateValue(exp.fecha) || new Date();
         const day = String(date.getDate()).padStart(2, '0');
         const monthStr = String(date.getMonth() + 1).padStart(2, '0');
 
@@ -3436,7 +3490,7 @@ function renderExpensesHistoryList() {
         const card = document.createElement("div");
         card.className = "history-card";
 
-        const dateObj = new Date(item.fecha + "T00:00:00");
+        const dateObj = normalizeDateValue(item.fecha) || new Date();
         const formattedDate = dateObj.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' });
 
         const payIcons = {
