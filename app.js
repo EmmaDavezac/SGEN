@@ -208,7 +208,8 @@ const state = {
     calendarDate: new Date(),   // Mes visible en el calendario
     selectedCalendarDay: new Date(), // Día seleccionado en el calendario
     selectedExternalRemoval: null, // Objeto de remoción externa seleccionada
-    allowFiado: localStorage.getItem("evolet_allow_fiado") === "true" // Opción de cobro fiado
+    allowFiado: localStorage.getItem("evolet_allow_fiado") === "true", // Opción de cobro fiado
+    allowRegisterTab: localStorage.getItem("evolet_allow_register_tab") === "true" // Mostrar pestaña de Registrar
 };
 
 // =========================================================================
@@ -414,7 +415,20 @@ function setupEventListeners() {
             showToast(state.allowFiado ? "Modo Fiado habilitado" : "Modo Fiado deshabilitado", "info");
         });
     }
+
+    // Mostrar/ocultar la pestaña de Registrar desde Ajustes
+    const chkRegisterTab = document.getElementById("chk-allow-register-tab");
+    if (chkRegisterTab) {
+        chkRegisterTab.addEventListener("change", (e) => {
+            state.allowRegisterTab = e.target.checked;
+            localStorage.setItem("evolet_allow_register_tab", state.allowRegisterTab ? "true" : "false");
+            updateRegisterTabVisibility();
+            showToast(state.allowRegisterTab ? "Pestaña Registrar habilitada" : "Pestaña Registrar oculta", "info");
+        });
+    }
+
     updateFiadoPaymentVisibility();
+    updateRegisterTabVisibility();
 
     // Ajustes de precios (Admin)
     document.getElementById("btn-edit-mode").addEventListener("click", () => {
@@ -567,6 +581,32 @@ function updateFiadoPaymentVisibility() {
     }
 }
 
+function updateRegisterTabVisibility() {
+    const registrarBtn = document.getElementById("nav-btn-registrar");
+    const chkRegisterTab = document.getElementById("chk-allow-register-tab");
+    const isAdmin = state.currentUser && state.currentUser.rol === "admin";
+
+    if (chkRegisterTab) {
+        chkRegisterTab.checked = !!state.allowRegisterTab;
+    }
+
+    const shouldShowRegisterTab = isAdmin && state.allowRegisterTab;
+    if (registrarBtn) {
+        if (shouldShowRegisterTab) {
+            registrarBtn.classList.remove("hidden");
+        } else {
+            registrarBtn.classList.add("hidden");
+        }
+    }
+
+    if (!shouldShowRegisterTab) {
+        const activeTabBtn = document.querySelector(".nav-item.active");
+        if (activeTabBtn && activeTabBtn.getAttribute("data-tab") === "registrar") {
+            switchTab("calendario");
+        }
+    }
+}
+
 // =========================================================================
 //                  MANEJO DE PANTALLAS Y NAVEGACIÓN
 // =========================================================================
@@ -713,6 +753,7 @@ function handleLogout() {
     const configBtn = document.getElementById("nav-btn-config");
     if (configBtn) configBtn.classList.add("hidden");
 
+    updateRegisterTabVisibility();
     showLoginScreen();
     showToast("Sesión cerrada con éxito. ¡Vuelve pronto!");
 }
@@ -2259,7 +2300,6 @@ async function loadPricesFromCloud() {
 function checkAdminAccess() {
     const configBtn = document.getElementById("nav-btn-config");
     const syncBtn = document.getElementById("btn-sync-history");
-    const registrarBtn = document.getElementById("nav-btn-registrar");
     const isAdmin = state.currentUser && state.currentUser.rol === "admin";
 
     if (configBtn) {
@@ -2282,17 +2322,7 @@ function checkAdminAccess() {
         }
     }
 
-    if (registrarBtn) {
-        if (isAdmin) {
-            registrarBtn.classList.remove("hidden");
-        } else {
-            registrarBtn.classList.add("hidden");
-            const activeTabBtn = document.querySelector(".nav-item.active");
-            if (activeTabBtn && activeTabBtn.getAttribute("data-tab") === "registrar" && !state.linkedAppointment) {
-                switchTab("calendario");
-            }
-        }
-    }
+    updateRegisterTabVisibility();
 }
 
 // Renderizar el editor de precios dinámico en Ajustes

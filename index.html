@@ -698,7 +698,7 @@
                             de pago están habilitados en el formulario de servicios.</p>
 
                         <div
-                            style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--white); border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
+                            style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--white); border: 2px solid var(--barbie-light); border-radius: var(--radius-md); margin-bottom: 10px;">
                             <span
                                 style="font-size: 13px; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
                                 <i class="fa-solid fa-hand-holding-hand" style="color: #ff4d4d;"></i>
@@ -706,6 +706,19 @@
                             </span>
                             <label class="switch-toggle">
                                 <input type="checkbox" id="chk-allow-fiado">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <div
+                            style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--white); border: 2px solid var(--barbie-light); border-radius: var(--radius-md);">
+                            <span
+                                style="font-size: 13px; font-weight: 700; color: var(--text-color); display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-circle-plus" style="color: var(--barbie-pink);"></i>
+                                Mostrar siempre la pestaña Registrar
+                            </span>
+                            <label class="switch-toggle">
+                                <input type="checkbox" id="chk-allow-register-tab">
                                 <span class="slider round"></span>
                             </label>
                         </div>
@@ -920,7 +933,6 @@
                         <span>Lo que le devolvés</span>
                         <strong id="cash-summary-change">$0</strong>
                     </div>
-                    <p class="cash-helper-text">Si paga de más, acá aparece el vuelto automáticamente.</p>
                 </div>
 
                 <div class="form-group">
