@@ -1326,6 +1326,45 @@ input:focus::placeholder {
     box-shadow: var(--shadow-inset);
 }
 
+.cash-summary-card {
+    background: #fff8fc;
+    border: 1px solid #f4c4d8;
+    border-radius: 14px;
+    padding: 12px;
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cash-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.cash-summary-row strong {
+    color: var(--text-color);
+    font-weight: 700;
+}
+
+.cash-summary-row--highlight {
+    background: #fff0f5;
+    border-radius: 10px;
+    padding: 6px 8px;
+    color: #b7286e;
+}
+
+.cash-helper-text {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    margin: 0;
+    line-height: 1.4;
+}
+
 .confirm-item {
     display: flex;
     justify-content: space-between;

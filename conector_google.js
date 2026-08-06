@@ -102,6 +102,10 @@ function doGet(e) {
     if (action === "get_expenses") {
       return getExpenses();
     }
+
+    if (action === "get_caja_movements") {
+      return getCajaMovements();
+    }
   } catch (error) {
     return jsonResponse({ success: false, message: "Error en el servidor: " + error.toString() });
   }
@@ -189,6 +193,10 @@ function doPost(e) {
 
     if (action === "delete_expense") {
       return deleteExpense(data.id);
+    }
+
+    if (action === "add_caja_movement") {
+      return addCajaMovement(data);
     }
     
     return jsonResponse({ success: false, message: "Acción POST no soportada" });
@@ -1233,6 +1241,67 @@ function deduplicateUserData(email, fix) {
   }
 
   return jsonResponse({ success: true, report: report });
+}
+
+// Obtener todos los movimientos de caja
+function getCajaMovements() {
+  const ss = getSpreadsheet();
+  let sheet = ss.getSheetByName("CajaMovimientos");
+  if (!sheet) {
+    sheet = ss.insertSheet("CajaMovimientos");
+    sheet.appendRow(["ID", "Fecha", "Tipo", "Monto", "Concepto", "Origen", "Destino", "Usuario"]);
+  }
+
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) {
+    return jsonResponse({ success: true, movements: [] });
+  }
+
+  const movements = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[0]) continue;
+
+    movements.push({
+      id: row[0].toString().trim(),
+      fecha: row[1] ? row[1].toString().trim() : "",
+      tipo: row[2] ? row[2].toString().trim() : "deposito",
+      monto: Number(row[3]) || 0,
+      concepto: row[4] ? row[4].toString().trim() : "",
+      origen: row[5] ? row[5].toString().trim() : "",
+      destino: row[6] ? row[6].toString().trim() : "",
+      usuario: row[7] ? row[7].toString().trim() : ""
+    });
+  }
+
+  return jsonResponse({ success: true, movements: movements });
+}
+
+// Registrar un nuevo movimiento entre cajas
+function addCajaMovement(data) {
+  const ss = getSpreadsheet();
+  let sheet = ss.getSheetByName("CajaMovimientos");
+  if (!sheet) {
+    sheet = ss.insertSheet("CajaMovimientos");
+    sheet.appendRow(["ID", "Fecha", "Tipo", "Monto", "Concepto", "Origen", "Destino", "Usuario"]);
+  }
+
+  const id = data.id || "caja_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000);
+  const fecha = data.fecha || new Date().toISOString().slice(0, 10);
+  const tipo = data.tipo === "extraccion" ? "extraccion" : "deposito";
+  const monto = Number(data.monto) || 0;
+  const concepto = data.concepto || "Movimiento de caja";
+  const origen = data.origen || (tipo === "deposito" ? "Efectivo" : "MP");
+  const destino = data.destino || (tipo === "deposito" ? "MP" : "Efectivo");
+  const usuario = data.usuario ? data.usuario.toLowerCase().trim() : "";
+
+  sheet.appendRow([id, fecha, tipo, monto, concepto, origen, destino, usuario]);
+
+  return jsonResponse({
+    success: true,
+    message: "Movimiento de caja registrado correctamente",
+    movement: { id, fecha, tipo, monto, concepto, origen, destino, usuario }
+  });
 }
 
 // Registrar un nuevo gasto

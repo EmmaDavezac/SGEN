@@ -76,13 +76,36 @@ function updateCashActionsVisibility() {
     if (cashActions) cashActions.style.display = (val === 'Efectivo') ? 'block' : 'none';
 }
 
+function updateCashSummary() {
+    const amountInput = document.getElementById('cash-amount-given');
+    const dueEl = document.getElementById('cash-summary-due');
+    const givenEl = document.getElementById('cash-summary-given');
+    const changeEl = document.getElementById('cash-summary-change');
+
+    if (!amountInput || !dueEl || !givenEl || !changeEl || !state.pendingTransaction) return;
+
+    const totalPrice = Number(state.pendingTransaction.precio) || 0;
+    const senaAmount = Number(state.pendingTransaction.seña) || 0;
+    const amountDue = Math.max(0, totalPrice - senaAmount);
+    const amountGiven = Number(amountInput.value) || 0;
+    const change = Math.max(0, amountGiven - amountDue);
+
+    dueEl.textContent = `$${amountDue.toLocaleString("es-AR")}`;
+    givenEl.textContent = `$${amountGiven.toLocaleString("es-AR")}`;
+    changeEl.textContent = `$${change.toLocaleString("es-AR")}`;
+}
+
 function openCashModal() {
     const modal = document.getElementById('cash-modal');
     if (!modal) return;
     const amountInput = document.getElementById('cash-amount-given');
     if (amountInput && state.pendingTransaction) {
-        amountInput.value = (state.pendingTransaction.amountGiven !== undefined) ? state.pendingTransaction.amountGiven : (state.pendingTransaction.precio || '');
+        const totalPrice = Number(state.pendingTransaction.precio) || 0;
+        const senaAmount = Number(state.pendingTransaction.seña) || 0;
+        const amountDue = Math.max(0, totalPrice - senaAmount);
+        amountInput.value = (state.pendingTransaction.amountGiven !== undefined) ? state.pendingTransaction.amountGiven : amountDue;
     }
+    updateCashSummary();
     modal.classList.remove('hidden');
 }
 
@@ -104,8 +127,10 @@ function handleCashModalConfirm() {
         return;
     }
 
-    const price = Number(state.pendingTransaction.precio) || 0;
-    const vuelto = Math.max(0, Number((amountNum - price).toFixed(2)));
+    const totalPrice = Number(state.pendingTransaction.precio) || 0;
+    const senaAmount = Number(state.pendingTransaction.seña) || 0;
+    const amountDue = Math.max(0, totalPrice - senaAmount);
+    const vuelto = Math.max(0, Number((amountNum - amountDue).toFixed(2)));
     state.pendingTransaction.vuelto = vuelto;
     state.pendingTransaction.vueltoReturnMethod = returnMethod;
     state.pendingTransaction.amountGiven = amountNum;
@@ -116,7 +141,6 @@ function handleCashModalConfirm() {
     document.getElementById("confirm-client").textContent = state.pendingTransaction.cliente;
     document.getElementById("confirm-service").textContent = state.pendingTransaction.servicio;
 
-    const senaAmount = Number(state.pendingTransaction.seña) || 0;
     if (senaAmount > 0) {
         const netPrice = Number(state.pendingTransaction.precio) - senaAmount;
         document.getElementById("confirm-price").innerHTML = `Total: $${Number(state.pendingTransaction.precio).toLocaleString("es-AR")} <br> <span style="font-size: 11px; color: var(--text-muted);">Seña: -$${senaAmount.toLocaleString("es-AR")} | Neto: <strong>$${netPrice.toLocaleString("es-AR")}</strong></span>`;
@@ -180,6 +204,7 @@ const state = {
     isEditingPrices: false,     // Control del modo edición de precios
     appointmentsList: [],       // Lista de turnos agendados en la nube
     expensesList: [],           // Lista de gastos registrados
+    cajaMovementsList: [],      // Movimientos entre Efectivo y MP
     calendarDate: new Date(),   // Mes visible en el calendario
     selectedCalendarDay: new Date(), // Día seleccionado en el calendario
     selectedExternalRemoval: null, // Objeto de remoción externa seleccionada
@@ -237,6 +262,7 @@ function initApp() {
         loadPricesFromCloud(); // Cargar precios dinámicos
         loadAppointments(); // Cargar turnos agendados en la nube
         loadExpenses(); // Cargar gastos registrados
+        loadCajaMovements(); // Cargar movimientos entre cajas
         checkAdminAccess(); // Verificar si es admin para la pestaña Ajustes
     } else {
         showLoginScreen();
@@ -321,12 +347,18 @@ function setupEventListeners() {
     // Cash modal handlers
     const cashCancel = document.getElementById('cash-modal-cancel');
     const cashConfirm = document.getElementById('cash-modal-confirm');
+    const cashAmountInput = document.getElementById('cash-amount-given');
     if (cashCancel) cashCancel.addEventListener('click', closeCashModal);
     if (cashConfirm) cashConfirm.addEventListener('click', handleCashModalConfirm);
+    if (cashAmountInput) cashAmountInput.addEventListener('input', updateCashSummary);
 
     // Modal de Confirmación de Eliminación
     document.getElementById("delete-btn-confirm").addEventListener("click", confirmDeleteServiceRecord);
     document.getElementById("delete-btn-cancel").addEventListener("click", cancelDeleteServiceRecord);
+
+    // Movimientos entre cajas
+    const cajaMovementForm = document.getElementById("caja-movement-form");
+    if (cajaMovementForm) cajaMovementForm.addEventListener("submit", handleCajaMovementSubmit);
 
     // Historial - Buscador y Filtros
     document.getElementById("history-search").addEventListener("input", filterHistory);
@@ -660,6 +692,7 @@ async function handleLoginSubmit(e) {
             loadServicesData();
             loadPricesFromCloud(); // Cargar precios dinámicos
             loadExpenses(); // Cargar gastos registrados
+            loadCajaMovements(); // Cargar movimientos entre cajas
             checkAdminAccess(); // Chequear permisos
         } else {
             showToast(data.message || "Email o contraseña incorrectos", "error");
@@ -1521,6 +1554,167 @@ async function confirmDeleteServiceRecord() {
 // =========================================================================
 //                  CÁLCULOS Y ESTADÍSTICAS
 // =========================================================================
+function renderCajaMovementsList() {
+    const container = document.getElementById("caja-movements-list");
+    if (!container) return;
+
+    if (!state.cajaMovementsList || state.cajaMovementsList.length === 0) {
+        container.innerHTML = `
+            <div class="no-appointments-placeholder">
+                <i class="fa-solid fa-right-left" style="font-size: 20px; color: var(--text-light); margin-bottom: 5px; display: block;"></i>
+                Todavía no hay movimientos entre cajas.
+            </div>
+        `;
+        return;
+    }
+
+    const sorted = [...state.cajaMovementsList].sort((a, b) => {
+        const dateA = normalizeDateValue(a.fecha);
+        const dateB = normalizeDateValue(b.fecha);
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateB - dateA;
+    });
+
+    container.innerHTML = "";
+    sorted.forEach(item => {
+        const date = normalizeDateValue(item.fecha) || new Date();
+        const day = String(date.getDate()).padStart(2, '0');
+        const monthStr = String(date.getMonth() + 1).padStart(2, '0');
+        const isDeposit = item.tipo === "deposito";
+        const label = isDeposit ? "Depósito" : "Extracción";
+        const fromTo = isDeposit ? "Efectivo → MP" : "MP → Efectivo";
+
+        const card = document.createElement("div");
+        card.className = "appointment-card";
+        card.innerHTML = `
+            <div class="appointment-time-col">
+                <span class="appointment-time-start">${day}/${monthStr}</span>
+                <span class="appointment-time-duration">${escapeHtml(label)}</span>
+            </div>
+            <div class="appointment-info-col">
+                <div class="appointment-client-name">${escapeHtml(item.concepto || "Movimiento de caja")}</div>
+                <div class="appointment-service-name" style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px;">
+                    <span class="pay-badge" style="background-color: #fce4ec; color: #c2185b; font-size: 9px; padding: 1px 6px; border-radius: 4px;">${escapeHtml(fromTo)}</span>
+                    <span>
+                        <i class="fa-solid fa-right-left" style="color: var(--barbie-pink); font-size: 10px;"></i>
+                        <strong>$${Number(item.monto || 0).toLocaleString("es-AR")}</strong>
+                    </span>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+async function loadCajaMovements() {
+    if (!state.currentUser) return;
+
+    const cacheKey = `evolet_caja_movements_v1_${state.currentUser.email}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+        try {
+            state.cajaMovementsList = JSON.parse(cached);
+        } catch (error) {
+            console.warn("No se pudo leer el caché de movimientos de caja:", error);
+            state.cajaMovementsList = [];
+        }
+    } else {
+        state.cajaMovementsList = [];
+    }
+
+    renderCajaMovementsList();
+
+    if (!CONFIG_SHEET_URL) return;
+
+    try {
+        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_caja_movements`);
+        const data = await response.json();
+        if (data.success && Array.isArray(data.movements)) {
+            state.cajaMovementsList = data.movements;
+            localStorage.setItem(cacheKey, JSON.stringify(state.cajaMovementsList));
+            renderCajaMovementsList();
+            calculateAndRenderStats();
+        }
+    } catch (error) {
+        console.warn("No se pudieron cargar movimientos de caja desde la nube:", error);
+    }
+}
+
+async function handleCajaMovementSubmit(e) {
+    e.preventDefault();
+
+    if (!state.currentUser) {
+        showToast("Inicia sesión para registrar movimientos entre cajas.", "error");
+        return;
+    }
+
+    const tipo = document.getElementById("caja-movement-type").value;
+    const monto = Number(document.getElementById("caja-movement-amount").value);
+    const fecha = document.getElementById("caja-movement-date").value;
+    const concepto = document.getElementById("caja-movement-concept").value.trim();
+
+    if (!monto || !fecha || !concepto) {
+        showToast("Completá el monto, fecha y concepto del movimiento.", "error");
+        return;
+    }
+
+    const movimiento = {
+        action: "add_caja_movement",
+        id: "caja_" + new Date().getTime() + "_" + Math.floor(Math.random() * 1000),
+        fecha,
+        tipo,
+        monto,
+        concepto,
+        origen: tipo === "deposito" ? "Efectivo" : "MP",
+        destino: tipo === "deposito" ? "MP" : "Efectivo",
+        usuario: state.currentUser.email
+    };
+
+    showLoader(true, "Registrando movimiento de caja...");
+
+    try {
+        const response = await fetch(CONFIG_SHEET_URL, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "text/plain"
+            },
+            body: JSON.stringify(movimiento)
+        });
+        const data = await response.json();
+        showLoader(false);
+
+        if (data.success) {
+            state.cajaMovementsList.push(data.movement || movimiento);
+            const cacheKey = `evolet_caja_movements_v1_${state.currentUser.email}`;
+            localStorage.setItem(cacheKey, JSON.stringify(state.cajaMovementsList));
+            renderCajaMovementsList();
+            calculateAndRenderStats();
+            showToast("Movimiento registrado con éxito.", "success");
+            document.getElementById("caja-movement-form").reset();
+            const today = new Date().toISOString().slice(0, 10);
+            document.getElementById("caja-movement-date").value = today;
+        } else {
+            showToast(data.message || "No se pudo guardar el movimiento.", "error");
+        }
+    } catch (error) {
+        showLoader(false);
+        console.error("Error al guardar movimiento de caja:", error);
+        const queueKey = `evolet_offline_caja_movements_v1_${state.currentUser.email}`;
+        const queue = JSON.parse(localStorage.getItem(queueKey) || "[]");
+        queue.push(movimiento);
+        localStorage.setItem(queueKey, JSON.stringify(queue));
+        state.cajaMovementsList.push(movimiento);
+        const cacheKey = `evolet_caja_movements_v1_${state.currentUser.email}`;
+        localStorage.setItem(cacheKey, JSON.stringify(state.cajaMovementsList));
+        renderCajaMovementsList();
+        calculateAndRenderStats();
+        showToast("Movimiento guardado offline. Se sincronizará luego.", "warning");
+    }
+}
+
 function calculateAndRenderStats() {
     const now = new Date();
     const { startDate, endDate } = getMonthWindowRange(now);
@@ -1576,9 +1770,23 @@ function calculateAndRenderStats() {
     const initialEfectivo = 20300.00;
     const initialMp = 67921.85;
 
-    // Calcular montos actuales
-    const currentEfectivo = initialEfectivo + periodEfectivoIncome - periodEfectivoExpenses;
-    const currentMp = initialMp + periodMpIncome - periodMpExpenses;
+    const initialBalanceDateValue = new Date(`${initialBalanceDate}T00:00:00`);
+    let currentEfectivo = initialEfectivo + periodEfectivoIncome - periodEfectivoExpenses;
+    let currentMp = initialMp + periodMpIncome - periodMpExpenses;
+
+    state.cajaMovementsList.forEach(item => {
+        const movementDate = normalizeDateValue(item.fecha);
+        if (!movementDate || movementDate < initialBalanceDateValue) return;
+        const monto = Number(item.monto) || 0;
+        if (item.tipo === "deposito") {
+            currentEfectivo -= monto;
+            currentMp += monto;
+        } else if (item.tipo === "extraccion") {
+            currentMp -= monto;
+            currentEfectivo += monto;
+        }
+    });
+
     const currentTotal = currentEfectivo + currentMp;
 
     // Pintar valores en el DOM
@@ -1726,6 +1934,7 @@ function calculateAndRenderStats() {
 
     renderPopularServices(serviceCounts);
     renderDebtorsList();
+    renderCajaMovementsList();
 }
 
 // Renderizar el listado dinámico de deudores (fiados)
@@ -2488,7 +2697,8 @@ async function refreshAllData(showLoaderToast = true) {
             loadAppointments(),
             loadServicesData(),
             loadPricesFromCloud(),
-            loadExpenses()
+            loadExpenses(),
+            loadCajaMovements()
         ]);
         showToast("¡Datos sincronizados correctamente!", "success");
     } catch (err) {

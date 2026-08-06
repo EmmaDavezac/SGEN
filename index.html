@@ -398,6 +398,49 @@
                 </div>
 
                 <!-- Panel de Deudores (Fiados) - Oculto por defecto -->
+                <div class="chart-section"
+                    style="margin-top: 25px; border: 2px solid var(--barbie-light); background: #fffdfd;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                        <div>
+                            <h4 style="margin-bottom: 0;">Mover dinero entre cajas</h4>
+                            <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0;">Registra depósitos o extracciones entre Efectivo y MP.</p>
+                        </div>
+                    </div>
+
+                    <form id="caja-movement-form" class="cute-form" style="margin-top: 10px;">
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label for="caja-movement-type">Tipo</label>
+                                <select id="caja-movement-type" required>
+                                    <option value="deposito">Depósito (Efectivo → MP)</option>
+                                    <option value="extraccion">Extracción (MP → Efectivo)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="caja-movement-amount">Monto ($)</label>
+                                <input type="number" id="caja-movement-amount" min="1" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label for="caja-movement-date">Fecha</label>
+                                <input type="date" id="caja-movement-date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="caja-movement-concept">Concepto</label>
+                                <input type="text" id="caja-movement-concept" placeholder="Ej. Depósito bancario" required>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 10px;">
+                            <i class="fa-solid fa-right-left"></i> Registrar movimiento
+                        </button>
+                    </form>
+
+                    <div id="caja-movements-list" class="day-appointments-container" style="margin-top: 16px;"></div>
+                </div>
+
                 <div id="debtors-panel" class="chart-section hidden"
                     style="margin-top: 25px; border: 2px dashed #ffb3b3; background: #fffcfc;">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
@@ -852,16 +895,32 @@
     <!-- VENTANA MODAL PARA 'PAGO JUSTO' (VUELTO) -->
     <div id="cash-modal" class="modal-overlay hidden">
         <div class="modal-card">
-            <h3>Pago Justo / Vuelto</h3>
-            <p class="modal-sub">Ingresá el monto que la clienta dio y cómo devolvés el vuelto.</p>
+            <h3>Pago fácil</h3>
+            <p class="modal-sub">Escribí cuánto le dio la clienta y el sistema te muestra cuánto devolver.</p>
 
             <div class="modal-body">
                 <div class="form-group">
-                    <label for="cash-amount-given">Monto recibido ($)</label>
+                    <label for="cash-amount-given">Monto que la clienta dio ($)</label>
                     <div class="input-wrapper">
                         <i class="fa-solid fa-money-bill input-icon"></i>
-                        <input type="number" id="cash-amount-given" placeholder="0" min="0" step="0.01">
+                        <input type="number" id="cash-amount-given" placeholder="Ej: 20000" min="0" step="0.01">
                     </div>
+                </div>
+
+                <div class="cash-summary-card">
+                    <div class="cash-summary-row">
+                        <span>Lo que falta cobrar</span>
+                        <strong id="cash-summary-due">$0</strong>
+                    </div>
+                    <div class="cash-summary-row">
+                        <span>Lo que dio</span>
+                        <strong id="cash-summary-given">$0</strong>
+                    </div>
+                    <div class="cash-summary-row cash-summary-row--highlight">
+                        <span>Lo que le devolvés</span>
+                        <strong id="cash-summary-change">$0</strong>
+                    </div>
+                    <p class="cash-helper-text">Si paga de más, acá aparece el vuelto automáticamente.</p>
                 </div>
 
                 <div class="form-group">
