@@ -2993,9 +2993,11 @@ function renderDayAppointments() {
                 </div>
             </div>
             <div class="appointment-actions-col" style="display: flex; gap: 8px; align-items: center;">
+                ${apt.estado !== "Completado" ? `
                 <button class="btn-reschedule-appointment" title="Reagendar Turno" data-id="${apt.id}" style="background: #fff3e0; color: #e65100; border: none; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
                     <i class="fa-regular fa-calendar-plus" style="font-size: 11px;"></i>
                 </button>
+                ` : ''}
                 ${apt.estado === "Provisional" ? `
                     <button class="btn-confirm-appointment-sena" title="Cargar Seña" data-id="${apt.id}" style="background: #e3f2fd; color: #0d47a1; border: none; border-radius: 50%; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;">
                         <i class="fa-solid fa-check-double" style="font-size: 11px;"></i>
