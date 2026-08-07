@@ -103,10 +103,7 @@
                 </div>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
-                <button id="btn-global-reload" class="btn-logout" title="Actualizar Todos los Datos"
-                    style="background: var(--barbie-pale); color: var(--barbie-dark);">
-                    <i class="fa-solid fa-rotate-right"></i>
-                </button>
+               
                 <button id="btn-logout" class="btn-logout" title="Cerrar Sesión">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i>
                 </button>
@@ -465,12 +462,9 @@
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                         <button id="btn-refresh-calendar" class="btn btn-secondary btn-sm"
                             style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
-                            <i class="fa-solid fa-rotate-right"></i> Actualizar
+                            <i class="fa-solid fa-rotate-right"></i>
                         </button>
-                        <button id="btn-sync-history" class="btn btn-secondary btn-sm hidden"
-                            style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
-                            <i class="fa-solid fa-rotate"></i> Importar Cobrados
-                        </button>
+                     
                         <button id="btn-view-history" class="btn btn-secondary btn-sm"
                             style="width: auto; padding: 8px 12px; font-size: 12px; white-space: nowrap;">
                             <i class="fa-solid fa-clock-rotate-left"></i> Historial
@@ -478,8 +472,22 @@
                     </div>
                 </div>
 
+                <!-- TURNOS DEL DÍA SELECCIONADO -->
+                <div class="chart-section" style="margin-top: 20px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                        <h4 id="selected-day-title" style="margin-bottom: 0;">Turnos del Día</h4>
+                        <span id="selected-day-date"
+                            style="font-size: 12px; color: var(--text-muted); font-weight: 600;">28/07/2026</span>
+                    </div>
+
+                    <div id="day-appointments-container" class="day-appointments-container">
+                        <!-- Turnos cargados dinámicamente -->
+                    </div>
+                </div>
+
                 <!-- EL CALENDARIO MENSUAL -->
-                <div class="calendar-card" style="position: relative;">
+                <div class="calendar-card" style="position: relative; margin-top: 20px;">
                     <div class="calendar-header">
                         <button id="cal-prev-month" class="btn-cal-nav"><i
                                 class="fa-solid fa-chevron-left"></i></button>
@@ -506,20 +514,6 @@
                     <button id="btn-open-schedule" class="calendar-add-btn" title="Nuevo Turno">
                         <i class="fa-solid fa-calendar-plus"></i>
                     </button>
-                </div>
-
-                <!-- TURNOS DEL DÍA SELECCIONADO -->
-                <div class="chart-section" style="margin-top: 20px;">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
-                        <h4 id="selected-day-title" style="margin-bottom: 0;">Turnos del Día</h4>
-                        <span id="selected-day-date"
-                            style="font-size: 12px; color: var(--text-muted); font-weight: 600;">28/07/2026</span>
-                    </div>
-
-                    <div id="day-appointments-container" class="day-appointments-container">
-                        <!-- Turnos cargados dinámicamente -->
-                    </div>
                 </div>
             </div>
 

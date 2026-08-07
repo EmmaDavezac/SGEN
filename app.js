@@ -62,6 +62,73 @@ function getMonthWindowRange(referenceDate = new Date()) {
     return { startDate, endDate };
 }
 
+function getStoredJson(key, fallback = null) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return fallback;
+        return JSON.parse(raw);
+    } catch (error) {
+        console.warn(`No se pudo leer el valor guardado en ${key}:`, error);
+        return fallback;
+    }
+}
+
+function setStoredJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+}
+
+function normalizeServiceRecord(item) {
+    if (!item || typeof item !== "object") {
+        return {
+            id: `service_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+            fecha: new Date().toISOString(),
+            cliente: "Cliente",
+            servicio: "Servicio",
+            precio: 0,
+            metodoPago: "Transferencia",
+            categoria: "Otro",
+            seña: 0,
+            completado: "No"
+        };
+    }
+
+    return {
+        ...item,
+        id: item.id || `service_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        fecha: item.fecha || new Date().toISOString(),
+        cliente: (item.cliente || "Cliente").toString().trim() || "Cliente",
+        servicio: (item.servicio || "Servicio").toString().trim() || "Servicio",
+        precio: Number(item.precio) || 0,
+        metodoPago: (item.metodoPago || "Transferencia").toString().trim() || "Transferencia",
+        categoria: (item.categoria || "Otro").toString().trim() || "Otro",
+        seña: Number(item.seña) || 0,
+        completado: item.completado || "No"
+    };
+}
+
+function normalizeExpenseRecord(item) {
+    if (!item || typeof item !== "object") {
+        return {
+            id: `expense_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+            fecha: new Date().toISOString(),
+            concepto: "Gasto",
+            monto: 0,
+            metodoPago: "Efectivo",
+            categoria: "Otro"
+        };
+    }
+
+    return {
+        ...item,
+        id: item.id || `expense_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        fecha: item.fecha || new Date().toISOString(),
+        concepto: (item.concepto || "Gasto").toString().trim() || "Gasto",
+        monto: Number(item.monto) || 0,
+        metodoPago: (item.metodoPago || "Efectivo").toString().trim() || "Efectivo",
+        categoria: (item.categoria || "Otro").toString().trim() || "Otro"
+    };
+}
+
 function isWithinMonthWindow(fechaValue, referenceDate = new Date()) {
     const dateValue = normalizeDateValue(fechaValue);
     if (!dateValue) return false;
@@ -493,14 +560,7 @@ function setupEventListeners() {
         openScheduleModalForDate(state.selectedCalendarDay);
     });
 
-    // Sincronizar historial de servicios cobrados
-    document.getElementById("btn-sync-history").addEventListener("click", () => {
-        showGenericConfirmModal(
-            "Importar Historial",
-            "¿Deseas importar todos los servicios cobrados históricos de tu planilla como turnos en tu calendario? Se sincronizarán también en tu Google Calendar.",
-            importHistoryServices
-        );
-    });
+ 
 
     // Cerrar Modal de Agendar Turno
     document.getElementById("schedule-btn-cancel").addEventListener("click", () => {
@@ -1371,9 +1431,10 @@ function resetServiceForm() {
 //                  LECTURA Y SINCRONIZACIÓN DE DATOS
 // =========================================================================
 async function loadServicesData() {
-    const cachedServices = localStorage.getItem(`evolet_services_v4_${state.currentUser.email}`);
-    if (cachedServices) {
-        state.servicesList = JSON.parse(cachedServices);
+    const cacheKey = `evolet_services_v4_${state.currentUser.email}`;
+    const cachedServices = getStoredJson(cacheKey, []);
+    if (Array.isArray(cachedServices)) {
+        state.servicesList = cachedServices.map(normalizeServiceRecord);
         renderHistoryList();
         calculateAndRenderStats();
         updateClientAutocomplete();
@@ -1389,7 +1450,7 @@ async function loadServicesData() {
         const data = await response.json();
 
         if (data.success) {
-            state.servicesList = data.services;
+            state.servicesList = Array.isArray(data.services) ? data.services.map(normalizeServiceRecord) : [];
             saveServicesCache();
             renderHistoryList();
             calculateAndRenderStats();
@@ -1405,7 +1466,9 @@ async function loadServicesData() {
 // Guarda la base de datos de manera local rápida
 function saveServicesCache() {
     if (state.currentUser) {
-        localStorage.setItem(`evolet_services_v4_${state.currentUser.email}`, JSON.stringify(state.servicesList));
+        const normalized = Array.isArray(state.servicesList) ? state.servicesList.map(normalizeServiceRecord) : [];
+        state.servicesList = normalized;
+        setStoredJson(`evolet_services_v4_${state.currentUser.email}`, normalized);
     }
 }
 
@@ -1416,9 +1479,11 @@ function updateClientAutocomplete() {
     const datalist = document.getElementById("past-clients-list");
     if (!datalist) return;
 
+    const serviceList = Array.isArray(state.servicesList) ? state.servicesList.map(normalizeServiceRecord) : [];
+
     // Extraer nombres de clientas únicos del historial
-    const uniqueClients = [...new Set(state.servicesList.map(item => item.cliente.trim()))]
-        .filter(name => name.length > 0)
+    const uniqueClients = [...new Set(serviceList.map(item => item.cliente))]
+        .filter(name => name && name.length > 0)
         .sort((a, b) => a.localeCompare(b));
 
     datalist.innerHTML = uniqueClients
@@ -1431,6 +1496,8 @@ function updateClientAutocomplete() {
 // =========================================================================
 function renderHistoryList() {
     const listElement = document.getElementById("history-list");
+    if (!listElement) return;
+
     listElement.innerHTML = "";
 
     const filteredList = getFilteredHistory();
@@ -1448,7 +1515,7 @@ function renderHistoryList() {
         const card = document.createElement("div");
         card.className = "history-card";
 
-        const dateObj = new Date(item.fecha);
+        const dateObj = normalizeDateValue(item.fecha) || new Date();
         const formattedDate = dateObj.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' }) + " " +
             dateObj.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
 
@@ -1459,14 +1526,16 @@ function renderHistoryList() {
         };
         const payIcon = payIcons[item.metodoPago] || '<i class="fa-solid fa-money-check-dollar"></i>';
 
-        const totalFormatted = `$${Number(item.precio).toLocaleString("es-AR")}`;
+        const totalFormatted = `$${Number(item.precio || 0).toLocaleString("es-AR")}`;
+        const clienteLabel = (item.cliente || "Cliente").toString().trim() || "Cliente";
+        const servicioLabel = (item.servicio || "Servicio").toString().trim() || "Servicio";
 
         const isAdmin = state.currentUser && state.currentUser.rol === "admin";
 
         card.innerHTML = `
             <div class="card-details">
-                <div class="card-client">${escapeHtml(item.cliente)}</div>
-                <div class="card-service">${escapeHtml(item.servicio)}</div>
+                <div class="card-client">${escapeHtml(clienteLabel)}</div>
+                <div class="card-service">${escapeHtml(servicioLabel)}</div>
                 <div class="card-meta">
                     <span><i class="fa-regular fa-calendar" style="color: var(--barbie-pink); margin-right: 3px;"></i>${formattedDate}</span>
                     <span class="pay-badge" title="Método de pago">${payIcon} ${item.metodoPago}</span>
@@ -1487,12 +1556,25 @@ function renderHistoryList() {
 }
 
 function getFilteredHistory() {
-    const searchVal = document.getElementById("history-search").value.toLowerCase().trim();
-    const filterVal = document.getElementById("history-filter").value;
+    const searchInput = document.getElementById("history-search");
+    const filterSelect = document.getElementById("history-filter");
+    const searchVal = searchInput ? searchInput.value.toLowerCase().trim() : "";
+    const filterVal = filterSelect ? filterSelect.value : "todos";
 
-    return state.servicesList.filter(item => {
-        const matchesSearch = item.cliente.toLowerCase().includes(searchVal) ||
-            item.servicio.toLowerCase().includes(searchVal);
+    const list = Array.isArray(state.servicesList) ? state.servicesList.map(normalizeServiceRecord) : [];
+    list.sort((a, b) => {
+        const dateA = normalizeDateValue(a.fecha);
+        const dateB = normalizeDateValue(b.fecha);
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateB - dateA;
+    });
+
+    return list.filter(item => {
+        const clienteText = (item.cliente || "").toString().toLowerCase();
+        const servicioText = (item.servicio || "").toString().toLowerCase();
+        const matchesSearch = clienteText.includes(searchVal) || servicioText.includes(searchVal);
 
         if (!matchesSearch) return false;
 
@@ -3440,9 +3522,9 @@ async function loadExpenses() {
     if (!state.currentUser) return;
 
     const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) {
-        state.expensesList = JSON.parse(cached);
+    const cached = getStoredJson(cacheKey, []);
+    if (Array.isArray(cached)) {
+        state.expensesList = cached.map(normalizeExpenseRecord);
         const activeTab = document.querySelector(".nav-item.active");
         if (activeTab && activeTab.getAttribute("data-tab") === "gastos") {
             renderExpensesList();
@@ -3456,8 +3538,8 @@ async function loadExpenses() {
         const data = await response.json();
 
         if (data.success && data.expenses) {
-            state.expensesList = data.expenses;
-            localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
+            state.expensesList = Array.isArray(data.expenses) ? data.expenses.map(normalizeExpenseRecord) : [];
+            setStoredJson(cacheKey, state.expensesList);
 
             const activeTab = document.querySelector(".nav-item.active");
             if (activeTab && activeTab.getAttribute("data-tab") === "gastos") {
@@ -3620,10 +3702,10 @@ async function handleExpenseSubmit(e) {
             document.getElementById("expense-amount").value = "";
 
             // Añadir localmente
-            state.expensesList.push(data.expense || expenseData);
+            state.expensesList.push(normalizeExpenseRecord(data.expense || expenseData));
 
             const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
-            localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
+            setStoredJson(cacheKey, state.expensesList);
 
             renderExpensesList();
             calculateAndRenderStats();
@@ -3641,9 +3723,9 @@ async function handleExpenseSubmit(e) {
         queue.push(expenseData);
         localStorage.setItem(queueKey, JSON.stringify(queue));
 
-        state.expensesList.push(expenseData);
+        state.expensesList.push(normalizeExpenseRecord(expenseData));
         const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
-        localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
+        setStoredJson(cacheKey, state.expensesList);
 
         renderExpensesList();
         calculateAndRenderStats();
@@ -3683,7 +3765,7 @@ function deleteExpenseRecord(id, concepto) {
 
                     state.expensesList = state.expensesList.filter(exp => exp.id !== id);
                     const cacheKey = `evolet_expenses_v4_${state.currentUser.email}`;
-                    localStorage.setItem(cacheKey, JSON.stringify(state.expensesList));
+                    setStoredJson(cacheKey, state.expensesList);
 
                     renderExpensesList();
                     calculateAndRenderStats();
@@ -3738,13 +3820,14 @@ function renderExpensesHistoryList() {
             Efectivo: '<i class="fa-solid fa-money-bill-wave"></i>'
         };
         const payIcon = payIcons[item.metodoPago] || '<i class="fa-solid fa-receipt"></i>';
-        const totalFormatted = `$${Number(item.monto).toLocaleString("es-AR")}`;
+        const totalFormatted = `$${Number(item.monto || 0).toLocaleString("es-AR")}`;
+        const conceptoLabel = (item.concepto || "Gasto").toString().trim() || "Gasto";
 
         const isAdmin = state.currentUser && state.currentUser.rol === "admin";
 
         card.innerHTML = `
             <div class="card-details">
-                <div class="card-client">${escapeHtml(item.concepto)}</div>
+                <div class="card-client">${escapeHtml(conceptoLabel)}</div>
                 <div class="card-meta" style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px;">
                     <span><i class="fa-regular fa-calendar" style="color: var(--barbie-pink); margin-right: 3px;"></i>${formattedDate}</span>
                     <span class="pay-badge" title="Método de pago">${payIcon} ${item.metodoPago}</span>
@@ -3784,12 +3867,20 @@ function getFilteredExpensesHistory() {
     const filterVal = filterSelect.value;
 
     // Clonar y ordenar del más nuevo al más viejo
-    const list = [...state.expensesList];
-    list.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    const list = Array.isArray(state.expensesList) ? state.expensesList.map(normalizeExpenseRecord) : [];
+    list.sort((a, b) => {
+        const dateA = normalizeDateValue(a.fecha);
+        const dateB = normalizeDateValue(b.fecha);
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateB - dateA;
+    });
 
     return list.filter(item => {
-        const matchesSearch = item.concepto.toLowerCase().includes(searchVal) ||
-            item.metodoPago.toLowerCase().includes(searchVal);
+        const conceptoText = (item.concepto || "").toString().toLowerCase();
+        const metodoText = (item.metodoPago || "").toString().toLowerCase();
+        const matchesSearch = conceptoText.includes(searchVal) || metodoText.includes(searchVal);
 
         if (!matchesSearch) return false;
 
