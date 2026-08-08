@@ -905,7 +905,7 @@ input:focus::placeholder {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
     position: relative;
     display: grid;
-    grid-template-columns: 1fr 90px 32px; /* texto | precio | icono borrar */
+    grid-template-columns: 1fr 90px 40px; /* texto | precio | icono borrar */
     align-items: center;
     gap: 10px;
     transition: var(--transition);
@@ -917,9 +917,7 @@ input:focus::placeholder {
     background: linear-gradient(135deg, var(--white) 90%, #FFFDF0 100%);
 }
 
-.history-card:active {
-    transform: scale(0.98);
-}
+
 
 .card-details {
     display: flex;
@@ -1002,22 +1000,47 @@ input:focus::placeholder {
     color: #856404;
 }
 
-.btn-delete-card {
-    background: none;
-    color: var(--text-light);
-    padding: 6px;
+
+
+.card-actions-col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.btn-delete-card,
+.btn-view-detail {
+    width: 30px;
+    height: 30px;
+    padding: 0;
     border-radius: 50%;
-    transition: var(--transition);
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: var(--transition);
+    background: none;
+}
+
+.btn-view-detail {
+    color: var(--barbie-pink);
+}
+
+.btn-view-detail:active {
+    color: var(--barbie-dark);
+    background-color: var(--barbie-pale);
+}
+
+.btn-delete-card {
+    color: var(--text-light);
 }
 
 .btn-delete-card:active {
     color: #FF4D4D;
     background-color: #FFF0F0;
 }
-
 /* =========================================================================
    ESTADÍSTICAS TAB
    ========================================================================= */

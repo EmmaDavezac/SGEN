@@ -1038,7 +1038,56 @@
             </form>
         </div>
     </div>
+<!-- VENTANA MODAL DE DETALLE DE SERVICIO / TICKET -->
+<div id="service-detail-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 400px; width: 95%;">
+        <h3><i class="fa-solid fa-receipt" style="color: var(--barbie-pink);"></i> Detalle del Servicio</h3>
+        <p class="modal-sub">Información completa del cobro registrado</p>
 
+        <div class="modal-body" style="text-align: left;">
+            <div class="confirm-item">
+                <span class="confirm-label">Clienta</span>
+                <strong id="detail-cliente">-</strong>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Servicio</span>
+                <strong id="detail-servicio" style="text-align: right; max-width: 60%;">-</strong>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Categoría</span>
+                <strong id="detail-categoria">-</strong>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Precio Total</span>
+                <strong id="detail-precio">-</strong>
+            </div>
+            <div class="confirm-item" id="detail-sena-row" style="display:none;">
+                <span class="confirm-label">Seña Descontada</span>
+                <strong id="detail-sena" style="color: #cc0000;">-</strong>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Método de Pago</span>
+                <strong id="detail-metodo">-</strong>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Fecha y Hora</span>
+                <strong id="detail-fecha">-</strong>
+            </div>
+            <div class="confirm-item">
+                <span class="confirm-label">Atendido por</span>
+                <strong id="detail-usuario">-</strong>
+            </div>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 15px;">
+            <button id="detail-btn-close" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Cerrar</button>
+            <button id="detail-btn-share" class="btn btn-primary"><i class="fa-brands fa-whatsapp"></i> Compartir</button>
+        </div>
+    </div>
+</div>
+
+<!-- Canvas oculto usado solo para generar la imagen del ticket -->
+<canvas id="ticket-canvas" width="640" height="820" style="display:none;"></canvas>
     <script type="module" src="/app.js"></script>
 </body>
 

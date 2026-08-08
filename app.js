@@ -358,7 +358,17 @@ function setupEventListeners() {
             switchTab(tabName);
         });
     });
-
+// Modal de Detalle de Servicio / Ticket
+    const detailBtnClose = document.getElementById("detail-btn-close");
+    if (detailBtnClose) {
+        detailBtnClose.addEventListener("click", () => {
+            document.getElementById("service-detail-modal").classList.add("hidden");
+        });
+    }
+    const detailBtnShare = document.getElementById("detail-btn-share");
+    if (detailBtnShare) {
+        detailBtnShare.addEventListener("click", shareServiceTicket);
+    }
     // Logout con Confirmación
     document.getElementById("btn-logout").addEventListener("click", () => {
         showGenericConfirmModal(
@@ -1519,7 +1529,6 @@ function renderHistoryList() {
         const formattedDate = dateObj.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' }) + " " +
             dateObj.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
 
-        // Icono de Método de Pago (FontAwesome)
         const payIcons = {
             Transferencia: '<i class="fa-solid fa-mobile-screen-button"></i>',
             Efectivo: '<i class="fa-solid fa-money-bill-wave"></i>'
@@ -1532,28 +1541,51 @@ function renderHistoryList() {
 
         const isAdmin = state.currentUser && state.currentUser.rol === "admin";
 
-        card.innerHTML = `
-            <div class="card-details">
-                <div class="card-client">${escapeHtml(clienteLabel)}</div>
-                <div class="card-service">${escapeHtml(servicioLabel)}</div>
-                <div class="card-meta">
-                    <span><i class="fa-regular fa-calendar" style="color: var(--barbie-pink); margin-right: 3px;"></i>${formattedDate}</span>
-                    <span class="pay-badge" title="Método de pago">${payIcon} ${item.metodoPago}</span>
-                </div>
-            </div>
-            <div class="card-amount-box">
-                <div class="card-price" style="font-size: 18px; color: var(--barbie-dark);">${totalFormatted}</div>
-            </div>
-            ${isAdmin ? `
-            <button class="btn-delete-card" onclick="app.deleteServiceRecord('${item.id}')" title="Eliminar Registro">
-                <i class="fa-solid fa-trash-can"></i>
-            </button>
-            ` : ''}
-        `;
+     card.innerHTML = `
+    <div class="card-details">
+        <div class="card-client">${escapeHtml(clienteLabel)}</div>
+        <div class="card-service">${escapeHtml(servicioLabel)}</div>
+        <div class="card-meta">
+            <span><i class="fa-regular fa-calendar" style="color: var(--barbie-pink); margin-right: 3px;"></i>${formattedDate}</span>
+            <span class="pay-badge" title="Método de pago">${payIcon} ${item.metodoPago}</span>
+        </div>
+    </div>
+    <div class="card-amount-box">
+        <div class="card-price" style="font-size: 18px; color: var(--barbie-dark);">${totalFormatted}</div>
+    </div>
+    <div class="card-actions-col">
+        <button class="btn-view-detail" title="Ver Detalle">
+            <i class="fa-solid fa-eye"></i>
+        </button>
+        ${isAdmin ? `
+        <button class="btn-delete-card" title="Eliminar Registro">
+            <i class="fa-solid fa-trash-can"></i>
+        </button>
+        ` : ''}
+    </div>
+`;
+
+card.querySelector(".btn-view-detail").addEventListener("click", () => {
+    viewServiceDetail(item.id);
+});
+
+        // Closures directas sobre "item" -> se acabaron los problemas de tipo con el id
+        card.querySelector(".btn-view-detail").addEventListener("click", () => {
+            viewServiceDetail(item.id);
+        });
+
+        const deleteBtn = card.querySelector(".btn-delete-card");
+        if (deleteBtn) {
+            deleteBtn.addEventListener("click", () => {
+                deleteServiceRecord(item.id);
+            });
+        }
 
         listElement.appendChild(card);
     });
 }
+
+
 
 function getFilteredHistory() {
     const searchInput = document.getElementById("history-search");
@@ -1674,6 +1706,356 @@ async function confirmDeleteServiceRecord() {
     }
 }
 
+// =========================================================================
+//                  DETALLE DE SERVICIO Y TICKET COMPARTIBLE
+// =========================================================================
+
+function capitalizeCategoryLabel(cat) {
+    const labels = {
+        semi: "Semipermanente",
+        kapping: "Kapping",
+        softgel: "Soft Gel",
+        esculpidas: "Esculpidas",
+        remocion: "Remoción",
+        personalizado: "Personalizado / Combinado"
+    };
+    return labels[cat] || (cat || "Otro");
+}
+
+function viewServiceDetail(id) {
+ const item = state.servicesList.find(s => String(s.id) === String(id));
+    if (!item) {
+        showToast("No se encontró el registro.", "error");
+        return;
+    }
+
+    state.currentDetailItem = item;
+
+    document.getElementById("detail-cliente").textContent = item.cliente;
+    document.getElementById("detail-servicio").textContent = item.servicio;
+    document.getElementById("detail-categoria").textContent = capitalizeCategoryLabel(item.categoria);
+
+    const precio = Number(item.precio) || 0;
+    const sena = Number(item.seña) || 0;
+    document.getElementById("detail-precio").textContent = `$${precio.toLocaleString("es-AR")}`;
+
+    const senaRow = document.getElementById("detail-sena-row");
+    if (sena > 0) {
+        senaRow.style.display = "flex";
+        document.getElementById("detail-sena").textContent = `-$${sena.toLocaleString("es-AR")} (Neto: $${(precio - sena).toLocaleString("es-AR")})`;
+    } else {
+        senaRow.style.display = "none";
+    }
+
+    document.getElementById("detail-metodo").textContent = item.metodoPago;
+
+    const dateObj = normalizeDateValue(item.fecha) || new Date();
+    const formattedFullDate = dateObj.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+        " - " + dateObj.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
+    document.getElementById("detail-fecha").textContent = formattedFullDate;
+
+    document.getElementById("detail-usuario").textContent = item.usuario || "-";
+
+    document.getElementById("service-detail-modal").classList.remove("hidden");
+}
+
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+    const words = text.split(' ');
+    let line = '';
+    const lines = [];
+    for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+            lines.push(line.trim());
+            line = words[n] + ' ';
+        } else {
+            line = testLine;
+        }
+    }
+    lines.push(line.trim());
+    lines.forEach((l, i) => ctx.fillText(l, x, y + i * lineHeight));
+    return lines.length;
+}
+
+
+function countWrappedLines(ctx, text, maxWidth) {
+    const words = text.toString().split(' ');
+    let line = '';
+    let lines = 1;
+    for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+            lines++;
+            line = words[n] + ' ';
+        } else {
+            line = testLine;
+        }
+    }
+    return lines;
+}
+
+function generateTicketCanvas(item) {
+    const canvas = document.getElementById("ticket-canvas");
+    const ctx = canvas.getContext("2d");
+    const W = 640;
+    const marginX = 50;
+    const contentWidth = W - marginX * 2;
+
+    const precio = Number(item.precio) || 0;
+    const sena = Number(item.seña) || 0;
+    const hasSena = sena > 0;
+    const neto = precio - sena;
+
+    const dateObj = normalizeDateValue(item.fecha) || new Date();
+    const fechaStr = dateObj.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+        " - " + dateObj.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
+
+    const rows = [
+        { label: "CLIENTA", value: item.cliente, big: true },
+        { label: "SERVICIO", value: item.servicio },
+        { label: "CATEGORÍA", value: capitalizeCategoryLabel(item.categoria) },
+        { label: "PRECIO TOTAL", value: `$${precio.toLocaleString("es-AR")}` },
+        { label: "MÉTODO DE PAGO", value: item.metodoPago },
+        { label: "FECHA Y HORA", value: fechaStr },
+        { label: "ATENDIDO POR", value: item.usuario || "-" }
+    ];
+
+    // === Constantes de layout ===
+    const headerHeight = 110;
+    const badgeRadius = 44;
+    const rowLabelFont = "600 12px 'Outfit', Arial";
+    const rowValueFont = "22px 'Outfit', Arial";
+    const rowValueBigFont = "bold 24px 'Outfit', Arial";
+    const rowLineHeight = 27;
+
+    // === PASADA 1: medir alturas sin dibujar ===
+ let y = headerHeight + badgeRadius + 100; // espacio para badge + nombre + subtítulo + separador
+    rows.forEach(row => {
+        ctx.font = row.big ? rowValueBigFont : rowValueFont;
+        const lines = countWrappedLines(ctx, row.value, contentWidth);
+        y += 30 + (lines - 1) * rowLineHeight + 22; // label + líneas de valor + espacio entre filas
+    });
+
+    y += 30; // separador antes de seña/total
+
+    if (hasSena) {
+        ctx.font = rowValueFont;
+        const lines = countWrappedLines(ctx, `-$${sena.toLocaleString("es-AR")}`, contentWidth);
+        y += 30 + (lines - 1) * rowLineHeight + 22;
+    }
+
+    y += 20; // espacio antes del total
+    const totalBlockHeight = 90;
+    y += totalBlockHeight;
+
+    const footerHeight = 90;
+    const H = Math.round(y + footerHeight);
+
+    // Ahora sí, fijamos el tamaño real y dibujamos
+    canvas.width = W;
+    canvas.height = H;
+
+    // === Fondo ===
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, W, H);
+
+    // === Header degradé (membrete) ===
+    const headerGradient = ctx.createLinearGradient(0, 0, W, 0);
+    headerGradient.addColorStop(0, "#FF69B4");
+    headerGradient.addColorStop(1, "#FF1493");
+    ctx.fillStyle = headerGradient;
+    ctx.fillRect(0, 0, W, headerHeight);
+
+    // === Insignia circular con el logo ===
+    const badgeX = W / 2;
+    const badgeY = headerHeight;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fill();
+    ctx.clip();
+
+    const logoImg = document.getElementById("logo-img");
+    if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
+        ctx.drawImage(logoImg, badgeX - badgeRadius, badgeY - badgeRadius, badgeRadius * 2, badgeRadius * 2);
+    } else {
+        ctx.fillStyle = "#FFF0F5";
+        ctx.fillRect(badgeX - badgeRadius, badgeY - badgeRadius, badgeRadius * 2, badgeRadius * 2);
+        ctx.fillStyle = "#FF1493";
+        ctx.font = "bold 26px 'Outfit', Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("EN", badgeX, badgeY);
+        ctx.textBaseline = "alphabetic";
+    }
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#FF69B4";
+    ctx.stroke();
+
+    // === Nombre del negocio y subtítulo ===
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#5A3D46";
+    ctx.font = "bold 26px 'Outfit', Arial";
+    ctx.fillText("EVOLET NAILS", badgeX, badgeY + badgeRadius + 38);
+
+    ctx.fillStyle = "#9E7D86";
+    ctx.font = "13px 'Outfit', Arial";
+    ctx.fillText("COMPROBANTE DE SERVICIO", badgeX, badgeY + badgeRadius + 58);
+
+    // === Separador ===
+    function drawDivider(yPos) {
+        ctx.strokeStyle = "#FFC0CB";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.moveTo(marginX, yPos);
+        ctx.lineTo(W - marginX, yPos);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    let cursorY = badgeY + badgeRadius + 100;
+    drawDivider(cursorY - 24);
+
+    ctx.textAlign = "left";
+
+    // === PASADA 2: dibujar filas ===
+    function drawRow(label, value, valueColor, big) {
+        ctx.fillStyle = "#9E7D86";
+        ctx.font = rowLabelFont;
+        ctx.fillText(label, marginX, cursorY);
+
+        ctx.fillStyle = valueColor || "#5A3D46";
+        ctx.font = big ? rowValueBigFont : rowValueFont;
+        const lines = countWrappedLines(ctx, value, contentWidth);
+        wrapCanvasText(ctx, value.toString(), marginX, cursorY + 26, contentWidth, rowLineHeight);
+        cursorY += 30 + (lines - 1) * rowLineHeight + 22;
+    }
+
+    rows.forEach(row => {
+        drawRow(row.label, row.value, row.big ? "#FF1493" : "#5A3D46", row.big);
+    });
+
+    cursorY += 8;
+    drawDivider(cursorY);
+    cursorY += 30;
+
+    if (hasSena) {
+        drawRow("SEÑA DESCONTADA", `-$${sena.toLocaleString("es-AR")}`, "#FF4D4D", false);
+    }
+
+    // === Total destacado ===
+    ctx.fillStyle = "#9E7D86";
+    ctx.font = "600 14px 'Outfit', Arial";
+    ctx.fillText(hasSena ? "TOTAL COBRADO (NETO)" : "TOTAL COBRADO", marginX, cursorY);
+
+    ctx.fillStyle = "#FF1493";
+    ctx.font = "bold 46px 'Outfit', Arial";
+    ctx.textAlign = "right";
+    ctx.fillText(`$${neto.toLocaleString("es-AR")}`, W - marginX, cursorY + 12);
+    ctx.textAlign = "left";
+
+    cursorY += totalBlockHeight;
+    drawDivider(cursorY - 20);
+
+   // === Footer ===
+    const footerText = "Gracias por su confianza";
+    const footerY = cursorY + 35;
+
+    ctx.font = "600 15px 'Outfit', Arial";
+    const footerTextWidth = ctx.measureText(footerText).width;
+
+    let iconWidth = 0;
+    const iconGap = 10;
+    try {
+        ctx.font = "900 15px 'Font Awesome 6 Free'";
+        iconWidth = ctx.measureText("\uf004").width;
+    } catch (e) {
+        iconWidth = 0;
+    }
+
+    const footerBlockWidth = iconWidth + (iconWidth > 0 ? iconGap : 0) + footerTextWidth;
+    let footerX = (W - footerBlockWidth) / 2;
+
+    ctx.textAlign = "left";
+
+    if (iconWidth > 0) {
+        try {
+            ctx.font = "900 15px 'Font Awesome 6 Free'";
+            ctx.fillStyle = "#FF69B4";
+            ctx.fillText("\uf004", footerX, footerY);
+            footerX += iconWidth + iconGap;
+        } catch (e) {
+            // seguimos sin ícono
+        }
+    }
+
+    ctx.fillStyle = "#5A3D46";
+    ctx.font = "600 15px 'Outfit', Arial";
+    ctx.fillText(footerText, footerX, footerY);
+
+    ctx.fillStyle = "#CBB2B9";
+    ctx.font = "11px 'Outfit', Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Comprobante generado automáticamente", W / 2, cursorY + 58);
+
+    ctx.textAlign = "left";
+
+    return canvas;
+}
+
+function downloadTicketBlob(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+async function shareServiceTicket() {
+    const item = state.currentDetailItem;
+    if (!item) return;
+
+    const canvas = generateTicketCanvas(item);
+
+    canvas.toBlob(async (blob) => {
+        if (!blob) {
+            showToast("No se pudo generar el ticket.", "error");
+            return;
+        }
+
+        const fileName = `ticket_${item.cliente.replace(/\s+/g, '_')}.png`;
+        const file = new File([blob], fileName, { type: "image/png" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: "Ticket Evolet Nails",
+                    text: `Ticket de ${item.cliente} - ${item.servicio}`
+                });
+            } catch (err) {
+                if (err.name !== "AbortError") {
+                    console.error("Error al compartir:", err);
+                    showToast("No se pudo abrir el menú de compartir.", "error");
+                }
+                // Si el usuario cancela (AbortError), no hacemos nada.
+            }
+        } else {
+            showToast("Tu navegador no permite compartir imágenes directamente. Probá desde el celular con Chrome actualizado.", "warning");
+        }
+    }, "image/png");
+}
 // =========================================================================
 //                  CÁLCULOS Y ESTADÍSTICAS
 // =========================================================================
@@ -2342,7 +2724,8 @@ function showLoader(show, text = "Cargando...") {
 }
 
 window.app = {
-    deleteServiceRecord
+    deleteServiceRecord,
+    viewServiceDetail
 };
 
 // Cargar catálogo de precios desde Google Sheets
@@ -2981,7 +3364,7 @@ function renderDayAppointments() {
         const isAdmin = state.currentUser && state.currentUser.rol === "admin";
         const aptSena = Number(apt.precio) || 0;
 
-        card.innerHTML = `
+    card.innerHTML = `
             <div class="appointment-time-col">
                 <span class="appointment-time-start">${timeStr}</span>
             </div>

@@ -56,3 +56,26 @@ self.addEventListener('fetch', (e) => {
       })
   );
 });
+const CACHE_NAME = 'evolet-nails-v12'; // subí la versión para forzar actualización
+const ASSETS = [
+  './index.html',
+  './style.css',
+  './app.js',
+  './manifest.json',
+  './logo.png'
+];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(
+    caches.open(CACHE_NAME).then(async (cache) => {
+      const results = await Promise.allSettled(
+        ASSETS.map((url) => cache.add(url))
+      );
+      results.forEach((result, i) => {
+        if (result.status === 'rejected') {
+          console.warn('No se pudo cachear:', ASSETS[i], result.reason);
+        }
+      });
+    }).then(() => self.skipWaiting())
+  );
+});
