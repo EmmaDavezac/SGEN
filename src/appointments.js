@@ -180,3 +180,19 @@ export async function loadAppointments(showNotification = false) {
         }
     }
 }
+
+// Obtener partes de fecha de un turno (year, month (0-based), day, hour, minute)
+export function getAppointmentDateParts(apt) {
+    if (!apt) return null;
+    const dateStr = apt.horaInicio || apt.fecha || null;
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    return {
+        year: d.getFullYear(),
+        month: d.getMonth(),
+        day: d.getDate(),
+        hour: d.getHours(),
+        minute: d.getMinutes()
+    };
+}

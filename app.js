@@ -1792,9 +1792,9 @@ async function loadCajaMovements() {
     if (!CONFIG_SHEET_URL) return;
 
     try {
-        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_caja_movements`);
-        const data = await response.json();
-        if (data.success && Array.isArray(data.movements)) {
+        const url = `${CONFIG_SHEET_URL}?action=get_caja_movements`;
+        const data = await apiGet(url, { showLoading: true, loadingText: 'Cargando movimientos de caja...', swallowError: true });
+        if (data && data.success && Array.isArray(data.movements)) {
             state.cajaMovementsList = data.movements;
             localStorage.setItem(cacheKey, JSON.stringify(state.cajaMovementsList));
             renderCajaMovementsList();
@@ -2366,10 +2366,10 @@ window.app = {
 async function loadPricesFromCloud() {
     if (!CONFIG_SHEET_URL) return;
     try {
-        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_prices`);
-        const data = await response.json();
+        const url = `${CONFIG_SHEET_URL}?action=get_prices`;
+        const data = await apiGet(url, { showLoading: true, loadingText: 'Cargando precios...', swallowError: true });
 
-        if (data.success && data.prices && data.prices.length > 0) {
+        if (data && data.success && data.prices && data.prices.length > 0) {
             const newCatalog = {};
             data.prices.forEach(p => {
                 if (!newCatalog[p.categoria]) {
