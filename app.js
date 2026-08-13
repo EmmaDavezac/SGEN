@@ -1218,7 +1218,6 @@ async function confirmServiceRegistration() {
                     body: JSON.stringify(editPayload)
                 });
                 const respData = await resp.json();
-                showLoader(false);
 
                 if (respData && respData.success) {
                     // Actualizar cache local del servicio editado
@@ -1238,7 +1237,7 @@ async function confirmServiceRegistration() {
                     // Marcar el turno vinculado como completado en la nube
                     const aptId = apt.id;
                     try {
-                        await fetch(CONFIG_SHEET_URL, {
+                        const updateResp = await fetch(CONFIG_SHEET_URL, {
                             method: 'POST',
                             mode: 'cors',
                             headers: { 'Content-Type': 'text/plain' },
@@ -1255,16 +1254,22 @@ async function confirmServiceRegistration() {
                             })
                         });
 
-                        state.appointmentsList = state.appointmentsList.map(x => {
-                            if (x.id === aptId) {
-                                return { ...x, estado: 'Completado', precio: transaction.precio };
-                            }
-                            return x;
-                        });
-                        const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
-                        localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-                        renderCalendar();
-                        renderDayAppointments();
+                        // Leer respuesta y solo aplicar cambios locales si el servidor confirma
+                        const updateData = await updateResp.json().catch(() => null);
+                        if (!updateData || !updateData.success) {
+                            console.warn('No se pudo actualizar el turno en la nube:', updateData && updateData.message);
+                        } else {
+                            state.appointmentsList = state.appointmentsList.map(x => {
+                                if (x.id === aptId) {
+                                    return { ...x, estado: 'Completado', precio: transaction.precio };
+                                }
+                                return x;
+                            });
+                            const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+                            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+                            renderCalendar();
+                            renderDayAppointments();
+                        }
                     } catch (editErr) {
                         console.error('Error al actualizar el turno después de cobrar:', editErr);
                     }
@@ -1276,7 +1281,6 @@ async function confirmServiceRegistration() {
                     return;
                 } else {
                     showToast(respData.message || 'Error al actualizar la seña en Google Sheets', 'error');
-                    showLoader(false);
                     return;
                 }
             }
@@ -1296,7 +1300,6 @@ async function confirmServiceRegistration() {
         });
 
         const data = await response.json();
-        showLoader(false);
 
         if (data.success) {
             const wasLinked = !!state.linkedAppointment;
@@ -1342,7 +1345,7 @@ async function confirmServiceRegistration() {
                 const aptId = state.linkedAppointment.id;
 
                 try {
-                    await fetch(CONFIG_SHEET_URL, {
+                    const updateResp = await fetch(CONFIG_SHEET_URL, {
                         method: "POST",
                         mode: "cors",
                         headers: { "Content-Type": "text/plain" },
@@ -1359,17 +1362,22 @@ async function confirmServiceRegistration() {
                         })
                     });
 
-                    state.appointmentsList = state.appointmentsList.map(x => {
-                        if (x.id === aptId) {
-                            return { ...x, estado: "Completado", precio: transaction.precio };
-                        }
-                        return x;
-                    });
-                    const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
-                    localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+                    const updateData = await updateResp.json().catch(() => null);
+                    if (!updateData || !updateData.success) {
+                        console.warn('No se pudo actualizar el turno en la nube:', updateData && updateData.message);
+                    } else {
+                        state.appointmentsList = state.appointmentsList.map(x => {
+                            if (x.id === aptId) {
+                                return { ...x, estado: "Completado", precio: transaction.precio };
+                            }
+                            return x;
+                        });
+                        const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+                        localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
 
-                    renderCalendar();
-                    renderDayAppointments();
+                        renderCalendar();
+                        renderDayAppointments();
+                    }
                 } catch (updateErr) {
                     console.error("Error al actualizar el turno después de cobrar:", updateErr);
                 }
@@ -1389,11 +1397,12 @@ async function confirmServiceRegistration() {
             showToast(data.message || "Error al registrar en Google Sheets", "error");
         }
     } catch (error) {
-        showLoader(false);
         console.error("Error al registrar servicio:", error);
         saveOfflineTransaction(transaction);
         showToast("Error de conexión. Se guardó localmente en tu iPhone y se subirá luego.", "warning");
         resetServiceForm();
+    } finally {
+        showLoader(false);
     }
 }
 
