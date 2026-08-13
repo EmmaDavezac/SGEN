@@ -173,6 +173,7 @@ function handleCashModalConfirm() {
     const senaAmount = Number(state.pendingTransaction.seña) || 0;
     const amountDue = Math.max(0, totalPrice - senaAmount);
     const vuelto = Math.max(0, Number((amountNum - amountDue).toFixed(2)));
+
     state.pendingTransaction.vuelto = vuelto;
     state.pendingTransaction.vueltoReturnMethod = returnMethod;
     state.pendingTransaction.amountGiven = amountNum;
@@ -732,26 +733,10 @@ async function handleLoginSubmit(e) {
         return;
     }
 
-    showLoader(true, "Verificando credenciales...");
-
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify({
-                action: "login",
-                email: email,
-                password: password
-            })
-        });
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "login", email: email, password: password }, { showLoading: true, loadingText: 'Verificando credenciales...' });
 
-        const data = await response.json();
-        showLoader(false);
-
-        if (data.success) {
+        if (data && data.success) {
             state.currentUser = data.user;
             localStorage.setItem("evolet_session_v4", JSON.stringify(state.currentUser));
             document.getElementById("user-display-name").textContent = state.currentUser.nombre;
@@ -763,10 +748,9 @@ async function handleLoginSubmit(e) {
             loadCajaMovements(); // Cargar movimientos entre cajas
             checkAdminAccess(); // Chequear permisos
         } else {
-            showToast(data.message || "Email o contraseña incorrectos", "error");
+            showToast((data && data.message) ? data.message : "Email o contraseña incorrectos", "error");
         }
     } catch (error) {
-        showLoader(false);
         console.error("Error en login:", error);
         showToast("Error de conexión. Verifica la URL de Google Sheets o tu internet.", "error");
     }
@@ -1169,13 +1153,7 @@ async function confirmServiceRegistration() {
                     completado: 'Sí'
                 };
 
-                const resp = await fetch(CONFIG_SHEET_URL, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(editPayload)
-                });
-                const respData = await resp.json();
+                const respData = await apiPost(CONFIG_SHEET_URL, editPayload, { showLoading: true, loadingText: 'Actualizando servicio...', swallowError: true });
 
                 if (respData && respData.success) {
                     // Actualizar cache local del servicio editado
@@ -1195,25 +1173,17 @@ async function confirmServiceRegistration() {
                     // Marcar el turno vinculado como completado en la nube
                     const aptId = apt.id;
                     try {
-                        const updateResp = await fetch(CONFIG_SHEET_URL, {
-                            method: 'POST',
-                            mode: 'cors',
-                            headers: { 'Content-Type': 'text/plain' },
-                            body: JSON.stringify({
-                                action: 'edit_appointment',
-                                id: aptId,
-                                estado: 'Completado',
-                                precio: transaction.precio,
-                                servicio: apt.servicio,
-                                fecha: apt.fecha,
-                                horaInicio: apt.horaInicio,
-                                horaFin: apt.horaFin,
-                                eventId: apt.eventId
-                            })
-                        });
-
-                        // Leer respuesta y solo aplicar cambios locales si el servidor confirma
-                        const updateData = await updateResp.json().catch(() => null);
+                        const updateData = await apiPost(CONFIG_SHEET_URL, {
+                            action: 'edit_appointment',
+                            id: aptId,
+                            estado: 'Completado',
+                            precio: transaction.precio,
+                            servicio: apt.servicio,
+                            fecha: apt.fecha,
+                            horaInicio: apt.horaInicio,
+                            horaFin: apt.horaFin,
+                            eventId: apt.eventId
+                        }, { showLoading: true, loadingText: 'Actualizando turno...', swallowError: true });
                         if (!updateData || !updateData.success) {
                             console.warn('No se pudo actualizar el turno en la nube:', updateData && updateData.message);
                         } else {
@@ -1245,19 +1215,7 @@ async function confirmServiceRegistration() {
         }
 
         // Si no se actualizó una seña existente, crear un nuevo servicio como antes
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify({
-                action: "add_service",
-                ...transaction
-            })
-        });
-
-        const data = await response.json();
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "add_service", ...transaction }, { showLoading: true, loadingText: 'Registrando servicio...' });
 
         if (data.success) {
             const wasLinked = !!state.linkedAppointment;
@@ -1278,12 +1236,8 @@ async function confirmServiceRegistration() {
                         categoria: 'Vuelto'
                     };
 
-                    fetch(CONFIG_SHEET_URL, {
-                        method: 'POST',
-                        mode: 'cors',
-                        headers: { 'Content-Type': 'text/plain' },
-                        body: JSON.stringify(expensePayload)
-                    }).then(res => res.json()).then(expData => {
+                    try {
+                        const expData = await apiPost(CONFIG_SHEET_URL, expensePayload, { showLoading: false, swallowError: true });
                         if (expData && expData.success) {
                             showToast('Vuelto registrado en Gastos para ajustar caja', 'info');
                             // Recargar lista de gastos en background
@@ -1292,7 +1246,9 @@ async function confirmServiceRegistration() {
                         } else {
                             console.warn('No se pudo registrar el vuelto como gasto:', expData && expData.message);
                         }
-                    }).catch(err => console.error('Error registrando gasto por vuelto:', err));
+                    } catch (err) {
+                        console.error('Error registrando gasto por vuelto:', err);
+                    }
                 } catch (err) {
                     console.error('Error preparando payload de gasto por vuelto:', err);
                 }
@@ -1303,24 +1259,18 @@ async function confirmServiceRegistration() {
                 const aptId = state.linkedAppointment.id;
 
                 try {
-                    const updateResp = await fetch(CONFIG_SHEET_URL, {
-                        method: "POST",
-                        mode: "cors",
-                        headers: { "Content-Type": "text/plain" },
-                        body: JSON.stringify({
-                            action: "edit_appointment",
-                            id: aptId,
-                            estado: "Completado",
-                            precio: transaction.precio,
-                            servicio: state.linkedAppointment.servicio,
-                            fecha: state.linkedAppointment.fecha,
-                            horaInicio: state.linkedAppointment.horaInicio,
-                            horaFin: state.linkedAppointment.horaFin,
-                            eventId: state.linkedAppointment.eventId
-                        })
-                    });
+                    const updateData = await apiPost(CONFIG_SHEET_URL, {
+                        action: "edit_appointment",
+                        id: aptId,
+                        estado: "Completado",
+                        precio: transaction.precio,
+                        servicio: state.linkedAppointment.servicio,
+                        fecha: state.linkedAppointment.fecha,
+                        horaInicio: state.linkedAppointment.horaInicio,
+                        horaFin: state.linkedAppointment.horaFin,
+                        eventId: state.linkedAppointment.eventId
+                    }, { showLoading: true, loadingText: 'Actualizando turno...', swallowError: true });
 
-                    const updateData = await updateResp.json().catch(() => null);
                     if (!updateData || !updateData.success) {
                         console.warn('No se pudo actualizar el turno en la nube:', updateData && updateData.message);
                     } else {
@@ -1837,21 +1787,10 @@ async function handleCajaMovementSubmit(e) {
         usuario: state.currentUser.email
     };
 
-    showLoader(true, "Registrando movimiento de caja...");
-
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify(movimiento)
-        });
-        const data = await response.json();
-        showLoader(false);
+        const data = await apiPost(CONFIG_SHEET_URL, movimiento, { showLoading: true, loadingText: 'Registrando movimiento de caja...' });
 
-        if (data.success) {
+        if (data && data.success) {
             state.cajaMovementsList.push(data.movement || movimiento);
             const cacheKey = `evolet_caja_movements_v1_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.cajaMovementsList));
@@ -2154,21 +2093,9 @@ function renderDebtorsList() {
 async function collectDebt(debt) {
     const metodo = confirm(`¿El cobro de la deuda de $${debt.precio} de ${debt.cliente} fue por transferencia / MercadoPago?\n(Aceptar = MercadoPago/Transferencia, Cancelar = Efectivo)`) ? "Transferencia" : "Efectivo";
 
-    showLoader(true, "Registrando pago de deuda en la nube...");
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({
-                action: "edit_service",
-                id: debt.id,
-                metodoPago: metodo,
-                fecha: new Date().toISOString()
-            })
-        });
-        const data = await response.json();
-        if (data.success) {
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "edit_service", id: debt.id, metodoPago: metodo, fecha: new Date().toISOString() }, { showLoading: true, loadingText: 'Registrando pago de deuda...' });
+        if (data && data.success) {
             showToast("¡Deuda cobrada e ingresada a la caja correctamente!", "success");
 
             // Actualizar localmente el servicio
@@ -2240,19 +2167,8 @@ async function checkAndSyncOfflineTransactions() {
         const failedServices = [];
         for (const transaction of servicesQueue) {
             try {
-                const response = await fetch(CONFIG_SHEET_URL, {
-                    method: "POST",
-                    mode: "cors",
-                    headers: {
-                        "Content-Type": "text/plain"
-                    },
-                    body: JSON.stringify({
-                        action: "add_service",
-                        ...transaction
-                    })
-                });
-                const data = await response.json();
-                if (!data.success) {
+                const data = await apiPost(CONFIG_SHEET_URL, { action: "add_service", ...transaction }, { showLoading: false, swallowError: true });
+                if (!data || !data.success) {
                     failedServices.push(transaction);
                 }
             } catch (e) {
@@ -2277,19 +2193,8 @@ async function checkAndSyncOfflineTransactions() {
         const failedExpenses = [];
         for (const expenseData of expensesQueue) {
             try {
-                const response = await fetch(CONFIG_SHEET_URL, {
-                    method: "POST",
-                    mode: "cors",
-                    headers: {
-                        "Content-Type": "text/plain"
-                    },
-                    body: JSON.stringify({
-                        action: "add_expense",
-                        ...expenseData
-                    })
-                });
-                const data = await response.json();
-                if (!data.success) {
+                const data = await apiPost(CONFIG_SHEET_URL, { action: "add_expense", ...expenseData }, { showLoading: false, swallowError: true });
+                if (!data || !data.success) {
                     failedExpenses.push(expenseData);
                 }
             } catch (e) {
@@ -2543,26 +2448,10 @@ async function savePricesToCloud() {
         });
     }
 
-    showLoader(true, "Guardando lista de precios en la nube...");
-
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify({
-                action: "update_prices",
-                email: state.currentUser.email,
-                prices: updatedPrices
-            })
-        });
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "update_prices", email: state.currentUser.email, prices: updatedPrices }, { showLoading: true, loadingText: 'Guardando lista de precios...' });
 
-        const data = await response.json();
-        showLoader(false);
-
-        if (data.success) {
+        if (data && data.success) {
             state.isEditingPrices = false;
 
             const actionsContainer = document.getElementById("edit-actions-container");
@@ -2898,21 +2787,8 @@ async function handleSenaSubmit(e) {
     showLoader(true, "Actualizando turno en la nube...");
 
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({
-                action: "edit_appointment",
-                id: apt.id,
-                cliente: apt.cliente,
-                fecha: apt.fecha,
-                estado: newStatus,
-                precio: sena
-            })
-        });
-        const data = await response.json();
-        if (data.success) {
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "edit_appointment", id: apt.id, cliente: apt.cliente, fecha: apt.fecha, estado: newStatus, precio: sena }, { showLoading: false, swallowError: true });
+        if (data && data.success) {
             apt.estado = newStatus;
             apt.precio = sena;
             state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
@@ -3004,20 +2880,8 @@ async function handleRescheduleSubmit(e) {
     showLoader(true, "Reagendando turno en la nube y Google Calendar...");
 
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({
-                action: "edit_appointment",
-                id: apt.id,
-                fecha: newDate,
-                horaInicio: startDate.toISOString(),
-                horaFin: endIso
-            })
-        });
-        const data = await response.json();
-        if (data.success) {
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "edit_appointment", id: apt.id, fecha: newDate, horaInicio: startDate.toISOString(), horaFin: endIso }, { showLoading: false, swallowError: true });
+        if (data && data.success) {
             apt.fecha = newDate;
             apt.horaInicio = startDate.toISOString();
             apt.horaFin = endIso;
@@ -3150,19 +3014,9 @@ async function handleScheduleSubmit(e) {
     showLoader(true, "Agendando turno y sincronizando con Google Calendar...");
 
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify(appointmentData)
-        });
+        const data = await apiPost(CONFIG_SHEET_URL, appointmentData, { showLoading: true, loadingText: 'Agendando turno y sincronizando con Google Calendar...' });
 
-        const data = await response.json();
-        showLoader(false);
-
-        if (data.success) {
+        if (data && data.success) {
             showToast("¡Turno agendado y sincronizado con éxito!", "success");
 
             const normalizedAppointment = {
@@ -3227,23 +3081,9 @@ function cancelAppointment(id, clientName) {
         async () => {
             showLoader(true, "Cancelando turno...");
             try {
-                const response = await fetch(CONFIG_SHEET_URL, {
-                    method: "POST",
-                    mode: "cors",
-                    headers: {
-                        "Content-Type": "text/plain"
-                    },
-                    body: JSON.stringify({
-                        action: "delete_appointment",
-                        id: id,
-                        email: state.currentUser.email
-                    })
-                });
+                const data = await apiPost(CONFIG_SHEET_URL, { action: "delete_appointment", id: id, email: state.currentUser.email }, { showLoading: true, loadingText: 'Cancelando turno...' });
 
-                const data = await response.json();
-                showLoader(false);
-
-                if (data.success) {
+                if (data && data.success) {
                     showToast("Turno cancelado correctamente.", "success");
 
                     // Remover de la lista local sin perder el resto de turnos
@@ -3292,25 +3132,10 @@ async function importHistoryServices() {
         return;
     }
 
-    showLoader(true, "Importando cobrados y sincronizando en Google Calendar...");
-
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify({
-                action: "import_services",
-                email: state.currentUser.email
-            })
-        });
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "import_services", email: state.currentUser.email }, { showLoading: true, loadingText: 'Importando cobrados...' });
 
-        const data = await response.json();
-        showLoader(false);
-
-        if (data.success) {
+        if (data && data.success) {
             showToast(data.message || `¡Sincronización completada!`, "success");
 
             // Recargar turnos de la nube
@@ -3342,10 +3167,9 @@ async function loadExpenses() {
     if (!CONFIG_SHEET_URL) return;
 
     try {
-        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_expenses`);
-        const data = await response.json();
+        const data = await apiGet(`${CONFIG_SHEET_URL}?action=get_expenses`, { showLoading: true, loadingText: 'Cargando gastos...', swallowError: true });
 
-        if (data.success && data.expenses) {
+        if (data && data.success && data.expenses) {
             state.expensesList = Array.isArray(data.expenses) ? data.expenses.map(normalizeExpenseRecord) : [];
             setStoredJson(cacheKey, state.expensesList);
 
@@ -3487,22 +3311,10 @@ async function handleExpenseSubmit(e) {
         usuario: state.currentUser.email
     };
 
-    showLoader(true, "Registrando gasto en la planilla...");
-
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify(expenseData)
-        });
+        const data = await apiPost(CONFIG_SHEET_URL, expenseData, { showLoading: true, loadingText: 'Registrando gasto en la planilla...' });
 
-        const data = await response.json();
-        showLoader(false);
-
-        if (data.success) {
+        if (data && data.success) {
             showToast("¡Gasto registrado con éxito!", "success");
 
             // Limpiar formulario
@@ -3521,9 +3333,9 @@ async function handleExpenseSubmit(e) {
             showToast(data.message || "Error al registrar el gasto", "error");
         }
     } catch (error) {
-        showLoader(false);
-        console.error("Error al registrar gasto:", error);
-        showToast("Error de conexión al registrar. Se guardó offline.", "error");
+            showLoader(false);
+            console.error("Error al registrar gasto:", error);
+            showToast("Error de conexión al registrar. Se guardó offline.", "error");
 
         // Guardar offline
         const queueKey = `evolet_offline_expenses_v4_${state.currentUser.email}`;
@@ -3553,22 +3365,9 @@ function deleteExpenseRecord(id, concepto) {
             showLoader(true, "Eliminando gasto...");
 
             try {
-                const response = await fetch(CONFIG_SHEET_URL, {
-                    method: "POST",
-                    mode: "cors",
-                    headers: {
-                        "Content-Type": "text/plain"
-                    },
-                    body: JSON.stringify({
-                        action: "delete_expense",
-                        id: id
-                    })
-                });
+                const data = await apiPost(CONFIG_SHEET_URL, { action: "delete_expense", id: id }, { showLoading: true, loadingText: 'Eliminando gasto...' });
 
-                const data = await response.json();
-                showLoader(false);
-
-                if (data.success) {
+                if (data && data.success) {
                     showToast("Gasto eliminado correctamente.", "success");
 
                     state.expensesList = state.expensesList.filter(exp => exp.id !== id);
