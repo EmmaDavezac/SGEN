@@ -1,70 +1,14 @@
-const CACHE_NAME = 'evolet-nails-v11';
+// Service Worker para cacheo básico (Network-first con fallback a Cache)
+const CACHE_NAME = 'evolet-nails-v13';
 const ASSETS = [
-  './index.html',
-  './style.css',
-  './app.js',
-  './manifest.json',
-  './logo.png'
+  '/index.html',
+  '/style.css',
+  '/app.js',
+  '/manifest.json',
+  '/logo.png'
 ];
 
-// Instalar y Cachear recursos
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    }).then(() => self.skipWaiting())
-  );
-});
-
-// Activar y Limpiar caches antiguas
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
-
-// Interceptar Peticiones (Estrategia Network-First con Fallback a Cache)
-self.addEventListener('fetch', (e) => {
-  // Evitar interceptar llamadas a la API de Google Sheets
-  if (e.request.url.includes('script.google.com')) {
-    return;
-  }
-  
-  e.respondWith(
-    fetch(e.request)
-      .then((networkResponse) => {
-        // Si la respuesta es válida, clonarla y guardarla en la caché
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      })
-      .catch(() => {
-        // En caso de estar offline o fallar la red, buscar en la caché
-        return caches.match(e.request);
-      })
-  );
-});
-const CACHE_NAME = 'evolet-nails-v13'; // subí la versión para forzar actualización
-const ASSETS = [
-  './index.html',
-  './style.css',
-  './app.js',
-  './manifest.json',
-  './logo.png'
-];
-
+// Instalar y cachear recursos (no fallar si algún asset no existe)
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
@@ -77,5 +21,39 @@ self.addEventListener('install', (e) => {
         }
       });
     }).then(() => self.skipWaiting())
+  );
+});
+
+// Activar y limpiar caches antiguas
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) return caches.delete(key);
+          return null;
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
+});
+
+// Interceptar peticiones (Network-first)
+self.addEventListener('fetch', (e) => {
+  // Evitar interceptar llamadas a la API de Google Sheets y Google Calendar
+  if (e.request.url.includes('script.google.com') || e.request.url.includes('googleapis.com')) {
+    return;
+  }
+
+  e.respondWith(
+    fetch(e.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseToCache));
+        }
+        return networkResponse;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
