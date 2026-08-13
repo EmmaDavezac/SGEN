@@ -40,7 +40,8 @@ export async function apiPost(url, payload, { showLoading = true, loadingText = 
 export async function apiGet(url, { showLoading = true, loadingText = 'Cargando...', swallowError = false } = {}) {
     if (showLoading) showLoader(true, loadingText);
     try {
-        const resp = await fetch(url);
+        if (!url) throw new Error('URL vacía en apiGet');
+        const resp = await fetch(url, { mode: 'cors' });
         const text = await resp.text().catch(() => null);
         let data = null;
         if (text) {
@@ -59,7 +60,7 @@ export async function apiGet(url, { showLoading = true, loadingText = 'Cargando.
 
         return data;
     } catch (err) {
-        console.error('API GET error:', err);
+        console.error('API GET error for URL:', url, err);
         if (!swallowError) showToast('Error de conexión con la nube', 'warning');
         return null;
     } finally {
