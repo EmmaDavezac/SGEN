@@ -11,7 +11,7 @@ import { showToast } from './src/ui/toast.js';
 import { apiPost, apiGet } from './src/api.js';
 import { CONFIG_SHEET_URL } from './src/config.js';
 import state from './src/state.js';
-import { loadAppointments, normalizeAppointmentList, mergeAppointmentLists, createStableAppointmentId } from './src/appointments.js';
+import { loadAppointments, normalizeAppointmentList, mergeAppointmentLists, createStableAppointmentId, getAppointmentDateParts } from './src/appointments.js';
 import {
     normalizeServiceRecord,
     normalizeExpenseRecord,
