@@ -2,6 +2,7 @@ import { CONFIG_SHEET_URL } from './config.js';
 import state from './state.js';
 import { showLoader } from './ui/loader.js';
 import { showToast } from './ui/toast.js';
+import { apiGet } from './api.js';
 
 export function createStableAppointmentId(apt) {
     const seed = [
