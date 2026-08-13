@@ -11,5 +11,8 @@
   "devDependencies": {
     "playwright": "^1.62.1",
     "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.3.1"
   }
 }

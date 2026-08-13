@@ -141,10 +141,10 @@ export async function loadAppointments(showNotification = false) {
     if (!CONFIG_SHEET_URL) return;
 
     try {
-        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_appointments&email=${encodeURIComponent(state.currentUser.email)}`);
-        const data = await response.json();
+        const url = `${CONFIG_SHEET_URL}?action=get_appointments&email=${encodeURIComponent(state.currentUser.email)}`;
+        const data = await apiGet(url, { showLoading: true, loadingText: 'Cargando turnos...', swallowError: true });
 
-        if (data.success && Array.isArray(data.appointments)) {
+        if (data && data.success && Array.isArray(data.appointments)) {
             const hasCloudData = data.appointments.length > 0;
             const hasLocalData = state.appointmentsList.length > 0;
 

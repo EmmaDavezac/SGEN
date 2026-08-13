@@ -9,6 +9,8 @@
 import { showLoader } from './src/ui/loader.js';
 import { showToast } from './src/ui/toast.js';
 import { apiPost, apiGet } from './src/api.js';
+// Import Font Awesome from local dependency so Vite bundles fonts correctly
+import '@fortawesome/fontawesome-free/css/all.min.css';
 import { CONFIG_SHEET_URL } from './src/config.js';
 import state from './src/state.js';
 import { loadAppointments, normalizeAppointmentList, mergeAppointmentLists, createStableAppointmentId, getAppointmentDateParts } from './src/appointments.js';
