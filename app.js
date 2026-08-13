@@ -6,7 +6,12 @@
  * CONFIGURACIÓN DE LA NUBE:
  * Pega la URL del Web App de Google (Apps Script) entre las comillas simples de abajo.
  */
-const CONFIG_SHEET_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEET_URL) || 'https://script.google.com/macros/s/AKfycbxZT_wSTPClKAN78_TYAEnxBUj_b7BWPmQz2pwiKm4dkff5CgH_96xOLuj30IFdc0uUVg/exec';
+import { showLoader } from './src/ui/loader.js';
+import { showToast } from './src/ui/toast.js';
+import { apiPost, apiGet } from './src/api.js';
+import { CONFIG_SHEET_URL } from './src/config.js';
+import state from './src/state.js';
+import { loadAppointments, normalizeAppointmentList, mergeAppointmentLists, createStableAppointmentId } from './src/appointments.js';
 
 function getYearMonthStr(fechaValue) {
     if (!fechaValue) return "";
@@ -22,6 +27,10 @@ function getYearMonthStr(fechaValue) {
     if (isNaN(d.getTime())) return "";
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+
+// Exponer renderizadores para que los módulos importados puedan invocarlos sin crear dependencia circular
+window.renderCalendar = renderCalendar;
+window.renderDayAppointments = renderDayAppointments;
 
 function normalizeDateValue(fechaValue) {
     if (!fechaValue) return null;
@@ -2706,31 +2715,7 @@ function escapeHtml(string) {
         : html;
 }
 
-function showToast(message, type = "info") {
-    const container = document.getElementById("toast-container");
-    const toast = document.createElement("div");
-    toast.className = `toast ${type}`;
-    toast.textContent = message;
-
-    container.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.animation = "slideInToast 0.4s reverse forwards";
-        setTimeout(() => toast.remove(), 400);
-    }, 3500);
-}
-
-function showLoader(show, text = "Cargando...") {
-    const overlay = document.getElementById("loader-overlay");
-    const textEl = overlay.querySelector("p");
-    textEl.textContent = text;
-
-    if (show) {
-        overlay.classList.remove("hidden");
-    } else {
-        overlay.classList.add("hidden");
-    }
-}
+// showToast and showLoader are provided by modular UI helpers in src/ui/
 
 window.app = {
     deleteServiceRecord,
@@ -2972,220 +2957,7 @@ function showGenericConfirmModal(title, subtitle, onConfirm) {
     if (modal) modal.classList.remove("hidden");
 }
 
-// =========================================================================
-//                   GESTIÓN DE TURNOS Y CALENDARIO
-// =========================================================================
-
-function createStableAppointmentId(apt) {
-    const seed = [
-        apt?.id || "",
-        apt?.fecha || "",
-        apt?.horaInicio || "",
-        apt?.horaFin || "",
-        apt?.cliente || "",
-        apt?.servicio || "",
-        apt?.precio || "",
-        apt?.estado || ""
-    ].join("|");
-
-    let hash = 0;
-    for (let i = 0; i < seed.length; i++) {
-        hash = ((hash << 5) - hash) + seed.charCodeAt(i);
-        hash |= 0;
-    }
-
-    return `app_${Math.abs(hash)}`;
-}
-
-function normalizeAppointmentRecord(apt) {
-    if (!apt || typeof apt !== "object") return null;
-
-    const normalized = { ...apt };
-    if (!normalized.id) {
-        normalized.id = createStableAppointmentId(normalized);
-    }
-    if (normalized.estado && typeof normalized.estado === "string") {
-        normalized.estado = normalized.estado.toString().trim();
-    }
-    if (!normalized.estado) {
-        normalized.estado = "Provisional";
-    }
-    if (normalized.estado && typeof normalized.estado === "string") {
-        // Aceptar mayúsculas/minúsculas y normalizar valores comunes.
-        const lower = normalized.estado.toLowerCase();
-        if (lower === "completed" || lower === "completado" || lower === "cobrado" || lower === "pagado") normalized.estado = "Completado";
-        else if (lower === "reservado") normalized.estado = "Reservado";
-        else if (lower === "provisional") normalized.estado = "Provisional";
-    }
-    if (normalized.precio === undefined || normalized.precio === null) {
-        normalized.precio = 0;
-    }
-    if (!normalized.horaInicio && normalized.fecha) {
-        normalized.horaInicio = normalized.fecha;
-    }
-    if (!normalized.horaFin && normalized.horaInicio) {
-        normalized.horaFin = normalized.horaInicio;
-    }
-    return normalized;
-}
-
-function normalizeCalendarDate(date) {
-    const normalized = new Date(date);
-    if (isNaN(normalized.getTime())) return new Date();
-    normalized.setHours(12, 0, 0, 0);
-    return normalized;
-}
-
-function getAppointmentDateParts(apt) {
-    if (!apt) return null;
-
-    const candidateDates = [];
-    if (typeof apt.horaInicio === "string") candidateDates.push(apt.horaInicio);
-    if (typeof apt.horaFin === "string") candidateDates.push(apt.horaFin);
-    if (typeof apt.fecha === "string") candidateDates.push(apt.fecha);
-
-    for (const value of candidateDates) {
-        if (!value) continue;
-        const parsed = new Date(value);
-        if (!isNaN(parsed.getTime())) {
-            return {
-                year: parsed.getFullYear(),
-                month: parsed.getMonth(),
-                day: parsed.getDate()
-            };
-        }
-    }
-
-    return null;
-}
-
-function normalizeAppointmentList(appointments, fallbackAppointments = []) {
-    const normalized = [];
-    const seenKeys = new Set();
-
-    const pushUnique = (item) => {
-        const record = normalizeAppointmentRecord(item);
-        if (!record) return;
-
-        const key = record.id || `${record.horaInicio || ""}-${record.cliente || ""}-${record.servicio || ""}`;
-        if (!key || seenKeys.has(key)) return;
-
-        seenKeys.add(key);
-        normalized.push(record);
-    };
-
-    if (Array.isArray(appointments)) {
-        appointments.forEach(pushUnique);
-    }
-
-    if (Array.isArray(fallbackAppointments) && normalized.length < fallbackAppointments.length) {
-        fallbackAppointments.forEach(pushUnique);
-    }
-
-    return normalized.sort((a, b) => {
-        const aTime = new Date(a.horaInicio || a.fecha || 0).getTime();
-        const bTime = new Date(b.horaInicio || b.fecha || 0).getTime();
-        return aTime - bTime;
-    });
-}
-
-function mergeAppointmentLists(localAppointments, cloudAppointments) {
-    const merged = [];
-    const byId = new Map();
-
-    const addRecord = (record) => {
-        const normalized = normalizeAppointmentRecord(record);
-        if (!normalized) return;
-        const key = normalized.id;
-        const existing = byId.get(key);
-        if (existing) {
-            byId.set(key, { ...existing, ...normalized });
-        } else {
-            byId.set(key, normalized);
-            merged.push(normalized);
-        }
-    };
-
-    (Array.isArray(localAppointments) ? localAppointments : []).forEach(addRecord);
-    (Array.isArray(cloudAppointments) ? cloudAppointments : []).forEach(addRecord);
-
-    return merged.sort((a, b) => {
-        const aTime = new Date(a.horaInicio || a.fecha || 0).getTime();
-        const bTime = new Date(b.horaInicio || b.fecha || 0).getTime();
-        return aTime - bTime;
-    });
-}
-
-// Cargar turnos de la nube con protección offline
-async function loadAppointments(showNotification = false) {
-    if (!state.currentUser) return;
-
-    // Carga inicial del caché local (PWA Offline)
-    const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) {
-        try {
-            const parsed = JSON.parse(cached);
-            state.appointmentsList = normalizeAppointmentList(parsed);
-        } catch (e) {
-            console.error("Error al parsear caché local de turnos:", e);
-            state.appointmentsList = [];
-        }
-    } else {
-        state.appointmentsList = [];
-    }
-
-    // Renderizar lo que hay en memoria/cache de inmediato para que NUNCA quede vacía la agenda
-    const activeTab = document.querySelector(".nav-item.active");
-    if (activeTab && activeTab.getAttribute("data-tab") === "calendario") {
-        renderCalendar();
-        renderDayAppointments();
-    }
-
-    if (!CONFIG_SHEET_URL) return;
-
-    try {
-        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_appointments&email=${encodeURIComponent(state.currentUser.email)}`);
-        const data = await response.json();
-
-        if (data.success && Array.isArray(data.appointments)) {
-            const hasCloudData = data.appointments.length > 0;
-            const hasLocalData = state.appointmentsList.length > 0;
-
-            if (hasCloudData && hasLocalData) {
-                state.appointmentsList = mergeAppointmentLists(state.appointmentsList, data.appointments);
-            } else if (hasCloudData) {
-                state.appointmentsList = normalizeAppointmentList(data.appointments);
-            } else {
-                state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
-            }
-
-            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-
-            const currentTab = document.querySelector(".nav-item.active");
-            if (currentTab && currentTab.getAttribute("data-tab") === "calendario") {
-                renderCalendar();
-                renderDayAppointments();
-            }
-            if (showNotification) {
-                showToast("Agenda actualizada desde la nube.", "success");
-            }
-        } else {
-            state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
-            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-            if (showNotification) {
-                showToast(data.message || "No se pudieron obtener los turnos", "error");
-            }
-        }
-    } catch (error) {
-        console.warn("No se pudieron cargar los turnos de la nube, usando caché local.", error);
-        state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
-        localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-        if (showNotification) {
-            showToast("Sin conexión a la nube. Mostrando turnos guardados localmente.", "warning");
-        }
-    }
-}
+// Gestión de turnos movida a src/appointments.js
 
 // Función global para forzar recarga/sincronización de todos los datos
 async function refreshAllData(showLoaderToast = true) {
