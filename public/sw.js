@@ -41,7 +41,7 @@ self.addEventListener('activate', (e) => {
 // Interceptar peticiones (Network-first)
 self.addEventListener('fetch', (e) => {
   // Evitar interceptar llamadas a la API de Google Sheets y Google Calendar
-  if (e.request.url.includes('script.google.com') || e.request.url.includes('googleapis.com')) {
+  if (e.request.url.includes('script.google.com') || e.request.url.includes('googleapis.com') || e.request.url.includes('cdnjs.cloudflare.com')) {
     return;
   }
 
