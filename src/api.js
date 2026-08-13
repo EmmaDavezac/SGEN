@@ -1,6 +1,9 @@
 import { showLoader } from './ui/loader.js';
 import { showToast } from './ui/toast.js';
 
+// Evitar notificar repetidamente la misma URL fallida
+const failedUrlCache = new Set();
+
 export async function apiPost(url, payload, { showLoading = true, loadingText = 'Conectando con la nube...', swallowError = false } = {}) {
     if (showLoading) showLoader(true, loadingText);
     try {
@@ -61,8 +64,13 @@ export async function apiGet(url, { showLoading = true, loadingText = 'Cargando.
         return data;
     } catch (err) {
         console.error('API GET error for URL:', url, err);
-        if (!swallowError) showToast('Error de conexión con la nube', 'warning');
-        return null;
+        if (!swallowError) {
+            if (!failedUrlCache.has(url)) {
+                failedUrlCache.add(url);
+                showToast(`Error de conexión con la nube. Revisa el despliegue y la URL: ${url}`, 'warning');
+            }
+        }
+        return { success: false, message: 'network_error', rawError: String(err) };
     } finally {
         if (showLoading) showLoader(false);
     }
