@@ -233,24 +233,7 @@ let SERVICES_CATALOG = {
     ]
 };
 
-// Estado General de la Aplicación
-const state = {
-    currentUser: null,          // { email, nombre, token }
-    servicesList: [],           // Transacciones registradas
-    selectedCategory: "semi",   // Categoría activa
-    selectedService: null,      // Servicio específico activo
-    pendingTransaction: null,   // Transacción en espera de confirmación
-    pendingDeleteId: null,      // ID de registro en espera de eliminación
-    isEditingPrices: false,     // Control del modo edición de precios
-    appointmentsList: [],       // Lista de turnos agendados en la nube
-    expensesList: [],           // Lista de gastos registrados
-    cajaMovementsList: [],      // Movimientos entre Efectivo y MP
-    calendarDate: new Date(),   // Mes visible en el calendario
-    selectedCalendarDay: new Date(), // Día seleccionado en el calendario
-    selectedExternalRemoval: null, // Objeto de remoción externa seleccionada
-    allowFiado: localStorage.getItem("evolet_allow_fiado") === "true", // Opción de cobro fiado
-    allowRegisterTab: localStorage.getItem("evolet_allow_register_tab") === "true" // Mostrar pestaña de Registrar
-};
+// Estado General de la Aplicación (definido en src/state.js)
 
 // =========================================================================
 //                  INICIALIZACIÓN DE LA APLICACIÓN
