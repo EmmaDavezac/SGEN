@@ -7,12 +7,16 @@ const failedUrlCache = new Set();
 export async function apiPost(url, payload, { showLoading = true, loadingText = 'Conectando con la nube...', swallowError = false } = {}) {
     if (showLoading) showLoader(true, loadingText);
     try {
+        const controller = new AbortController();
+        const timeoutMs = 8000; // 8s timeout para evitar esperas largas
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         const resp = await fetch(url, {
             method: 'POST',
             mode: 'cors',
             headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify(payload)
-        });
+            body: JSON.stringify(payload),
+            signal: controller.signal
+        }).finally(() => clearTimeout(timeoutId));
         let data = null;
         const text = await resp.text().catch(() => null);
         if (text) {
@@ -32,9 +36,9 @@ export async function apiPost(url, payload, { showLoading = true, loadingText = 
 
         return data;
     } catch (err) {
-        console.error('API POST error:', err);
+        console.error('API POST error for URL:', url, err);
         if (!swallowError) showToast('Error de conexión con la nube', 'warning');
-        return null;
+        return { success: false, message: 'network_error', rawError: String(err) };
     } finally {
         if (showLoading) showLoader(false);
     }
@@ -50,7 +54,10 @@ export async function apiGet(url, { showLoading = true, loadingText = 'Cargando.
         let resp = null;
         while (attempt <= maxRetries) {
             try {
-                resp = await fetch(url, { mode: 'cors' });
+                const controller = new AbortController();
+                const timeoutMs = 8000;
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+                resp = await fetch(url, { mode: 'cors', signal: controller.signal }).finally(() => clearTimeout(timeoutId));
                 break;
             } catch (e) {
                 attempt++;
@@ -81,7 +88,6 @@ export async function apiGet(url, { showLoading = true, loadingText = 'Cargando.
         if (!swallowError) {
             if (!failedUrlCache.has(url)) {
                 failedUrlCache.add(url);
-                // Mostrar mensaje amigable; URL queda en consola para depuración
                 showToast('Error de conexión con la nube. Revisa el despliegue y abre consola para más detalles.', 'warning');
                 console.warn('API GET failed URL (logged once):', url);
             }
