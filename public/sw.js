@@ -56,7 +56,7 @@ self.addEventListener('fetch', (e) => {
       })
   );
 });
-const CACHE_NAME = 'evolet-nails-v12'; // subí la versión para forzar actualización
+const CACHE_NAME = 'evolet-nails-v13'; // subí la versión para forzar actualización
 const ASSETS = [
   './index.html',
   './style.css',
