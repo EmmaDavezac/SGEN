@@ -25,8 +25,8 @@
         href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&family=Outfit:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <!-- Optimización para evitar FOUC: preconnect y preloads -->
-    <!-- Cargamos CSS principal; Font Awesome se importa desde JS para que Vite gestione fuentes -->
-    <link rel="preload" href="/style.css" as="style" onload="this.rel='stylesheet'">
+    <!-- Cargamos CSS principal de forma inmediata para evitar flashes de estilo -->
+    <link rel="stylesheet" href="/style.css">
     <noscript>
         <link rel="stylesheet" href="/style.css">
     </noscript>
