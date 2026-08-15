@@ -29,6 +29,11 @@ import {
     confirmDeleteServiceRecord
 } from './src/services.js';
 
+window.deleteServiceRecord = deleteServiceRecord;
+window.cancelDeleteServiceRecord = cancelDeleteServiceRecord;
+window.confirmDeleteServiceRecord = confirmDeleteServiceRecord;
+window.viewServiceDetail = viewServiceDetail;
+
 function getYearMonthStr(fechaValue) {
     if (!fechaValue) return "";
 
@@ -75,6 +80,13 @@ function normalizeDateValue(fechaValue) {
     }
 
     return null;
+}
+
+function normalizeCalendarDate(fechaValue) {
+    const dateValue = normalizeDateValue(fechaValue);
+    if (!dateValue) return new Date();
+
+    return new Date(dateValue.getFullYear(), dateValue.getMonth(), dateValue.getDate());
 }
 
 function getMonthWindowRange(referenceDate = new Date()) {
@@ -161,6 +173,34 @@ function closeCashModal() {
     const modal = document.getElementById('cash-modal');
     if (!modal) return;
     modal.classList.add('hidden');
+}
+
+function resetServiceForm() {
+    const form = document.getElementById("service-form");
+    if (form) form.reset();
+
+    const servicePriceInput = document.getElementById("service-price");
+    if (servicePriceInput) {
+        servicePriceInput.value = "";
+        delete servicePriceInput.dataset.priceAlertShown;
+    }
+
+    const extRemovalCheck = document.getElementById("chk-external-removal");
+    if (extRemovalCheck) extRemovalCheck.checked = false;
+
+    const extRemovalContainer = document.getElementById("external-removal-options-container");
+    if (extRemovalContainer) {
+        extRemovalContainer.classList.add("hidden");
+    }
+
+    const paymentRadio = document.querySelector('input[name="payment-method"][value="Transferencia"]');
+    if (paymentRadio) paymentRadio.checked = true;
+
+    const cashAmountInput = document.getElementById("cash-amount-given");
+    if (cashAmountInput) cashAmountInput.value = "";
+
+    state.pendingTransaction = null;
+    state.linkedAppointment = null;
 }
 
 function handleCashModalConfirm() {
@@ -378,9 +418,17 @@ function setupEventListeners() {
 
     const servicePriceInput = document.getElementById('service-price');
     if (servicePriceInput) {
+        servicePriceInput.addEventListener('input', () => {
+            const rawValue = Number(servicePriceInput.value);
+            if (!hasSuspiciousPriceInput(rawValue)) {
+                delete servicePriceInput.dataset.priceAlertShown;
+            }
+        });
+
         servicePriceInput.addEventListener('blur', () => {
             const rawValue = Number(servicePriceInput.value);
-            if (hasSuspiciousPriceInput(rawValue)) {
+            if (hasSuspiciousPriceInput(rawValue) && servicePriceInput.dataset.priceAlertShown !== 'true') {
+                servicePriceInput.dataset.priceAlertShown = 'true';
                 window.alert('Hay un error en el monto ingresado. Verificá que el valor sea 9.000, 10.000 o similar, no 9 o 10.');
                 servicePriceInput.focus();
                 servicePriceInput.select();
@@ -2778,10 +2826,7 @@ let currentRescheduleAppointment = null;
 function openSenaModal(apt) {
     currentSenaAppointment = apt;
     const sub = document.getElementById("sena-modal-sub");
-    if (sub) sub.textContent = `Modificar estado o cargar seña de ${apt.cliente}:`;
-
-    const statusSelect = document.getElementById("sena-modal-status");
-    if (statusSelect) statusSelect.value = apt.estado || "Reservado";
+    if (sub) sub.textContent = `Cargar seña para ${apt.cliente}:`;
 
     const amt = document.getElementById("sena-modal-amount");
     if (amt) amt.value = apt.precio ? apt.precio : "2500";
@@ -2801,10 +2846,24 @@ async function handleSenaSubmit(e) {
     if (!currentSenaAppointment) return;
 
     const apt = currentSenaAppointment;
-    const statusEl = document.getElementById("sena-modal-status");
-    const newStatus = statusEl ? statusEl.value : "Reservado";
     const sena = Number(document.getElementById("sena-modal-amount").value) || 0;
     const metodo = document.querySelector('input[name="sena-modal-payment"]:checked').value;
+
+    if (sena < 0) {
+        showToast("Ingresá un monto de seña válido para confirmar el turno.", "error");
+        document.getElementById("sena-modal-amount").focus();
+        document.getElementById("sena-modal-amount").select();
+        return;
+    }
+
+    if (sena > 0 && sena < 1000) {
+        window.alert('La seña debe ser 0 o mayor a 1000. Revisá el monto ingresado antes de guardar.');
+        document.getElementById("sena-modal-amount").focus();
+        document.getElementById("sena-modal-amount").select();
+        return;
+    }
+
+    const newStatus = "Reservado";
 
     closeSenaModal();
     showLoader(true, "Actualizando turno en la nube...");
@@ -2816,20 +2875,18 @@ async function handleSenaSubmit(e) {
             apt.precio = sena;
             state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
 
-            if (newStatus === "Reservado" && sena > 0) {
-                await registerServiceDirectly({
-                    id: "serv_" + new Date().getTime(),
-                    fecha: new Date().toISOString(),
-                    usuario: state.currentUser ? state.currentUser.email : "Evolet",
-                    cliente: apt.cliente,
-                    servicio: "Seña",
-                    categoria: "Manicuría",
-                    precio: sena,
-                    seña: 0,
-                    metodoPago: metodo,
-                    completado: false
-                });
-            }
+            await registerServiceDirectly({
+                id: "serv_" + new Date().getTime(),
+                fecha: new Date().toISOString(),
+                usuario: state.currentUser ? state.currentUser.email : "Evolet",
+                cliente: apt.cliente,
+                servicio: "Seña",
+                categoria: "Manicuría",
+                precio: sena,
+                seña: 0,
+                metodoPago: metodo,
+                completado: false
+            });
 
             const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
