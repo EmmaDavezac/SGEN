@@ -1202,10 +1202,10 @@ async function confirmServiceRegistration() {
                         console.error('Error al actualizar el turno después de cobrar:', editErr);
                     }
 
+                    await loadServicesData();
                     clearCheckoutState();
                     resetServiceForm();
-                    const isAdmin = state.currentUser && state.currentUser.rol === 'admin';
-                    if (!isAdmin) switchTab('calendario');
+                    switchTab('calendario');
                     return;
                 } else {
                     showToast(respData.message || 'Error al actualizar la seña en Google Sheets', 'error');
@@ -1291,16 +1291,12 @@ async function confirmServiceRegistration() {
                 }
             }
 
+            await loadServicesData();
             clearCheckoutState();
             renderHistoryList();
             calculateAndRenderStats();
             resetServiceForm();
-
-            // Si fue un cobro de turno o la manicurista no es admin, regresar a la Agenda
-            const isAdmin = state.currentUser && state.currentUser.rol === "admin";
-            if (wasLinked || !isAdmin) {
-                switchTab("calendario");
-            }
+            switchTab("calendario");
         } else {
             showToast(data.message || "Error al registrar en Google Sheets", "error");
         }
