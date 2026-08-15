@@ -1,46 +1,31 @@
-// Service Worker para cacheo básico (Network-first con fallback a Cache)
-const CACHE_NAME = 'evolet-nails-v14';
-const ASSETS = [
-  '/index.html',
-  '/style.css',
-  '/app.js',
-  '/manifest.json',
-  '/logo.png'
-];
+import { precacheAndRoute } from 'workbox-precaching';
 
-// Instalar y cachear recursos (no fallar si algún asset no existe)
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      const results = await Promise.allSettled(
-        ASSETS.map((url) => cache.add(url))
-      );
-      results.forEach((result, i) => {
-        if (result.status === 'rejected') {
-          console.warn('No se pudo cachear:', ASSETS[i], result.reason);
-        }
-      });
-    }).then(() => self.skipWaiting())
-  );
-});
+// Service Worker con versionado y precache generado por Vite (Workbox)
+const CACHE_VERSION = 'v15';
+const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
+
+// precache manifest será inyectado por `vite-plugin-pwa` durante el build
+precacheAndRoute(self.__WB_MANIFEST || []);
 
 // Activar y limpiar caches antiguas
 self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) return caches.delete(key);
-          return null;
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
+  e.waitUntil((async () => {
+    // No borramos las cachés de precache (Workbox las administra).
+    // Limpiamos únicamente la caché runtime antigua si existe.
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => {
+      if (key !== RUNTIME_CACHE && key.startsWith('runtime-')) return caches.delete(key);
+      return null;
+    }));
+    await self.clients.claim();
+  })());
 });
 
-// Interceptar peticiones (Network-first)
+// Fetch: navegación network-first, otros recursos stale-while-revalidate
 self.addEventListener('fetch', (e) => {
-  // Evitar interceptar llamadas a la API de Google Sheets, Googleusercontent y CDNs
+  const url = new URL(e.request.url);
+
+  // No interceptar ciertos orígenes externos y CDNs
   if (
     e.request.url.includes('script.google.com') ||
     e.request.url.includes('script.googleusercontent.com') ||
@@ -51,15 +36,44 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  e.respondWith(
-    fetch(e.request)
-      .then((networkResponse) => {
+  // Si es navegación, network-first con fallback al precache (index.html)
+  if (e.request.mode === 'navigate') {
+    e.respondWith((async () => {
+      try {
+        const networkResponse = await fetch(e.request);
         if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseToCache));
+          const cache = await caches.open(RUNTIME_CACHE);
+          cache.put(e.request, networkResponse.clone());
         }
         return networkResponse;
-      })
-      .catch(() => caches.match(e.request))
-  );
+      } catch (err) {
+        return caches.match('/index.html');
+      }
+    })());
+    return;
+  }
+
+  // Para otros recursos: stale-while-revalidate en caché runtime
+  e.respondWith((async () => {
+    const cache = await caches.open(RUNTIME_CACHE);
+    const cachedResponse = await cache.match(e.request);
+    const networkPromise = fetch(e.request).then(async (networkResponse) => {
+      if (networkResponse && networkResponse.status === 200) {
+        await cache.put(e.request, networkResponse.clone());
+      }
+      return networkResponse;
+    }).catch(() => null);
+    return cachedResponse || networkPromise;
+  })());
+});
+
+// Mensajes desde la página: permitir forzar skipWaiting o limpiar cachés
+self.addEventListener('message', (event) => {
+  if (!event.data) return;
+  if (event.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
+  if (event.data === 'clearCaches') {
+    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))));
+  }
 });
