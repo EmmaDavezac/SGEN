@@ -1,5 +1,5 @@
 // Service Worker para cacheo básico (Network-first con fallback a Cache)
-const CACHE_NAME = 'evolet-nails-v13';
+const CACHE_NAME = 'evolet-nails-v14';
 const ASSETS = [
   '/index.html',
   '/style.css',
