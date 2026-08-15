@@ -118,6 +118,12 @@ function updateCashActionsVisibility() {
     if (cashActions) cashActions.style.display = (val === 'Efectivo') ? 'block' : 'none';
 }
 
+function hasSuspiciousPriceInput(rawValue) {
+    const num = Number(rawValue);
+    if (!Number.isFinite(num) || num <= 0) return false;
+    return num > 0 && num < 1000;
+}
+
 function updateCashSummary() {
     const amountInput = document.getElementById('cash-amount-given');
     const dueEl = document.getElementById('cash-summary-due');
@@ -369,6 +375,18 @@ function setupEventListeners() {
     // Mostrar controles extra para efectivo cuando aplique
     const paymentRadios = document.querySelectorAll('input[name="payment-method"]');
     paymentRadios.forEach(r => r.addEventListener('change', updateCashActionsVisibility));
+
+    const servicePriceInput = document.getElementById('service-price');
+    if (servicePriceInput) {
+        servicePriceInput.addEventListener('blur', () => {
+            const rawValue = Number(servicePriceInput.value);
+            if (hasSuspiciousPriceInput(rawValue)) {
+                window.alert('Hay un error en el monto ingresado. Verificá que el valor sea 9.000, 10.000 o similar, no 9 o 10.');
+                servicePriceInput.focus();
+                servicePriceInput.select();
+            }
+        });
+    }
 
     // Botón Pago Justo (abre modal)
     const btnPago = document.getElementById('btn-pago-justo');
@@ -1057,9 +1075,18 @@ function handleServiceSubmit(e) {
     if (chk && chk.checked && state.selectedExternalRemoval) {
         serviceName = `${serviceName} + ${state.selectedExternalRemoval.name}`;
     }
-    const price = Number(document.getElementById("service-price").value) || 0;
+
+    const rawPriceValue = Number(document.getElementById("service-price").value);
+    const price = rawPriceValue;
 
     const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
+
+    if (hasSuspiciousPriceInput(rawPriceValue)) {
+        window.alert('Hay un error en el monto ingresado. Verificá que el valor sea 9.000, 10.000 o similar, no 9 o 10.');
+        document.getElementById("service-price").focus();
+        document.getElementById("service-price").select();
+        return;
+    }
 
     if (!clientName || !serviceName || price <= 0) {
         showToast("Completa los datos del cliente y precio correctamente.", "error");
@@ -2981,9 +3008,17 @@ async function handleScheduleSubmit(e) {
     }
 
     const statusVal = document.getElementById("schedule-status").value;
-    const senaAmount = Number(document.getElementById("schedule-sena-amount").value) || 0;
+    const rawSenaAmount = Number(document.getElementById("schedule-sena-amount").value);
+    const senaAmount = rawSenaAmount || 0;
     const paymentMethodEl = document.querySelector('input[name="schedule-payment"]:checked');
     const senaPaymentMethod = paymentMethodEl ? paymentMethodEl.value : "Transferencia";
+
+    if (statusVal === "Reservado" && rawSenaAmount !== 0 && rawSenaAmount < 1000) {
+        window.alert('La seña debe ser 0 o mayor a 1000. Revisá el monto ingresado antes de guardar.');
+        document.getElementById("schedule-sena-amount").focus();
+        document.getElementById("schedule-sena-amount").select();
+        return;
+    }
 
     // Calcular horas ISO (Duración por defecto: 90 minutos, Servicio: "Turno", Precio: seña o 0)
     const start = new Date(`${dateVal}T${timeVal}`);
