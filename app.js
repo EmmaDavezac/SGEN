@@ -6,7 +6,33 @@
  * CONFIGURACIÓN DE LA NUBE:
  * Pega la URL del Web App de Google (Apps Script) entre las comillas simples de abajo.
  */
-const CONFIG_SHEET_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEET_URL) || 'https://script.google.com/macros/s/AKfycbxZT_wSTPClKAN78_TYAEnxBUj_b7BWPmQz2pwiKm4dkff5CgH_96xOLuj30IFdc0uUVg/exec';
+import { showLoader } from './src/ui/loader.js';
+import { showToast } from './src/ui/toast.js';
+import { apiPost, apiGet } from './src/api.js';
+// Import Font Awesome from local dependency so Vite bundles fonts correctly
+import '@fortawesome/fontawesome-free/css/all.min.css';
+import { CONFIG_SHEET_URL } from './src/config.js';
+import state from './src/state.js';
+import { loadAppointments, normalizeAppointmentList, mergeAppointmentLists, createStableAppointmentId, getAppointmentDateParts } from './src/appointments.js';
+import {
+    normalizeServiceRecord,
+    normalizeExpenseRecord,
+    loadServicesData,
+    registerServiceDirectly,
+    saveServicesCache,
+    updateClientAutocomplete,
+    renderHistoryList,
+    getFilteredHistory,
+    filterHistory,
+    deleteServiceRecord,
+    cancelDeleteServiceRecord,
+    confirmDeleteServiceRecord
+} from './src/services.js';
+
+window.deleteServiceRecord = deleteServiceRecord;
+window.cancelDeleteServiceRecord = cancelDeleteServiceRecord;
+window.confirmDeleteServiceRecord = confirmDeleteServiceRecord;
+window.viewServiceDetail = viewServiceDetail;
 
 function getYearMonthStr(fechaValue) {
     if (!fechaValue) return "";
@@ -22,6 +48,10 @@ function getYearMonthStr(fechaValue) {
     if (isNaN(d.getTime())) return "";
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+
+// Exponer renderizadores para que los módulos importados puedan invocarlos sin crear dependencia circular
+window.renderCalendar = renderCalendar;
+window.renderDayAppointments = renderDayAppointments;
 
 function normalizeDateValue(fechaValue) {
     if (!fechaValue) return null;
@@ -52,6 +82,13 @@ function normalizeDateValue(fechaValue) {
     return null;
 }
 
+function normalizeCalendarDate(fechaValue) {
+    const dateValue = normalizeDateValue(fechaValue);
+    if (!dateValue) return new Date();
+
+    return new Date(dateValue.getFullYear(), dateValue.getMonth(), dateValue.getDate());
+}
+
 function getMonthWindowRange(referenceDate = new Date()) {
     const endDate = new Date(referenceDate);
     endDate.setHours(23, 59, 59, 999);
@@ -77,57 +114,7 @@ function setStoredJson(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
 }
 
-function normalizeServiceRecord(item) {
-    if (!item || typeof item !== "object") {
-        return {
-            id: `service_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-            fecha: new Date().toISOString(),
-            cliente: "Cliente",
-            servicio: "Servicio",
-            precio: 0,
-            metodoPago: "Transferencia",
-            categoria: "Otro",
-            seña: 0,
-            completado: "No"
-        };
-    }
-
-    return {
-        ...item,
-        id: item.id || `service_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-        fecha: item.fecha || new Date().toISOString(),
-        cliente: (item.cliente || "Cliente").toString().trim() || "Cliente",
-        servicio: (item.servicio || "Servicio").toString().trim() || "Servicio",
-        precio: Number(item.precio) || 0,
-        metodoPago: (item.metodoPago || "Transferencia").toString().trim() || "Transferencia",
-        categoria: (item.categoria || "Otro").toString().trim() || "Otro",
-        seña: Number(item.seña) || 0,
-        completado: item.completado || "No"
-    };
-}
-
-function normalizeExpenseRecord(item) {
-    if (!item || typeof item !== "object") {
-        return {
-            id: `expense_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-            fecha: new Date().toISOString(),
-            concepto: "Gasto",
-            monto: 0,
-            metodoPago: "Efectivo",
-            categoria: "Otro"
-        };
-    }
-
-    return {
-        ...item,
-        id: item.id || `expense_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-        fecha: item.fecha || new Date().toISOString(),
-        concepto: (item.concepto || "Gasto").toString().trim() || "Gasto",
-        monto: Number(item.monto) || 0,
-        metodoPago: (item.metodoPago || "Efectivo").toString().trim() || "Efectivo",
-        categoria: (item.categoria || "Otro").toString().trim() || "Otro"
-    };
-}
+// Servicios y historial movidos a src/services.js
 
 function isWithinMonthWindow(fechaValue, referenceDate = new Date()) {
     const dateValue = normalizeDateValue(fechaValue);
@@ -141,6 +128,12 @@ function updateCashActionsVisibility() {
     const val = document.querySelector('input[name="payment-method"]:checked') ? document.querySelector('input[name="payment-method"]:checked').value : null;
     const cashActions = document.getElementById('cash-actions');
     if (cashActions) cashActions.style.display = (val === 'Efectivo') ? 'block' : 'none';
+}
+
+function hasSuspiciousPriceInput(rawValue) {
+    const num = Number(rawValue);
+    if (!Number.isFinite(num) || num <= 0) return false;
+    return num > 0 && num < 1000;
 }
 
 function updateCashSummary() {
@@ -182,6 +175,34 @@ function closeCashModal() {
     modal.classList.add('hidden');
 }
 
+function resetServiceForm() {
+    const form = document.getElementById("service-form");
+    if (form) form.reset();
+
+    const servicePriceInput = document.getElementById("service-price");
+    if (servicePriceInput) {
+        servicePriceInput.value = "";
+        delete servicePriceInput.dataset.priceAlertShown;
+    }
+
+    const extRemovalCheck = document.getElementById("chk-external-removal");
+    if (extRemovalCheck) extRemovalCheck.checked = false;
+
+    const extRemovalContainer = document.getElementById("external-removal-options-container");
+    if (extRemovalContainer) {
+        extRemovalContainer.classList.add("hidden");
+    }
+
+    const paymentRadio = document.querySelector('input[name="payment-method"][value="Transferencia"]');
+    if (paymentRadio) paymentRadio.checked = true;
+
+    const cashAmountInput = document.getElementById("cash-amount-given");
+    if (cashAmountInput) cashAmountInput.value = "";
+
+    state.pendingTransaction = null;
+    state.linkedAppointment = null;
+}
+
 function handleCashModalConfirm() {
     const amountInput = document.getElementById('cash-amount-given');
     const amountNum = amountInput ? Number(amountInput.value) || 0 : 0;
@@ -198,6 +219,7 @@ function handleCashModalConfirm() {
     const senaAmount = Number(state.pendingTransaction.seña) || 0;
     const amountDue = Math.max(0, totalPrice - senaAmount);
     const vuelto = Math.max(0, Number((amountNum - amountDue).toFixed(2)));
+
     state.pendingTransaction.vuelto = vuelto;
     state.pendingTransaction.vueltoReturnMethod = returnMethod;
     state.pendingTransaction.amountGiven = amountNum;
@@ -260,24 +282,7 @@ let SERVICES_CATALOG = {
     ]
 };
 
-// Estado General de la Aplicación
-const state = {
-    currentUser: null,          // { email, nombre, token }
-    servicesList: [],           // Transacciones registradas
-    selectedCategory: "semi",   // Categoría activa
-    selectedService: null,      // Servicio específico activo
-    pendingTransaction: null,   // Transacción en espera de confirmación
-    pendingDeleteId: null,      // ID de registro en espera de eliminación
-    isEditingPrices: false,     // Control del modo edición de precios
-    appointmentsList: [],       // Lista de turnos agendados en la nube
-    expensesList: [],           // Lista de gastos registrados
-    cajaMovementsList: [],      // Movimientos entre Efectivo y MP
-    calendarDate: new Date(),   // Mes visible en el calendario
-    selectedCalendarDay: new Date(), // Día seleccionado en el calendario
-    selectedExternalRemoval: null, // Objeto de remoción externa seleccionada
-    allowFiado: localStorage.getItem("evolet_allow_fiado") === "true", // Opción de cobro fiado
-    allowRegisterTab: localStorage.getItem("evolet_allow_register_tab") === "true" // Mostrar pestaña de Registrar
-};
+// Estado General de la Aplicación (definido en src/state.js)
 
 // =========================================================================
 //                  INICIALIZACIÓN DE LA APLICACIÓN
@@ -410,6 +415,26 @@ function setupEventListeners() {
     // Mostrar controles extra para efectivo cuando aplique
     const paymentRadios = document.querySelectorAll('input[name="payment-method"]');
     paymentRadios.forEach(r => r.addEventListener('change', updateCashActionsVisibility));
+
+    const servicePriceInput = document.getElementById('service-price');
+    if (servicePriceInput) {
+        servicePriceInput.addEventListener('input', () => {
+            const rawValue = Number(servicePriceInput.value);
+            if (!hasSuspiciousPriceInput(rawValue)) {
+                delete servicePriceInput.dataset.priceAlertShown;
+            }
+        });
+
+        servicePriceInput.addEventListener('blur', () => {
+            const rawValue = Number(servicePriceInput.value);
+            if (hasSuspiciousPriceInput(rawValue) && servicePriceInput.dataset.priceAlertShown !== 'true') {
+                servicePriceInput.dataset.priceAlertShown = 'true';
+                window.alert('Hay un error en el monto ingresado. Verificá que el valor sea 9.000, 10.000 o similar, no 9 o 10.');
+                servicePriceInput.focus();
+                servicePriceInput.select();
+            }
+        });
+    }
 
     // Botón Pago Justo (abre modal)
     const btnPago = document.getElementById('btn-pago-justo');
@@ -774,26 +799,10 @@ async function handleLoginSubmit(e) {
         return;
     }
 
-    showLoader(true, "Verificando credenciales...");
-
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify({
-                action: "login",
-                email: email,
-                password: password
-            })
-        });
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "login", email: email, password: password }, { showLoading: true, loadingText: 'Verificando credenciales...' });
 
-        const data = await response.json();
-        showLoader(false);
-
-        if (data.success) {
+        if (data && data.success) {
             state.currentUser = data.user;
             localStorage.setItem("evolet_session_v4", JSON.stringify(state.currentUser));
             document.getElementById("user-display-name").textContent = state.currentUser.nombre;
@@ -805,10 +814,9 @@ async function handleLoginSubmit(e) {
             loadCajaMovements(); // Cargar movimientos entre cajas
             checkAdminAccess(); // Chequear permisos
         } else {
-            showToast(data.message || "Email o contraseña incorrectos", "error");
+            showToast((data && data.message) ? data.message : "Email o contraseña incorrectos", "error");
         }
     } catch (error) {
-        showLoader(false);
         console.error("Error en login:", error);
         showToast("Error de conexión. Verifica la URL de Google Sheets o tu internet.", "error");
     }
@@ -1115,9 +1123,18 @@ function handleServiceSubmit(e) {
     if (chk && chk.checked && state.selectedExternalRemoval) {
         serviceName = `${serviceName} + ${state.selectedExternalRemoval.name}`;
     }
-    const price = Number(document.getElementById("service-price").value) || 0;
+
+    const rawPriceValue = Number(document.getElementById("service-price").value);
+    const price = rawPriceValue;
 
     const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
+
+    if (hasSuspiciousPriceInput(rawPriceValue)) {
+        window.alert('Hay un error en el monto ingresado. Verificá que el valor sea 9.000, 10.000 o similar, no 9 o 10.');
+        document.getElementById("service-price").focus();
+        document.getElementById("service-price").select();
+        return;
+    }
 
     if (!clientName || !serviceName || price <= 0) {
         showToast("Completa los datos del cliente y precio correctamente.", "error");
@@ -1211,13 +1228,7 @@ async function confirmServiceRegistration() {
                     completado: 'Sí'
                 };
 
-                const resp = await fetch(CONFIG_SHEET_URL, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(editPayload)
-                });
-                const respData = await resp.json();
+                const respData = await apiPost(CONFIG_SHEET_URL, editPayload, { showLoading: true, loadingText: 'Actualizando servicio...', swallowError: true });
 
                 if (respData && respData.success) {
                     // Actualizar cache local del servicio editado
@@ -1237,25 +1248,17 @@ async function confirmServiceRegistration() {
                     // Marcar el turno vinculado como completado en la nube
                     const aptId = apt.id;
                     try {
-                        const updateResp = await fetch(CONFIG_SHEET_URL, {
-                            method: 'POST',
-                            mode: 'cors',
-                            headers: { 'Content-Type': 'text/plain' },
-                            body: JSON.stringify({
-                                action: 'edit_appointment',
-                                id: aptId,
-                                estado: 'Completado',
-                                precio: transaction.precio,
-                                servicio: apt.servicio,
-                                fecha: apt.fecha,
-                                horaInicio: apt.horaInicio,
-                                horaFin: apt.horaFin,
-                                eventId: apt.eventId
-                            })
-                        });
-
-                        // Leer respuesta y solo aplicar cambios locales si el servidor confirma
-                        const updateData = await updateResp.json().catch(() => null);
+                        const updateData = await apiPost(CONFIG_SHEET_URL, {
+                            action: 'edit_appointment',
+                            id: aptId,
+                            estado: 'Completado',
+                            precio: transaction.precio,
+                            servicio: apt.servicio,
+                            fecha: apt.fecha,
+                            horaInicio: apt.horaInicio,
+                            horaFin: apt.horaFin,
+                            eventId: apt.eventId
+                        }, { showLoading: true, loadingText: 'Actualizando turno...', swallowError: true });
                         if (!updateData || !updateData.success) {
                             console.warn('No se pudo actualizar el turno en la nube:', updateData && updateData.message);
                         } else {
@@ -1274,10 +1277,10 @@ async function confirmServiceRegistration() {
                         console.error('Error al actualizar el turno después de cobrar:', editErr);
                     }
 
+                    await loadServicesData();
                     clearCheckoutState();
                     resetServiceForm();
-                    const isAdmin = state.currentUser && state.currentUser.rol === 'admin';
-                    if (!isAdmin) switchTab('calendario');
+                    switchTab('calendario');
                     return;
                 } else {
                     showToast(respData.message || 'Error al actualizar la seña en Google Sheets', 'error');
@@ -1287,19 +1290,7 @@ async function confirmServiceRegistration() {
         }
 
         // Si no se actualizó una seña existente, crear un nuevo servicio como antes
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify({
-                action: "add_service",
-                ...transaction
-            })
-        });
-
-        const data = await response.json();
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "add_service", ...transaction }, { showLoading: true, loadingText: 'Registrando servicio...' });
 
         if (data.success) {
             const wasLinked = !!state.linkedAppointment;
@@ -1320,12 +1311,8 @@ async function confirmServiceRegistration() {
                         categoria: 'Vuelto'
                     };
 
-                    fetch(CONFIG_SHEET_URL, {
-                        method: 'POST',
-                        mode: 'cors',
-                        headers: { 'Content-Type': 'text/plain' },
-                        body: JSON.stringify(expensePayload)
-                    }).then(res => res.json()).then(expData => {
+                    try {
+                        const expData = await apiPost(CONFIG_SHEET_URL, expensePayload, { showLoading: false, swallowError: true });
                         if (expData && expData.success) {
                             showToast('Vuelto registrado en Gastos para ajustar caja', 'info');
                             // Recargar lista de gastos en background
@@ -1334,7 +1321,9 @@ async function confirmServiceRegistration() {
                         } else {
                             console.warn('No se pudo registrar el vuelto como gasto:', expData && expData.message);
                         }
-                    }).catch(err => console.error('Error registrando gasto por vuelto:', err));
+                    } catch (err) {
+                        console.error('Error registrando gasto por vuelto:', err);
+                    }
                 } catch (err) {
                     console.error('Error preparando payload de gasto por vuelto:', err);
                 }
@@ -1345,24 +1334,18 @@ async function confirmServiceRegistration() {
                 const aptId = state.linkedAppointment.id;
 
                 try {
-                    const updateResp = await fetch(CONFIG_SHEET_URL, {
-                        method: "POST",
-                        mode: "cors",
-                        headers: { "Content-Type": "text/plain" },
-                        body: JSON.stringify({
-                            action: "edit_appointment",
-                            id: aptId,
-                            estado: "Completado",
-                            precio: transaction.precio,
-                            servicio: state.linkedAppointment.servicio,
-                            fecha: state.linkedAppointment.fecha,
-                            horaInicio: state.linkedAppointment.horaInicio,
-                            horaFin: state.linkedAppointment.horaFin,
-                            eventId: state.linkedAppointment.eventId
-                        })
-                    });
+                    const updateData = await apiPost(CONFIG_SHEET_URL, {
+                        action: "edit_appointment",
+                        id: aptId,
+                        estado: "Completado",
+                        precio: transaction.precio,
+                        servicio: state.linkedAppointment.servicio,
+                        fecha: state.linkedAppointment.fecha,
+                        horaInicio: state.linkedAppointment.horaInicio,
+                        horaFin: state.linkedAppointment.horaFin,
+                        eventId: state.linkedAppointment.eventId
+                    }, { showLoading: true, loadingText: 'Actualizando turno...', swallowError: true });
 
-                    const updateData = await updateResp.json().catch(() => null);
                     if (!updateData || !updateData.success) {
                         console.warn('No se pudo actualizar el turno en la nube:', updateData && updateData.message);
                     } else {
@@ -1383,16 +1366,12 @@ async function confirmServiceRegistration() {
                 }
             }
 
+            await loadServicesData();
             clearCheckoutState();
             renderHistoryList();
             calculateAndRenderStats();
             resetServiceForm();
-
-            // Si fue un cobro de turno o la manicurista no es admin, regresar a la Agenda
-            const isAdmin = state.currentUser && state.currentUser.rol === "admin";
-            if (wasLinked || !isAdmin) {
-                switchTab("calendario");
-            }
+            switchTab("calendario");
         } else {
             showToast(data.message || "Error al registrar en Google Sheets", "error");
         }
@@ -1406,314 +1385,7 @@ async function confirmServiceRegistration() {
     }
 }
 
-async function registerServiceDirectly(transaction) {
-    if (!CONFIG_SHEET_URL) {
-        showToast("Por favor configura la URL de tu Google Sheet en app.js para poder guardar.", "error");
-        return null;
-    }
-    try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify({
-                action: "add_service",
-                ...transaction
-            })
-        });
-        const data = await response.json();
-        if (data.success) {
-            state.servicesList.unshift(data.service);
-            saveServicesCache();
-            updateClientAutocomplete();
-            renderHistoryList();
-            calculateAndRenderStats();
-            return data.service;
-        } else {
-            console.error("Error al registrar servicio directamente en Sheets:", data.message);
-        }
-    } catch (err) {
-        console.error("Error al registrar servicio directamente:", err);
-    }
-    return null;
-}
-
-function resetServiceForm() {
-    clearCheckoutState();
-    selectCategory(state.selectedCategory);
-    document.querySelector(".app-content").scrollTop = 0;
-}
-
-// =========================================================================
-//                  LECTURA Y SINCRONIZACIÓN DE DATOS
-// =========================================================================
-async function loadServicesData() {
-    const cacheKey = `evolet_services_v4_${state.currentUser.email}`;
-    const cachedServices = getStoredJson(cacheKey, []);
-    if (Array.isArray(cachedServices)) {
-        state.servicesList = cachedServices.map(normalizeServiceRecord);
-        renderHistoryList();
-        calculateAndRenderStats();
-        updateClientAutocomplete();
-    }
-
-    if (!CONFIG_SHEET_URL) {
-        showToast("Por favor, configura la URL de tu Google Sheet en app.js para sincronizar.", "error");
-        return;
-    }
-
-    try {
-        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_services&email=${encodeURIComponent(state.currentUser.email)}`);
-        const data = await response.json();
-
-        if (data.success) {
-            state.servicesList = Array.isArray(data.services) ? data.services.map(normalizeServiceRecord) : [];
-            saveServicesCache();
-            renderHistoryList();
-            calculateAndRenderStats();
-            updateClientAutocomplete();
-            checkAndSyncOfflineTransactions();
-        }
-    } catch (error) {
-        console.error("Error al cargar servicios de la nube:", error);
-        showToast("Historial cargado localmente (sin conexión).");
-    }
-}
-
-// Guarda la base de datos de manera local rápida
-function saveServicesCache() {
-    if (state.currentUser) {
-        const normalized = Array.isArray(state.servicesList) ? state.servicesList.map(normalizeServiceRecord) : [];
-        state.servicesList = normalized;
-        setStoredJson(`evolet_services_v4_${state.currentUser.email}`, normalized);
-    }
-}
-
-// =========================================================================
-//                  AUTOCOMPLETAR CLIENTAS
-// =========================================================================
-function updateClientAutocomplete() {
-    const datalist = document.getElementById("past-clients-list");
-    if (!datalist) return;
-
-    const serviceList = Array.isArray(state.servicesList) ? state.servicesList.map(normalizeServiceRecord) : [];
-
-    // Extraer nombres de clientas únicos del historial
-    const uniqueClients = [...new Set(serviceList.map(item => item.cliente))]
-        .filter(name => name && name.length > 0)
-        .sort((a, b) => a.localeCompare(b));
-
-    datalist.innerHTML = uniqueClients
-        .map(clientName => `<option value="${escapeHtml(clientName)}">`)
-        .join("");
-}
-
-// =========================================================================
-//                  HISTORIAL Y FILTRADOS
-// =========================================================================
-function renderHistoryList() {
-    const listElement = document.getElementById("history-list");
-    if (!listElement) return;
-
-    listElement.innerHTML = "";
-
-    const filteredList = getFilteredHistory();
-
-    if (filteredList.length === 0) {
-        listElement.innerHTML = `
-            <div class="card-info-box" style="text-align: center;">
-                <p>No se encontraron registros</p>
-            </div>
-        `;
-        return;
-    }
-
-    filteredList.forEach(item => {
-        const card = document.createElement("div");
-        card.className = "history-card";
-
-        const dateObj = normalizeDateValue(item.fecha) || new Date();
-        const formattedDate = dateObj.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' }) + " " +
-            dateObj.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
-
-        const payIcons = {
-            Transferencia: '<i class="fa-solid fa-mobile-screen-button"></i>',
-            Efectivo: '<i class="fa-solid fa-money-bill-wave"></i>'
-        };
-        const payIcon = payIcons[item.metodoPago] || '<i class="fa-solid fa-money-check-dollar"></i>';
-
-        const totalFormatted = `$${Number(item.precio || 0).toLocaleString("es-AR")}`;
-        const clienteLabel = (item.cliente || "Cliente").toString().trim() || "Cliente";
-        const servicioLabel = (item.servicio || "Servicio").toString().trim() || "Servicio";
-
-        const isAdmin = state.currentUser && state.currentUser.rol === "admin";
-
-     card.innerHTML = `
-    <div class="card-details">
-        <div class="card-client">${escapeHtml(clienteLabel)}</div>
-        <div class="card-service">${escapeHtml(servicioLabel)}</div>
-        <div class="card-meta">
-            <span><i class="fa-regular fa-calendar" style="color: var(--barbie-pink); margin-right: 3px;"></i>${formattedDate}</span>
-            <span class="pay-badge" title="Método de pago">${payIcon} ${item.metodoPago}</span>
-        </div>
-    </div>
-    <div class="card-amount-box">
-        <div class="card-price" style="font-size: 18px; color: var(--barbie-dark);">${totalFormatted}</div>
-    </div>
-    <div class="card-actions-col">
-        <button class="btn-view-detail" title="Ver Detalle">
-            <i class="fa-solid fa-eye"></i>
-        </button>
-        ${isAdmin ? `
-        <button class="btn-delete-card" title="Eliminar Registro">
-            <i class="fa-solid fa-trash-can"></i>
-        </button>
-        ` : ''}
-    </div>
-`;
-
-card.querySelector(".btn-view-detail").addEventListener("click", () => {
-    viewServiceDetail(item.id);
-});
-
-        // Closures directas sobre "item" -> se acabaron los problemas de tipo con el id
-        card.querySelector(".btn-view-detail").addEventListener("click", () => {
-            viewServiceDetail(item.id);
-        });
-
-        const deleteBtn = card.querySelector(".btn-delete-card");
-        if (deleteBtn) {
-            deleteBtn.addEventListener("click", () => {
-                deleteServiceRecord(item.id);
-            });
-        }
-
-        listElement.appendChild(card);
-    });
-}
-
-
-
-function getFilteredHistory() {
-    const searchInput = document.getElementById("history-search");
-    const filterSelect = document.getElementById("history-filter");
-    const searchVal = searchInput ? searchInput.value.toLowerCase().trim() : "";
-    const filterVal = filterSelect ? filterSelect.value : "todos";
-
-    const list = Array.isArray(state.servicesList) ? state.servicesList.map(normalizeServiceRecord) : [];
-    list.sort((a, b) => {
-        const dateA = normalizeDateValue(a.fecha);
-        const dateB = normalizeDateValue(b.fecha);
-        if (!dateA && !dateB) return 0;
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-        return dateB - dateA;
-    });
-
-    return list.filter(item => {
-        const clienteText = (item.cliente || "").toString().toLowerCase();
-        const servicioText = (item.servicio || "").toString().toLowerCase();
-        const matchesSearch = clienteText.includes(searchVal) || servicioText.includes(searchVal);
-
-        if (!matchesSearch) return false;
-
-        if (filterVal === "todos") return true;
-
-        const date = new Date(item.fecha);
-        const now = new Date();
-
-        if (filterVal === "hoy") {
-            return date.toDateString() === now.toDateString();
-        }
-
-        if (filterVal === "semana") {
-            const oneWeekAgo = new Date();
-            oneWeekAgo.setDate(now.getDate() - 7);
-            return date >= oneWeekAgo;
-        }
-
-        if (filterVal === "mes") {
-            return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-        }
-
-        return true;
-    });
-}
-
-function filterHistory() {
-    renderHistoryList();
-}
-
-// Eliminar un registro (Usando el modal personalizado - Solo Administradores)
-function deleteServiceRecord(id) {
-    if (!state.currentUser || state.currentUser.rol !== "admin") {
-        showToast("Solo los administradores pueden eliminar registros.", "error");
-        return;
-    }
-    state.pendingDeleteId = id;
-    document.getElementById("delete-modal").classList.remove("hidden");
-}
-
-function cancelDeleteServiceRecord() {
-    document.getElementById("delete-modal").classList.add("hidden");
-    state.pendingDeleteId = null;
-    showToast("Eliminación cancelada", "info");
-}
-
-async function confirmDeleteServiceRecord() {
-    const id = state.pendingDeleteId;
-    document.getElementById("delete-modal").classList.add("hidden");
-
-    if (!id) return;
-    state.pendingDeleteId = null;
-
-    if (!CONFIG_SHEET_URL) {
-        state.servicesList = state.servicesList.filter(x => x.id !== id);
-        saveServicesCache();
-        renderHistoryList();
-        calculateAndRenderStats();
-        updateClientAutocomplete();
-        showToast("Registro eliminado localmente.", "success");
-        return;
-    }
-
-    showLoader(true, "Eliminando de la nube...");
-
-    try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify({
-                action: "delete_service",
-                id: id,
-                email: state.currentUser.email
-            })
-        });
-
-        const data = await response.json();
-        showLoader(false);
-
-        if (data.success) {
-            state.servicesList = state.servicesList.filter(x => x.id !== id);
-            saveServicesCache();
-            renderHistoryList();
-            calculateAndRenderStats();
-            updateClientAutocomplete();
-            showToast("Registro eliminado con éxito", "success");
-        } else {
-            showToast(data.message || "No se pudo eliminar el registro", "error");
-        }
-    } catch (error) {
-        showLoader(false);
-        console.error("Error al borrar:", error);
-        showToast("Error de conexión al intentar borrar. Inténtalo más tarde.", "error");
-    }
-}
+// Servicios/historial movidos a src/services.js
 
 // =========================================================================
 //                  DETALLE DE SERVICIO Y TICKET COMPARTIBLE
@@ -2143,9 +1815,9 @@ async function loadCajaMovements() {
     if (!CONFIG_SHEET_URL) return;
 
     try {
-        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_caja_movements`);
-        const data = await response.json();
-        if (data.success && Array.isArray(data.movements)) {
+        const url = `${CONFIG_SHEET_URL}?action=get_caja_movements`;
+        const data = await apiGet(url, { showLoading: true, loadingText: 'Cargando movimientos de caja...', swallowError: true });
+        if (data && data.success && Array.isArray(data.movements)) {
             state.cajaMovementsList = data.movements;
             localStorage.setItem(cacheKey, JSON.stringify(state.cajaMovementsList));
             renderCajaMovementsList();
@@ -2186,21 +1858,10 @@ async function handleCajaMovementSubmit(e) {
         usuario: state.currentUser.email
     };
 
-    showLoader(true, "Registrando movimiento de caja...");
-
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify(movimiento)
-        });
-        const data = await response.json();
-        showLoader(false);
+        const data = await apiPost(CONFIG_SHEET_URL, movimiento, { showLoading: true, loadingText: 'Registrando movimiento de caja...' });
 
-        if (data.success) {
+        if (data && data.success) {
             state.cajaMovementsList.push(data.movement || movimiento);
             const cacheKey = `evolet_caja_movements_v1_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.cajaMovementsList));
@@ -2503,21 +2164,9 @@ function renderDebtorsList() {
 async function collectDebt(debt) {
     const metodo = confirm(`¿El cobro de la deuda de $${debt.precio} de ${debt.cliente} fue por transferencia / MercadoPago?\n(Aceptar = MercadoPago/Transferencia, Cancelar = Efectivo)`) ? "Transferencia" : "Efectivo";
 
-    showLoader(true, "Registrando pago de deuda en la nube...");
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({
-                action: "edit_service",
-                id: debt.id,
-                metodoPago: metodo,
-                fecha: new Date().toISOString()
-            })
-        });
-        const data = await response.json();
-        if (data.success) {
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "edit_service", id: debt.id, metodoPago: metodo, fecha: new Date().toISOString() }, { showLoading: true, loadingText: 'Registrando pago de deuda...' });
+        if (data && data.success) {
             showToast("¡Deuda cobrada e ingresada a la caja correctamente!", "success");
 
             // Actualizar localmente el servicio
@@ -2589,19 +2238,8 @@ async function checkAndSyncOfflineTransactions() {
         const failedServices = [];
         for (const transaction of servicesQueue) {
             try {
-                const response = await fetch(CONFIG_SHEET_URL, {
-                    method: "POST",
-                    mode: "cors",
-                    headers: {
-                        "Content-Type": "text/plain"
-                    },
-                    body: JSON.stringify({
-                        action: "add_service",
-                        ...transaction
-                    })
-                });
-                const data = await response.json();
-                if (!data.success) {
+                const data = await apiPost(CONFIG_SHEET_URL, { action: "add_service", ...transaction }, { showLoading: false, swallowError: true });
+                if (!data || !data.success) {
                     failedServices.push(transaction);
                 }
             } catch (e) {
@@ -2626,19 +2264,8 @@ async function checkAndSyncOfflineTransactions() {
         const failedExpenses = [];
         for (const expenseData of expensesQueue) {
             try {
-                const response = await fetch(CONFIG_SHEET_URL, {
-                    method: "POST",
-                    mode: "cors",
-                    headers: {
-                        "Content-Type": "text/plain"
-                    },
-                    body: JSON.stringify({
-                        action: "add_expense",
-                        ...expenseData
-                    })
-                });
-                const data = await response.json();
-                if (!data.success) {
+                const data = await apiPost(CONFIG_SHEET_URL, { action: "add_expense", ...expenseData }, { showLoading: false, swallowError: true });
+                if (!data || !data.success) {
                     failedExpenses.push(expenseData);
                 }
             } catch (e) {
@@ -2706,31 +2333,7 @@ function escapeHtml(string) {
         : html;
 }
 
-function showToast(message, type = "info") {
-    const container = document.getElementById("toast-container");
-    const toast = document.createElement("div");
-    toast.className = `toast ${type}`;
-    toast.textContent = message;
-
-    container.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.animation = "slideInToast 0.4s reverse forwards";
-        setTimeout(() => toast.remove(), 400);
-    }, 3500);
-}
-
-function showLoader(show, text = "Cargando...") {
-    const overlay = document.getElementById("loader-overlay");
-    const textEl = overlay.querySelector("p");
-    textEl.textContent = text;
-
-    if (show) {
-        overlay.classList.remove("hidden");
-    } else {
-        overlay.classList.add("hidden");
-    }
-}
+// showToast and showLoader are provided by modular UI helpers in src/ui/
 
 window.app = {
     deleteServiceRecord,
@@ -2741,10 +2344,10 @@ window.app = {
 async function loadPricesFromCloud() {
     if (!CONFIG_SHEET_URL) return;
     try {
-        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_prices`);
-        const data = await response.json();
+        const url = `${CONFIG_SHEET_URL}?action=get_prices`;
+        const data = await apiGet(url, { showLoading: true, loadingText: 'Cargando precios...', swallowError: true });
 
-        if (data.success && data.prices && data.prices.length > 0) {
+        if (data && data.success && data.prices && data.prices.length > 0) {
             const newCatalog = {};
             data.prices.forEach(p => {
                 if (!newCatalog[p.categoria]) {
@@ -2916,26 +2519,10 @@ async function savePricesToCloud() {
         });
     }
 
-    showLoader(true, "Guardando lista de precios en la nube...");
-
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify({
-                action: "update_prices",
-                email: state.currentUser.email,
-                prices: updatedPrices
-            })
-        });
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "update_prices", email: state.currentUser.email, prices: updatedPrices }, { showLoading: true, loadingText: 'Guardando lista de precios...' });
 
-        const data = await response.json();
-        showLoader(false);
-
-        if (data.success) {
+        if (data && data.success) {
             state.isEditingPrices = false;
 
             const actionsContainer = document.getElementById("edit-actions-container");
@@ -2972,220 +2559,7 @@ function showGenericConfirmModal(title, subtitle, onConfirm) {
     if (modal) modal.classList.remove("hidden");
 }
 
-// =========================================================================
-//                   GESTIÓN DE TURNOS Y CALENDARIO
-// =========================================================================
-
-function createStableAppointmentId(apt) {
-    const seed = [
-        apt?.id || "",
-        apt?.fecha || "",
-        apt?.horaInicio || "",
-        apt?.horaFin || "",
-        apt?.cliente || "",
-        apt?.servicio || "",
-        apt?.precio || "",
-        apt?.estado || ""
-    ].join("|");
-
-    let hash = 0;
-    for (let i = 0; i < seed.length; i++) {
-        hash = ((hash << 5) - hash) + seed.charCodeAt(i);
-        hash |= 0;
-    }
-
-    return `app_${Math.abs(hash)}`;
-}
-
-function normalizeAppointmentRecord(apt) {
-    if (!apt || typeof apt !== "object") return null;
-
-    const normalized = { ...apt };
-    if (!normalized.id) {
-        normalized.id = createStableAppointmentId(normalized);
-    }
-    if (normalized.estado && typeof normalized.estado === "string") {
-        normalized.estado = normalized.estado.toString().trim();
-    }
-    if (!normalized.estado) {
-        normalized.estado = "Provisional";
-    }
-    if (normalized.estado && typeof normalized.estado === "string") {
-        // Aceptar mayúsculas/minúsculas y normalizar valores comunes.
-        const lower = normalized.estado.toLowerCase();
-        if (lower === "completed" || lower === "completado" || lower === "cobrado" || lower === "pagado") normalized.estado = "Completado";
-        else if (lower === "reservado") normalized.estado = "Reservado";
-        else if (lower === "provisional") normalized.estado = "Provisional";
-    }
-    if (normalized.precio === undefined || normalized.precio === null) {
-        normalized.precio = 0;
-    }
-    if (!normalized.horaInicio && normalized.fecha) {
-        normalized.horaInicio = normalized.fecha;
-    }
-    if (!normalized.horaFin && normalized.horaInicio) {
-        normalized.horaFin = normalized.horaInicio;
-    }
-    return normalized;
-}
-
-function normalizeCalendarDate(date) {
-    const normalized = new Date(date);
-    if (isNaN(normalized.getTime())) return new Date();
-    normalized.setHours(12, 0, 0, 0);
-    return normalized;
-}
-
-function getAppointmentDateParts(apt) {
-    if (!apt) return null;
-
-    const candidateDates = [];
-    if (typeof apt.horaInicio === "string") candidateDates.push(apt.horaInicio);
-    if (typeof apt.horaFin === "string") candidateDates.push(apt.horaFin);
-    if (typeof apt.fecha === "string") candidateDates.push(apt.fecha);
-
-    for (const value of candidateDates) {
-        if (!value) continue;
-        const parsed = new Date(value);
-        if (!isNaN(parsed.getTime())) {
-            return {
-                year: parsed.getFullYear(),
-                month: parsed.getMonth(),
-                day: parsed.getDate()
-            };
-        }
-    }
-
-    return null;
-}
-
-function normalizeAppointmentList(appointments, fallbackAppointments = []) {
-    const normalized = [];
-    const seenKeys = new Set();
-
-    const pushUnique = (item) => {
-        const record = normalizeAppointmentRecord(item);
-        if (!record) return;
-
-        const key = record.id || `${record.horaInicio || ""}-${record.cliente || ""}-${record.servicio || ""}`;
-        if (!key || seenKeys.has(key)) return;
-
-        seenKeys.add(key);
-        normalized.push(record);
-    };
-
-    if (Array.isArray(appointments)) {
-        appointments.forEach(pushUnique);
-    }
-
-    if (Array.isArray(fallbackAppointments) && normalized.length < fallbackAppointments.length) {
-        fallbackAppointments.forEach(pushUnique);
-    }
-
-    return normalized.sort((a, b) => {
-        const aTime = new Date(a.horaInicio || a.fecha || 0).getTime();
-        const bTime = new Date(b.horaInicio || b.fecha || 0).getTime();
-        return aTime - bTime;
-    });
-}
-
-function mergeAppointmentLists(localAppointments, cloudAppointments) {
-    const merged = [];
-    const byId = new Map();
-
-    const addRecord = (record) => {
-        const normalized = normalizeAppointmentRecord(record);
-        if (!normalized) return;
-        const key = normalized.id;
-        const existing = byId.get(key);
-        if (existing) {
-            byId.set(key, { ...existing, ...normalized });
-        } else {
-            byId.set(key, normalized);
-            merged.push(normalized);
-        }
-    };
-
-    (Array.isArray(localAppointments) ? localAppointments : []).forEach(addRecord);
-    (Array.isArray(cloudAppointments) ? cloudAppointments : []).forEach(addRecord);
-
-    return merged.sort((a, b) => {
-        const aTime = new Date(a.horaInicio || a.fecha || 0).getTime();
-        const bTime = new Date(b.horaInicio || b.fecha || 0).getTime();
-        return aTime - bTime;
-    });
-}
-
-// Cargar turnos de la nube con protección offline
-async function loadAppointments(showNotification = false) {
-    if (!state.currentUser) return;
-
-    // Carga inicial del caché local (PWA Offline)
-    const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) {
-        try {
-            const parsed = JSON.parse(cached);
-            state.appointmentsList = normalizeAppointmentList(parsed);
-        } catch (e) {
-            console.error("Error al parsear caché local de turnos:", e);
-            state.appointmentsList = [];
-        }
-    } else {
-        state.appointmentsList = [];
-    }
-
-    // Renderizar lo que hay en memoria/cache de inmediato para que NUNCA quede vacía la agenda
-    const activeTab = document.querySelector(".nav-item.active");
-    if (activeTab && activeTab.getAttribute("data-tab") === "calendario") {
-        renderCalendar();
-        renderDayAppointments();
-    }
-
-    if (!CONFIG_SHEET_URL) return;
-
-    try {
-        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_appointments&email=${encodeURIComponent(state.currentUser.email)}`);
-        const data = await response.json();
-
-        if (data.success && Array.isArray(data.appointments)) {
-            const hasCloudData = data.appointments.length > 0;
-            const hasLocalData = state.appointmentsList.length > 0;
-
-            if (hasCloudData && hasLocalData) {
-                state.appointmentsList = mergeAppointmentLists(state.appointmentsList, data.appointments);
-            } else if (hasCloudData) {
-                state.appointmentsList = normalizeAppointmentList(data.appointments);
-            } else {
-                state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
-            }
-
-            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-
-            const currentTab = document.querySelector(".nav-item.active");
-            if (currentTab && currentTab.getAttribute("data-tab") === "calendario") {
-                renderCalendar();
-                renderDayAppointments();
-            }
-            if (showNotification) {
-                showToast("Agenda actualizada desde la nube.", "success");
-            }
-        } else {
-            state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
-            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-            if (showNotification) {
-                showToast(data.message || "No se pudieron obtener los turnos", "error");
-            }
-        }
-    } catch (error) {
-        console.warn("No se pudieron cargar los turnos de la nube, usando caché local.", error);
-        state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
-        localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
-        if (showNotification) {
-            showToast("Sin conexión a la nube. Mostrando turnos guardados localmente.", "warning");
-        }
-    }
-}
+// Gestión de turnos movida a src/appointments.js
 
 // Función global para forzar recarga/sincronización de todos los datos
 async function refreshAllData(showLoaderToast = true) {
@@ -3452,10 +2826,7 @@ let currentRescheduleAppointment = null;
 function openSenaModal(apt) {
     currentSenaAppointment = apt;
     const sub = document.getElementById("sena-modal-sub");
-    if (sub) sub.textContent = `Modificar estado o cargar seña de ${apt.cliente}:`;
-
-    const statusSelect = document.getElementById("sena-modal-status");
-    if (statusSelect) statusSelect.value = apt.estado || "Reservado";
+    if (sub) sub.textContent = `Cargar seña para ${apt.cliente}:`;
 
     const amt = document.getElementById("sena-modal-amount");
     if (amt) amt.value = apt.precio ? apt.precio : "2500";
@@ -3475,48 +2846,47 @@ async function handleSenaSubmit(e) {
     if (!currentSenaAppointment) return;
 
     const apt = currentSenaAppointment;
-    const statusEl = document.getElementById("sena-modal-status");
-    const newStatus = statusEl ? statusEl.value : "Reservado";
     const sena = Number(document.getElementById("sena-modal-amount").value) || 0;
     const metodo = document.querySelector('input[name="sena-modal-payment"]:checked').value;
+
+    if (sena < 0) {
+        showToast("Ingresá un monto de seña válido para confirmar el turno.", "error");
+        document.getElementById("sena-modal-amount").focus();
+        document.getElementById("sena-modal-amount").select();
+        return;
+    }
+
+    if (sena > 0 && sena < 1000) {
+        window.alert('La seña debe ser 0 o mayor a 1000. Revisá el monto ingresado antes de guardar.');
+        document.getElementById("sena-modal-amount").focus();
+        document.getElementById("sena-modal-amount").select();
+        return;
+    }
+
+    const newStatus = "Reservado";
 
     closeSenaModal();
     showLoader(true, "Actualizando turno en la nube...");
 
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({
-                action: "edit_appointment",
-                id: apt.id,
-                cliente: apt.cliente,
-                fecha: apt.fecha,
-                estado: newStatus,
-                precio: sena
-            })
-        });
-        const data = await response.json();
-        if (data.success) {
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "edit_appointment", id: apt.id, cliente: apt.cliente, fecha: apt.fecha, estado: newStatus, precio: sena }, { showLoading: false, swallowError: true });
+        if (data && data.success) {
             apt.estado = newStatus;
             apt.precio = sena;
             state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
 
-            if (newStatus === "Reservado" && sena > 0) {
-                await registerServiceDirectly({
-                    id: "serv_" + new Date().getTime(),
-                    fecha: new Date().toISOString(),
-                    usuario: state.currentUser ? state.currentUser.email : "Evolet",
-                    cliente: apt.cliente,
-                    servicio: "Seña",
-                    categoria: "Manicuría",
-                    precio: sena,
-                    seña: 0,
-                    metodoPago: metodo,
-                    completado: false
-                });
-            }
+            await registerServiceDirectly({
+                id: "serv_" + new Date().getTime(),
+                fecha: new Date().toISOString(),
+                usuario: state.currentUser ? state.currentUser.email : "Evolet",
+                cliente: apt.cliente,
+                servicio: "Seña",
+                categoria: "Manicuría",
+                precio: sena,
+                seña: 0,
+                metodoPago: metodo,
+                completado: false
+            });
 
             const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
@@ -3590,20 +2960,8 @@ async function handleRescheduleSubmit(e) {
     showLoader(true, "Reagendando turno en la nube y Google Calendar...");
 
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({
-                action: "edit_appointment",
-                id: apt.id,
-                fecha: newDate,
-                horaInicio: startDate.toISOString(),
-                horaFin: endIso
-            })
-        });
-        const data = await response.json();
-        if (data.success) {
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "edit_appointment", id: apt.id, fecha: newDate, horaInicio: startDate.toISOString(), horaFin: endIso }, { showLoading: false, swallowError: true });
+        if (data && data.success) {
             apt.fecha = newDate;
             apt.horaInicio = startDate.toISOString();
             apt.horaFin = endIso;
@@ -3707,9 +3065,17 @@ async function handleScheduleSubmit(e) {
     }
 
     const statusVal = document.getElementById("schedule-status").value;
-    const senaAmount = Number(document.getElementById("schedule-sena-amount").value) || 0;
+    const rawSenaAmount = Number(document.getElementById("schedule-sena-amount").value);
+    const senaAmount = rawSenaAmount || 0;
     const paymentMethodEl = document.querySelector('input[name="schedule-payment"]:checked');
     const senaPaymentMethod = paymentMethodEl ? paymentMethodEl.value : "Transferencia";
+
+    if (statusVal === "Reservado" && rawSenaAmount !== 0 && rawSenaAmount < 1000) {
+        window.alert('La seña debe ser 0 o mayor a 1000. Revisá el monto ingresado antes de guardar.');
+        document.getElementById("schedule-sena-amount").focus();
+        document.getElementById("schedule-sena-amount").select();
+        return;
+    }
 
     // Calcular horas ISO (Duración por defecto: 90 minutos, Servicio: "Turno", Precio: seña o 0)
     const start = new Date(`${dateVal}T${timeVal}`);
@@ -3736,19 +3102,9 @@ async function handleScheduleSubmit(e) {
     showLoader(true, "Agendando turno y sincronizando con Google Calendar...");
 
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify(appointmentData)
-        });
+        const data = await apiPost(CONFIG_SHEET_URL, appointmentData, { showLoading: true, loadingText: 'Agendando turno y sincronizando con Google Calendar...' });
 
-        const data = await response.json();
-        showLoader(false);
-
-        if (data.success) {
+        if (data && data.success) {
             showToast("¡Turno agendado y sincronizado con éxito!", "success");
 
             const normalizedAppointment = {
@@ -3813,23 +3169,9 @@ function cancelAppointment(id, clientName) {
         async () => {
             showLoader(true, "Cancelando turno...");
             try {
-                const response = await fetch(CONFIG_SHEET_URL, {
-                    method: "POST",
-                    mode: "cors",
-                    headers: {
-                        "Content-Type": "text/plain"
-                    },
-                    body: JSON.stringify({
-                        action: "delete_appointment",
-                        id: id,
-                        email: state.currentUser.email
-                    })
-                });
+                const data = await apiPost(CONFIG_SHEET_URL, { action: "delete_appointment", id: id, email: state.currentUser.email }, { showLoading: true, loadingText: 'Cancelando turno...' });
 
-                const data = await response.json();
-                showLoader(false);
-
-                if (data.success) {
+                if (data && data.success) {
                     showToast("Turno cancelado correctamente.", "success");
 
                     // Remover de la lista local sin perder el resto de turnos
@@ -3878,25 +3220,10 @@ async function importHistoryServices() {
         return;
     }
 
-    showLoader(true, "Importando cobrados y sincronizando en Google Calendar...");
-
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify({
-                action: "import_services",
-                email: state.currentUser.email
-            })
-        });
+        const data = await apiPost(CONFIG_SHEET_URL, { action: "import_services", email: state.currentUser.email }, { showLoading: true, loadingText: 'Importando cobrados...' });
 
-        const data = await response.json();
-        showLoader(false);
-
-        if (data.success) {
+        if (data && data.success) {
             showToast(data.message || `¡Sincronización completada!`, "success");
 
             // Recargar turnos de la nube
@@ -3928,10 +3255,9 @@ async function loadExpenses() {
     if (!CONFIG_SHEET_URL) return;
 
     try {
-        const response = await fetch(`${CONFIG_SHEET_URL}?action=get_expenses`);
-        const data = await response.json();
+        const data = await apiGet(`${CONFIG_SHEET_URL}?action=get_expenses`, { showLoading: true, loadingText: 'Cargando gastos...', swallowError: true });
 
-        if (data.success && data.expenses) {
+        if (data && data.success && data.expenses) {
             state.expensesList = Array.isArray(data.expenses) ? data.expenses.map(normalizeExpenseRecord) : [];
             setStoredJson(cacheKey, state.expensesList);
 
@@ -4073,22 +3399,10 @@ async function handleExpenseSubmit(e) {
         usuario: state.currentUser.email
     };
 
-    showLoader(true, "Registrando gasto en la planilla...");
-
     try {
-        const response = await fetch(CONFIG_SHEET_URL, {
-            method: "POST",
-            mode: "cors",
-            headers: {
-                "Content-Type": "text/plain"
-            },
-            body: JSON.stringify(expenseData)
-        });
+        const data = await apiPost(CONFIG_SHEET_URL, expenseData, { showLoading: true, loadingText: 'Registrando gasto en la planilla...' });
 
-        const data = await response.json();
-        showLoader(false);
-
-        if (data.success) {
+        if (data && data.success) {
             showToast("¡Gasto registrado con éxito!", "success");
 
             // Limpiar formulario
@@ -4107,9 +3421,9 @@ async function handleExpenseSubmit(e) {
             showToast(data.message || "Error al registrar el gasto", "error");
         }
     } catch (error) {
-        showLoader(false);
-        console.error("Error al registrar gasto:", error);
-        showToast("Error de conexión al registrar. Se guardó offline.", "error");
+            showLoader(false);
+            console.error("Error al registrar gasto:", error);
+            showToast("Error de conexión al registrar. Se guardó offline.", "error");
 
         // Guardar offline
         const queueKey = `evolet_offline_expenses_v4_${state.currentUser.email}`;
@@ -4139,22 +3453,9 @@ function deleteExpenseRecord(id, concepto) {
             showLoader(true, "Eliminando gasto...");
 
             try {
-                const response = await fetch(CONFIG_SHEET_URL, {
-                    method: "POST",
-                    mode: "cors",
-                    headers: {
-                        "Content-Type": "text/plain"
-                    },
-                    body: JSON.stringify({
-                        action: "delete_expense",
-                        id: id
-                    })
-                });
+                const data = await apiPost(CONFIG_SHEET_URL, { action: "delete_expense", id: id }, { showLoading: true, loadingText: 'Eliminando gasto...' });
 
-                const data = await response.json();
-                showLoader(false);
-
-                if (data.success) {
+                if (data && data.success) {
                     showToast("Gasto eliminado correctamente.", "success");
 
                     state.expensesList = state.expensesList.filter(exp => exp.id !== id);
