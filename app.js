@@ -577,7 +577,19 @@ function setupEventListeners() {
     document.getElementById("generic-modal-btn-cancel").addEventListener("click", () => {
         document.getElementById("generic-confirm-modal").classList.add("hidden");
         genericConfirmCallback = null;
+        scheduleConfirmationPending = false;
+        rescheduleConfirmationPending = false;
+        senaConfirmationPending = false;
+        expenseConfirmationPending = false;
+        cajaMovementConfirmationPending = false;
+        scheduleConfirmationPending = false;
+        rescheduleConfirmationPending = false;
+        senaConfirmationPending = false;
+        expenseConfirmationPending = false;
     });
+
+    document.getElementById("collect-debt-btn-cancel").addEventListener("click", closeCollectDebtModal);
+    document.getElementById("collect-debt-btn-confirm").addEventListener("click", confirmDebtCollection);
 
     // Navegación del Calendario
     document.getElementById("cal-prev-month").addEventListener("click", () => {
@@ -1858,6 +1870,20 @@ async function handleCajaMovementSubmit(e) {
         usuario: state.currentUser.email
     };
 
+    if (!cajaMovementConfirmationPending) {
+        cajaMovementConfirmationPending = true;
+        showGenericConfirmModal(
+            "Confirmar movimiento de caja",
+            `Tipo: ${tipo === "deposito" ? "Depósito" : "Retiro"}\nImporte: $${monto.toLocaleString("es-AR")}\nFecha: ${fecha}\nConcepto: ${concepto}\nOrigen: ${movimiento.origen}\nDestino: ${movimiento.destino}\n\n¿Confirmas registrar este movimiento?`,
+            () => {
+                cajaMovementConfirmationPending = false;
+                handleCajaMovementSubmit({ preventDefault() {} });
+            }
+        );
+        return;
+    }
+    cajaMovementConfirmationPending = false;
+
     try {
         const data = await apiPost(CONFIG_SHEET_URL, movimiento, { showLoading: true, loadingText: 'Registrando movimiento de caja...' });
 
@@ -2160,9 +2186,28 @@ function renderDebtorsList() {
     });
 }
 
-// Cobrar una deuda pendiente (pasar de Fiado a Efectivo/Transferencia)
-async function collectDebt(debt) {
-    const metodo = confirm(`¿El cobro de la deuda de $${debt.precio} de ${debt.cliente} fue por transferencia / MercadoPago?\n(Aceptar = MercadoPago/Transferencia, Cancelar = Efectivo)`) ? "Transferencia" : "Efectivo";
+let pendingDebtCollection = null;
+
+function collectDebt(debt) {
+    pendingDebtCollection = debt;
+    document.getElementById("collect-debt-client").textContent = debt.cliente;
+    document.getElementById("collect-debt-service").textContent = debt.servicio;
+    document.getElementById("collect-debt-amount").textContent = `$${Number(debt.precio).toLocaleString("es-AR")}`;
+    document.querySelector('input[name="collect-debt-payment"][value="Efectivo"]').checked = true;
+    document.getElementById("collect-debt-modal").classList.remove("hidden");
+}
+
+function closeCollectDebtModal() {
+    pendingDebtCollection = null;
+    document.getElementById("collect-debt-modal").classList.add("hidden");
+}
+
+async function confirmDebtCollection() {
+    if (!pendingDebtCollection) return;
+
+    const debt = pendingDebtCollection;
+    const metodo = document.querySelector('input[name="collect-debt-payment"]:checked').value;
+    closeCollectDebtModal();
 
     try {
         const data = await apiPost(CONFIG_SHEET_URL, { action: "edit_service", id: debt.id, metodoPago: metodo, fecha: new Date().toISOString() }, { showLoading: true, loadingText: 'Registrando pago de deuda...' });
@@ -2545,6 +2590,11 @@ async function savePricesToCloud() {
 
 // Variables y lógica para el modal genérico de confirmación
 let genericConfirmCallback = null;
+let scheduleConfirmationPending = false;
+let rescheduleConfirmationPending = false;
+let senaConfirmationPending = false;
+let expenseConfirmationPending = false;
+let cajaMovementConfirmationPending = false;
 
 function showGenericConfirmModal(title, subtitle, onConfirm) {
     const titleEl = document.getElementById("generic-modal-title");
@@ -2863,6 +2913,20 @@ async function handleSenaSubmit(e) {
         return;
     }
 
+    if (!senaConfirmationPending) {
+        senaConfirmationPending = true;
+        showGenericConfirmModal(
+            "Confirmar reserva",
+            `Clienta: ${apt.cliente}\nTurno: ${apt.fecha || "-"}\nSeña: $${sena.toLocaleString("es-AR")}\nMétodo de pago: ${metodo}\n\n¿Confirmas cambiar el turno a Reservado y registrar la seña?`,
+            () => {
+                senaConfirmationPending = false;
+                handleSenaSubmit({ preventDefault() {} });
+            }
+        );
+        return;
+    }
+    senaConfirmationPending = false;
+
     const newStatus = "Reservado";
 
     closeSenaModal();
@@ -2955,6 +3019,20 @@ async function handleRescheduleSubmit(e) {
     const startDate = new Date(startIso);
     const endDate = new Date(startDate.getTime() + (90 * 60 * 1000));
     const endIso = endDate.toISOString();
+
+    if (!rescheduleConfirmationPending) {
+        rescheduleConfirmationPending = true;
+        showGenericConfirmModal(
+            "Confirmar reagendamiento",
+            `Clienta: ${apt.cliente}\nFecha actual: ${apt.fecha || "-"}\nNueva fecha: ${newDate}\nNueva hora: ${newTime}\n\n¿Confirmas modificar este turno?`,
+            () => {
+                rescheduleConfirmationPending = false;
+                handleRescheduleSubmit({ preventDefault() {} });
+            }
+        );
+        return;
+    }
+    rescheduleConfirmationPending = false;
 
     closeRescheduleModal();
     showLoader(true, "Reagendando turno en la nube y Google Calendar...");
@@ -3094,6 +3172,20 @@ async function handleScheduleSubmit(e) {
         usuario: state.currentUser.email,
         estado: statusVal
     };
+
+    if (!scheduleConfirmationPending) {
+        scheduleConfirmationPending = true;
+        showGenericConfirmModal(
+            "Confirmar turno",
+            `Clienta: ${cliente}\nFecha: ${dateVal}\nHora: ${timeVal}\nEstado: ${statusVal}\nSeña: $${senaAmount.toLocaleString("es-AR")}\nMétodo de pago de seña: ${senaPaymentMethod}\n\n¿Confirmas agendar este turno?`,
+            () => {
+                scheduleConfirmationPending = false;
+                handleScheduleSubmit({ preventDefault() {} });
+            }
+        );
+        return;
+    }
+    scheduleConfirmationPending = false;
 
     // Resetear formulario para siguientes llamadas
     document.getElementById("schedule-form").reset();
@@ -3398,6 +3490,20 @@ async function handleExpenseSubmit(e) {
         categoria: categoria,
         usuario: state.currentUser.email
     };
+
+    if (!expenseConfirmationPending) {
+        expenseConfirmationPending = true;
+        showGenericConfirmModal(
+            "Confirmar gasto",
+            `Concepto: ${concepto}\nImporte: $${monto.toLocaleString("es-AR")}\nFecha: ${fecha}\nCategoría: ${categoria}\nMétodo de pago: ${metodoPago}\n\n¿Confirmas registrar este gasto?`,
+            () => {
+                expenseConfirmationPending = false;
+                handleExpenseSubmit({ preventDefault() {} });
+            }
+        );
+        return;
+    }
+    expenseConfirmationPending = false;
 
     try {
         const data = await apiPost(CONFIG_SHEET_URL, expenseData, { showLoading: true, loadingText: 'Registrando gasto en la planilla...' });

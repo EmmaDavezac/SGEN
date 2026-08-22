@@ -811,12 +811,36 @@
         <div class="modal-card">
             <h3 id="generic-modal-title">¿Estás segura? <i class="fa-solid fa-circle-question"
                     style="color: var(--barbie-pink);"></i></h3>
-            <p id="generic-modal-sub" class="modal-sub"></p>
+            <p id="generic-modal-sub" class="modal-sub" style="white-space: pre-line; text-align: left;"></p>
             <div class="modal-actions">
                 <button id="generic-modal-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i>
                     Cancelar</button>
                 <button id="generic-modal-btn-confirm" class="btn btn-primary"><i class="fa-solid fa-check"></i>
                     Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VENTANA MODAL PARA COBRAR DEUDA -->
+    <div id="collect-debt-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width: 400px; width: 95%;">
+            <h3><i class="fa-solid fa-money-bill-wave" style="color: #2e7d32;"></i> Confirmar cobro</h3>
+            <p class="modal-sub">Verifica los datos y selecciona cómo recibió el pago.</p>
+            <div class="modal-body">
+                <div class="confirm-item"><span class="confirm-label">Clienta</span><strong id="collect-debt-client">-</strong></div>
+                <div class="confirm-item"><span class="confirm-label">Servicio</span><strong id="collect-debt-service">-</strong></div>
+                <div class="confirm-item"><span class="confirm-label">Importe</span><strong id="collect-debt-amount">-</strong></div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label>Método de pago</label>
+                    <div class="payment-method-selector">
+                        <label class="pay-btn"><input type="radio" name="collect-debt-payment" value="Efectivo" checked><div class="pay-btn-content"><i class="fa-solid fa-money-bill-wave pay-icon"></i>Efectivo</div></label>
+                        <label class="pay-btn"><input type="radio" name="collect-debt-payment" value="Transferencia"><div class="pay-btn-content"><i class="fa-solid fa-mobile-screen-button pay-icon"></i>Transferencia</div></label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="collect-debt-btn-cancel" class="btn btn-secondary"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+                <button id="collect-debt-btn-confirm" class="btn btn-primary"><i class="fa-solid fa-check"></i> Confirmar cobro</button>
             </div>
         </div>
     </div>
