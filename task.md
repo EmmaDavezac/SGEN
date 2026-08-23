@@ -35,7 +35,7 @@
 - [x] Crear `src/react-main.jsx` y `src/App.jsx`
 - [x] Mantener Vite como herramienta de build
 - [x] Mantener `src/supabase.js` como cliente único de Supabase
-- [ ] Montar la pantalla React mínima en una entrada aislada y comprobar el build
+- [x] Montar la pantalla React mínima en una entrada aislada y comprobar el build (`react-preview.html`)
 
 ### Fase 2: Componentes compartidos
 
