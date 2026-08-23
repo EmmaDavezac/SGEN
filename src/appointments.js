@@ -6,14 +6,11 @@ import { apiGet } from './api.js';
 
 export function createStableAppointmentId(apt) {
     const seed = [
-        apt?.id || "",
         apt?.fecha || "",
         apt?.horaInicio || "",
-        apt?.horaFin || "",
         apt?.cliente || "",
         apt?.servicio || "",
-        apt?.precio || "",
-        apt?.estado || ""
+        apt?.usuario || ""
     ].join("|");
 
     let hash = 0;
@@ -23,6 +20,15 @@ export function createStableAppointmentId(apt) {
     }
 
     return `app_${Math.abs(hash)}`;
+}
+
+function getAppointmentIdentity(apt) {
+    return [
+        apt?.horaInicio || apt?.fecha || "",
+        apt?.cliente || "",
+        apt?.servicio || "",
+        apt?.usuario || ""
+    ].join("|").toLowerCase().trim();
 }
 
 export function normalizeAppointmentRecord(apt) {
@@ -89,19 +95,26 @@ export function normalizeAppointmentList(appointments, fallbackAppointments = []
 export function mergeAppointmentLists(localAppointments, cloudAppointments) {
     const merged = [];
     const byId = new Map();
+    const byIdentity = new Map();
 
     const addRecord = (record) => {
         const normalized = normalizeAppointmentRecord(record);
         if (!normalized) return;
 
-        const key = normalized.id || `${normalized.horaInicio || ""}-${normalized.cliente || ""}-${normalized.servicio || ""}`;
-        if (!key) return;
+        const idKey = normalized.id || "";
+        const identityKey = getAppointmentIdentity(normalized);
+        if (!idKey && !identityKey) return;
 
-        const existing = byId.get(key);
+        const existing = byId.get(idKey) || byIdentity.get(identityKey);
         if (existing) {
-            byId.set(key, { ...existing, ...normalized });
+            const mergedRecord = { ...existing, ...normalized };
+            if (idKey) byId.set(idKey, mergedRecord);
+            if (identityKey) byIdentity.set(identityKey, mergedRecord);
+            const index = merged.indexOf(existing);
+            if (index !== -1) merged[index] = mergedRecord;
         } else {
-            byId.set(key, normalized);
+            if (idKey) byId.set(idKey, normalized);
+            if (identityKey) byIdentity.set(identityKey, normalized);
             merged.push(normalized);
         }
     };

@@ -294,7 +294,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function initApp() {
     // Registrar Service Worker para PWA Offline (Forzar chequeo de actualización de red)
-    if ('serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator && import.meta.env.DEV) {
+        navigator.serviceWorker.getRegistrations()
+            .then(registrations => Promise.all(registrations.map(registration => registration.unregister())))
+            .catch(error => console.warn('No se pudo limpiar el Service Worker de desarrollo:', error));
+    } else if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
             .then(reg => {
                 console.log('Service Worker registrado con éxito');
@@ -566,26 +570,22 @@ function setupEventListeners() {
     });
 
     // Modal Genérico de Confirmación
-    document.getElementById("generic-modal-btn-confirm").addEventListener("click", () => {
-        document.getElementById("generic-confirm-modal").classList.add("hidden");
-        if (genericConfirmCallback) {
-            genericConfirmCallback();
-            genericConfirmCallback = null;
-        }
+    document.getElementById("generic-modal-btn-confirm").addEventListener("click", async () => {
+        const confirmation = genericConfirmState;
+        if (!confirmation || confirmation.busy) return;
+
+        confirmation.busy = true;
+        setGenericConfirmBusy(true);
+        closeGenericConfirmModal();
+        confirmation.resolve(true);
+        if (confirmation.onConfirm) await confirmation.onConfirm();
     });
 
     document.getElementById("generic-modal-btn-cancel").addEventListener("click", () => {
-        document.getElementById("generic-confirm-modal").classList.add("hidden");
-        genericConfirmCallback = null;
-        scheduleConfirmationPending = false;
-        rescheduleConfirmationPending = false;
-        senaConfirmationPending = false;
-        expenseConfirmationPending = false;
-        cajaMovementConfirmationPending = false;
-        scheduleConfirmationPending = false;
-        rescheduleConfirmationPending = false;
-        senaConfirmationPending = false;
-        expenseConfirmationPending = false;
+        const confirmation = genericConfirmState;
+        if (!confirmation || confirmation.busy) return;
+        confirmation.resolve(false);
+        closeGenericConfirmModal();
     });
 
     document.getElementById("collect-debt-btn-cancel").addEventListener("click", closeCollectDebtModal);
@@ -1199,15 +1199,25 @@ function handleServiceSubmit(e) {
 }
 
 function cancelServiceRegistration() {
+    if (serviceRegistrationBusy) return;
     document.getElementById("confirm-modal").classList.add("hidden");
     state.pendingTransaction = null;
     showToast("Registro cancelado", "info");
 }
 
 async function confirmServiceRegistration() {
+    if (serviceRegistrationBusy) return;
+    serviceRegistrationBusy = true;
+    document.getElementById("modal-btn-confirm").disabled = true;
+    document.getElementById("modal-btn-cancel").disabled = true;
     document.getElementById("confirm-modal").classList.add("hidden");
 
-    if (!state.pendingTransaction) return;
+    if (!state.pendingTransaction) {
+        serviceRegistrationBusy = false;
+        document.getElementById("modal-btn-confirm").disabled = false;
+        document.getElementById("modal-btn-cancel").disabled = false;
+        return;
+    }
 
     const transaction = state.pendingTransaction;
     state.pendingTransaction = null;
@@ -1394,6 +1404,9 @@ async function confirmServiceRegistration() {
         resetServiceForm();
     } finally {
         showLoader(false);
+        serviceRegistrationBusy = false;
+        document.getElementById("modal-btn-confirm").disabled = false;
+        document.getElementById("modal-btn-cancel").disabled = false;
     }
 }
 
@@ -1870,19 +1883,11 @@ async function handleCajaMovementSubmit(e) {
         usuario: state.currentUser.email
     };
 
-    if (!cajaMovementConfirmationPending) {
-        cajaMovementConfirmationPending = true;
-        showGenericConfirmModal(
-            "Confirmar movimiento de caja",
-            `Tipo: ${tipo === "deposito" ? "Depósito" : "Retiro"}\nImporte: $${monto.toLocaleString("es-AR")}\nFecha: ${fecha}\nConcepto: ${concepto}\nOrigen: ${movimiento.origen}\nDestino: ${movimiento.destino}\n\n¿Confirmas registrar este movimiento?`,
-            () => {
-                cajaMovementConfirmationPending = false;
-                handleCajaMovementSubmit({ preventDefault() {} });
-            }
-        );
-        return;
-    }
-    cajaMovementConfirmationPending = false;
+    const confirmed = await showGenericConfirmModal(
+        "Confirmar movimiento de caja",
+        `Tipo: ${tipo === "deposito" ? "Depósito" : "Retiro"}\nImporte: $${monto.toLocaleString("es-AR")}\nFecha: ${fecha}\nConcepto: ${concepto}\nOrigen: ${movimiento.origen}\nDestino: ${movimiento.destino}\n\n¿Confirmas registrar este movimiento?`
+    );
+    if (!confirmed) return;
 
     try {
         const data = await apiPost(CONFIG_SHEET_URL, movimiento, { showLoading: true, loadingText: 'Registrando movimiento de caja...' });
@@ -2187,6 +2192,7 @@ function renderDebtorsList() {
 }
 
 let pendingDebtCollection = null;
+let debtCollectionBusy = false;
 
 function collectDebt(debt) {
     pendingDebtCollection = debt;
@@ -2198,16 +2204,20 @@ function collectDebt(debt) {
 }
 
 function closeCollectDebtModal() {
+    if (debtCollectionBusy) return;
     pendingDebtCollection = null;
     document.getElementById("collect-debt-modal").classList.add("hidden");
 }
 
 async function confirmDebtCollection() {
-    if (!pendingDebtCollection) return;
+    if (!pendingDebtCollection || debtCollectionBusy) return;
 
+    debtCollectionBusy = true;
+    document.getElementById("collect-debt-btn-confirm").disabled = true;
+    document.getElementById("collect-debt-btn-cancel").disabled = true;
     const debt = pendingDebtCollection;
     const metodo = document.querySelector('input[name="collect-debt-payment"]:checked').value;
-    closeCollectDebtModal();
+    document.getElementById("collect-debt-modal").classList.add("hidden");
 
     try {
         const data = await apiPost(CONFIG_SHEET_URL, { action: "edit_service", id: debt.id, metodoPago: metodo, fecha: new Date().toISOString() }, { showLoading: true, loadingText: 'Registrando pago de deuda...' });
@@ -2228,6 +2238,9 @@ async function confirmDebtCollection() {
         showToast("Error de conexión. Inténtalo de nuevo.", "error");
     } finally {
         showLoader(false);
+        debtCollectionBusy = false;
+        document.getElementById("collect-debt-btn-confirm").disabled = false;
+        document.getElementById("collect-debt-btn-cancel").disabled = false;
     }
 }
 
@@ -2320,7 +2333,7 @@ async function checkAndSyncOfflineTransactions() {
         if (failedExpenses.length === 0) {
             localStorage.removeItem(expensesKey);
             showToast("¡Gastos guardados offline sincronizados con éxito!", "success");
-            loadExpensesData();
+            loadExpenses();
         } else {
             localStorage.setItem(expensesKey, JSON.stringify(failedExpenses));
         }
@@ -2588,25 +2601,42 @@ async function savePricesToCloud() {
     }
 }
 
-// Variables y lógica para el modal genérico de confirmación
-let genericConfirmCallback = null;
-let scheduleConfirmationPending = false;
-let rescheduleConfirmationPending = false;
-let senaConfirmationPending = false;
-let expenseConfirmationPending = false;
-let cajaMovementConfirmationPending = false;
+// Estado único del modal genérico de confirmación.
+let genericConfirmState = null;
+let serviceRegistrationBusy = false;
 
-function showGenericConfirmModal(title, subtitle, onConfirm) {
+function setGenericConfirmBusy(isBusy) {
+    const confirmButton = document.getElementById("generic-modal-btn-confirm");
+    const cancelButton = document.getElementById("generic-modal-btn-cancel");
+    if (confirmButton) confirmButton.disabled = isBusy;
+    if (cancelButton) cancelButton.disabled = isBusy;
+}
+
+function closeGenericConfirmModal() {
+    document.getElementById("generic-confirm-modal").classList.add("hidden");
+    setGenericConfirmBusy(false);
+    genericConfirmState = null;
+}
+
+function showGenericConfirmModal(title, subtitle, onConfirm = null) {
     const titleEl = document.getElementById("generic-modal-title");
     const subEl = document.getElementById("generic-modal-sub");
 
     if (titleEl) titleEl.innerHTML = `${title} <i class="fa-solid fa-circle-question" style="color: var(--barbie-pink);"></i>`;
     if (subEl) subEl.textContent = subtitle;
 
-    genericConfirmCallback = onConfirm;
-
     const modal = document.getElementById("generic-confirm-modal");
-    if (modal) modal.classList.remove("hidden");
+    if (!modal) return Promise.resolve(false);
+
+    if (genericConfirmState) {
+        genericConfirmState.resolve(false);
+    }
+
+    setGenericConfirmBusy(false);
+    return new Promise((resolve) => {
+        genericConfirmState = { resolve, onConfirm, busy: false };
+        modal.classList.remove("hidden");
+    });
 }
 
 // Gestión de turnos movida a src/appointments.js
@@ -2913,19 +2943,11 @@ async function handleSenaSubmit(e) {
         return;
     }
 
-    if (!senaConfirmationPending) {
-        senaConfirmationPending = true;
-        showGenericConfirmModal(
-            "Confirmar reserva",
-            `Clienta: ${apt.cliente}\nTurno: ${apt.fecha || "-"}\nSeña: $${sena.toLocaleString("es-AR")}\nMétodo de pago: ${metodo}\n\n¿Confirmas cambiar el turno a Reservado y registrar la seña?`,
-            () => {
-                senaConfirmationPending = false;
-                handleSenaSubmit({ preventDefault() {} });
-            }
-        );
-        return;
-    }
-    senaConfirmationPending = false;
+    const confirmed = await showGenericConfirmModal(
+        "Confirmar reserva",
+        `Clienta: ${apt.cliente}\nTurno: ${apt.fecha || "-"}\nSeña: $${sena.toLocaleString("es-AR")}\nMétodo de pago: ${metodo}\n\n¿Confirmas cambiar el turno a Reservado y registrar la seña?`
+    );
+    if (!confirmed) return;
 
     const newStatus = "Reservado";
 
@@ -3020,19 +3042,11 @@ async function handleRescheduleSubmit(e) {
     const endDate = new Date(startDate.getTime() + (90 * 60 * 1000));
     const endIso = endDate.toISOString();
 
-    if (!rescheduleConfirmationPending) {
-        rescheduleConfirmationPending = true;
-        showGenericConfirmModal(
-            "Confirmar reagendamiento",
-            `Clienta: ${apt.cliente}\nFecha actual: ${apt.fecha || "-"}\nNueva fecha: ${newDate}\nNueva hora: ${newTime}\n\n¿Confirmas modificar este turno?`,
-            () => {
-                rescheduleConfirmationPending = false;
-                handleRescheduleSubmit({ preventDefault() {} });
-            }
-        );
-        return;
-    }
-    rescheduleConfirmationPending = false;
+    const confirmed = await showGenericConfirmModal(
+        "Confirmar reagendamiento",
+        `Clienta: ${apt.cliente}\nFecha actual: ${apt.fecha || "-"}\nNueva fecha: ${newDate}\nNueva hora: ${newTime}\n\n¿Confirmas modificar este turno?`
+    );
+    if (!confirmed) return;
 
     closeRescheduleModal();
     showLoader(true, "Reagendando turno en la nube y Google Calendar...");
@@ -3173,19 +3187,11 @@ async function handleScheduleSubmit(e) {
         estado: statusVal
     };
 
-    if (!scheduleConfirmationPending) {
-        scheduleConfirmationPending = true;
-        showGenericConfirmModal(
-            "Confirmar turno",
-            `Clienta: ${cliente}\nFecha: ${dateVal}\nHora: ${timeVal}\nEstado: ${statusVal}\nSeña: $${senaAmount.toLocaleString("es-AR")}\nMétodo de pago de seña: ${senaPaymentMethod}\n\n¿Confirmas agendar este turno?`,
-            () => {
-                scheduleConfirmationPending = false;
-                handleScheduleSubmit({ preventDefault() {} });
-            }
-        );
-        return;
-    }
-    scheduleConfirmationPending = false;
+    const confirmed = await showGenericConfirmModal(
+        "Confirmar turno",
+        `Clienta: ${cliente}\nFecha: ${dateVal}\nHora: ${timeVal}\nEstado: ${statusVal}\nSeña: $${senaAmount.toLocaleString("es-AR")}\nMétodo de pago de seña: ${senaPaymentMethod}\n\n¿Confirmas agendar este turno?`
+    );
+    if (!confirmed) return;
 
     // Resetear formulario para siguientes llamadas
     document.getElementById("schedule-form").reset();
@@ -3491,19 +3497,11 @@ async function handleExpenseSubmit(e) {
         usuario: state.currentUser.email
     };
 
-    if (!expenseConfirmationPending) {
-        expenseConfirmationPending = true;
-        showGenericConfirmModal(
-            "Confirmar gasto",
-            `Concepto: ${concepto}\nImporte: $${monto.toLocaleString("es-AR")}\nFecha: ${fecha}\nCategoría: ${categoria}\nMétodo de pago: ${metodoPago}\n\n¿Confirmas registrar este gasto?`,
-            () => {
-                expenseConfirmationPending = false;
-                handleExpenseSubmit({ preventDefault() {} });
-            }
-        );
-        return;
-    }
-    expenseConfirmationPending = false;
+    const confirmed = await showGenericConfirmModal(
+        "Confirmar gasto",
+        `Concepto: ${concepto}\nImporte: $${monto.toLocaleString("es-AR")}\nFecha: ${fecha}\nCategoría: ${categoria}\nMétodo de pago: ${metodoPago}\n\n¿Confirmas registrar este gasto?`
+    );
+    if (!confirmed) return;
 
     try {
         const data = await apiPost(CONFIG_SHEET_URL, expenseData, { showLoading: true, loadingText: 'Registrando gasto en la planilla...' });
