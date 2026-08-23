@@ -1,8 +1,7 @@
 import state from './state.js';
 import { showLoader } from './ui/loader.js';
 import { showToast } from './ui/toast.js';
-import { apiGet, apiPost } from './api.js';
-import { CONFIG_SHEET_URL } from './config.js';
+import { supabase } from './supabase.js';
 
 function getStoredJson(key, fallback = null) {
     try {
@@ -65,6 +64,13 @@ export function normalizeServiceRecord(item) {
         };
     }
 
+    const rawPaymentMethod = (item.metodoPago || 'Transferencia').toString().trim();
+    const paymentMethodByKey = {
+        efectivo: 'Efectivo',
+        transferencia: 'Transferencia',
+        fiado: 'Fiado'
+    };
+
     return {
         ...item,
         id: item.id || `service_${Date.now()}_${Math.random().toString(16).slice(2)}`,
@@ -72,7 +78,7 @@ export function normalizeServiceRecord(item) {
         cliente: (item.cliente || 'Cliente').toString().trim() || 'Cliente',
         servicio: (item.servicio || 'Servicio').toString().trim() || 'Servicio',
         precio: Number(item.precio) || 0,
-        metodoPago: (item.metodoPago || 'Transferencia').toString().trim() || 'Transferencia',
+        metodoPago: paymentMethodByKey[rawPaymentMethod.toLowerCase()] || rawPaymentMethod || 'Transferencia',
         categoria: (item.categoria || 'Otro').toString().trim() || 'Otro',
         seña: Number(item.seña) || 0,
         completado: item.completado || 'No'
@@ -103,63 +109,132 @@ export function normalizeExpenseRecord(item) {
 }
 
 export async function registerServiceDirectly(transaction) {
-    if (!CONFIG_SHEET_URL) {
-        showToast('Por favor configura la URL de tu Google Sheet en app.js para poder guardar.', 'error');
-        return null;
+    if (supabase && state.currentUser?.authId) {
+        try {
+            let { data: clientRecord, error: clientError } = await supabase
+                .from('clientes')
+                .select('id')
+                .eq('nombre_normalizado', transaction.cliente.toLowerCase().trim())
+                .maybeSingle();
+            if (clientError) throw clientError;
+
+            if (!clientRecord) {
+                const { data: newClient, error: newClientError } = await supabase
+                    .from('clientes')
+                    .insert({ nombre: transaction.cliente.trim() })
+                    .select('id')
+                    .single();
+                if (newClientError) throw newClientError;
+                clientRecord = newClient;
+            }
+
+            const { data, error } = await supabase
+                .from('servicios')
+                .insert({
+                    legacy_id: transaction.id,
+                    cliente_id: clientRecord.id,
+                    usuario_id: state.currentUser.authId,
+                    fecha: transaction.fecha,
+                    servicio: transaction.servicio,
+                    categoria: transaction.categoria || 'Otro',
+                    precio: Number(transaction.precio) || 0,
+                    sena: Number(transaction.seña) || 0,
+                    metodo_pago: transaction.metodoPago.toLowerCase(),
+                    completado: transaction.completado === true || ['sí', 'si', 'yes', 'true'].includes(String(transaction.completado).toLowerCase()),
+                    vuelto: Number(transaction.vuelto) || 0
+                })
+                .select('id, legacy_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre)')
+                .single();
+            if (error) throw error;
+
+            return { success: true, service: normalizeServiceRecord({
+                id: data.legacy_id || data.id,
+                fecha: data.fecha,
+                cliente: data.clientes?.nombre || transaction.cliente,
+                servicio: data.servicio,
+                categoria: data.categoria,
+                precio: data.precio,
+                seña: data.sena,
+                metodoPago: data.metodo_pago,
+                completado: data.completado ? 'Sí' : 'No',
+                vuelto: data.vuelto
+            }) };
+        } catch (error) {
+            console.error('Error al registrar servicio en Supabase:', error);
+            showToast('No se pudo guardar el servicio en Supabase.', 'error');
+            return null;
+        }
     }
 
-    try {
-        const resp = await apiPost(CONFIG_SHEET_URL, { action: 'add_service', ...transaction }, { showLoading: true, loadingText: 'Registrando servicio...' });
-        if (!resp) return null;
-        if (resp.success) {
-            state.servicesList.unshift(resp.service);
-            saveServicesCache();
-            updateClientAutocomplete();
-            renderHistoryList();
-            if (typeof window.calculateAndRenderStats === 'function') window.calculateAndRenderStats();
-            return resp.service;
-        } else {
-            console.error('Error al registrar servicio directamente en Sheets:', resp.message || resp);
-        }
-    } catch (err) {
-        console.error('Error al registrar servicio directamente:', err);
-    }
+    showToast('Supabase no está disponible para guardar el servicio.', 'error');
     return null;
+}
+
+export async function updateServiceRecord(id, updates) {
+    if (!supabase || !state.currentUser?.authId) return null;
+    const { data, error } = await supabase
+        .from('servicios')
+        .update(updates)
+        .eq('legacy_id', id)
+        .select('id, legacy_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre)')
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('No se encontró el servicio en Supabase.');
+    return normalizeServiceRecord({
+        id: data.legacy_id || data.id,
+        fecha: data.fecha,
+        cliente: data.clientes?.nombre || 'Cliente',
+        servicio: data.servicio,
+        categoria: data.categoria,
+        precio: data.precio,
+        seña: data.sena,
+        metodoPago: data.metodo_pago,
+        completado: data.completado ? 'Sí' : 'No',
+        vuelto: data.vuelto
+    });
 }
 
 export async function loadServicesData() {
     if (!state.currentUser) return;
 
-    const cacheKey = `evolet_services_v4_${state.currentUser.email}`;
-    const cachedServices = getStoredJson(cacheKey, []);
-    if (Array.isArray(cachedServices)) {
-        state.servicesList = cachedServices.map(normalizeServiceRecord);
-        renderHistoryList();
-        if (typeof window.calculateAndRenderStats === 'function') window.calculateAndRenderStats();
-        updateClientAutocomplete();
-    }
+    if (supabase && state.currentUser.authId) {
+        const { data, error } = await supabase
+            .from('servicios')
+            .select('id, legacy_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre)')
+            .order('fecha', { ascending: false });
 
-    if (!CONFIG_SHEET_URL) {
-        showToast('Por favor, configura la URL de tu Google Sheet en app.js para sincronizar.', 'error');
-        return;
-    }
-
-    try {
-        const url = `${CONFIG_SHEET_URL}?action=get_services&email=${encodeURIComponent(state.currentUser.email)}`;
-        const data = await apiGet(url, { showLoading: true, loadingText: 'Cargando historial...' });
-        if (!data) return;
-        if (data.success) {
-            state.servicesList = Array.isArray(data.services) ? data.services.map(normalizeServiceRecord) : [];
+        if (!error && Array.isArray(data)) {
+            state.servicesList = data.map(item => normalizeServiceRecord({
+                id: item.legacy_id || item.id,
+                fecha: item.fecha,
+                cliente: item.clientes?.nombre || 'Cliente',
+                servicio: item.servicio,
+                categoria: item.categoria,
+                precio: item.precio,
+                seña: item.sena,
+                metodoPago: item.metodo_pago,
+                completado: item.completado ? 'Sí' : 'No',
+                vuelto: item.vuelto
+            }));
             saveServicesCache();
             renderHistoryList();
             if (typeof window.calculateAndRenderStats === 'function') window.calculateAndRenderStats();
             updateClientAutocomplete();
-            if (typeof window.checkAndSyncOfflineTransactions === 'function') window.checkAndSyncOfflineTransactions();
+            return;
         }
-    } catch (error) {
-        console.error('Error al cargar servicios de la nube:', error);
-        showToast('Historial cargado localmente (sin conexión).');
+
+        console.error('No se pudieron cargar servicios desde Supabase:', error);
+        state.servicesList = [];
+        saveServicesCache();
+        renderHistoryList();
+        if (typeof window.calculateAndRenderStats === 'function') window.calculateAndRenderStats();
+        updateClientAutocomplete();
+        return;
     }
+
+    state.servicesList = [];
+    renderHistoryList();
+    updateClientAutocomplete();
 }
 
 export function saveServicesCache() {
@@ -338,20 +413,17 @@ export async function confirmDeleteServiceRecord() {
     if (!id) return;
     state.pendingDeleteId = null;
 
-    if (!CONFIG_SHEET_URL) {
-        state.servicesList = state.servicesList.filter(x => x.id !== id);
-        saveServicesCache();
-        renderHistoryList();
-        if (typeof window.calculateAndRenderStats === 'function') window.calculateAndRenderStats();
-        updateClientAutocomplete();
-        showToast('Registro eliminado localmente.', 'success');
-        return;
-    }
-
     showLoader(true, 'Eliminando de la nube...');
 
     try {
-        const resp = await apiPost(CONFIG_SHEET_URL, { action: 'delete_service', id, email: state.currentUser.email }, { showLoading: false });
+        let resp;
+        if (supabase && state.currentUser?.authId) {
+            const { error } = await supabase.from('servicios').delete().eq('legacy_id', id);
+            if (error) throw error;
+            resp = { success: true };
+        } else {
+            throw new Error('Supabase no está disponible para eliminar el servicio.');
+        }
         showLoader(false);
         if (resp && resp.success) {
             state.servicesList = state.servicesList.filter(x => x.id !== id);

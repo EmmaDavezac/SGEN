@@ -3,6 +3,7 @@ import state from './state.js';
 import { showLoader } from './ui/loader.js';
 import { showToast } from './ui/toast.js';
 import { apiGet } from './api.js';
+import { supabase } from './supabase.js';
 
 export function createStableAppointmentId(apt) {
     const seed = [
@@ -131,8 +132,44 @@ export function mergeAppointmentLists(localAppointments, cloudAppointments) {
 
 export async function loadAppointments(showNotification = false) {
     if (!state.currentUser) return;
-
     const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
+
+    if (supabase && state.currentUser.authId) {
+        const { data, error } = await supabase
+            .from('turnos')
+            .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, clientes(nombre), perfiles(email)')
+            .order('hora_inicio', { ascending: true });
+
+        if (!error && Array.isArray(data)) {
+            state.appointmentsList = normalizeAppointmentList(data.map(item => normalizeAppointmentRecord({
+                id: item.legacy_id || item.id,
+                fecha: item.fecha,
+                horaInicio: item.hora_inicio,
+                horaFin: item.hora_fin,
+                cliente: item.clientes?.nombre || 'Cliente',
+                servicio: item.servicio,
+                precio: item.precio,
+                estado: item.estado,
+                eventId: item.event_id,
+                usuario: item.perfiles?.email || state.currentUser.email
+            })));
+
+            localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+            if (typeof window.renderCalendar === 'function') window.renderCalendar();
+            if (typeof window.renderDayAppointments === 'function') window.renderDayAppointments();
+            if (showNotification) showToast('Agenda actualizada desde Supabase.', 'success');
+            return;
+        }
+
+        console.error('No se pudieron cargar turnos desde Supabase:', error);
+        state.appointmentsList = [];
+        localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
+        if (typeof window.renderCalendar === 'function') window.renderCalendar();
+        if (typeof window.renderDayAppointments === 'function') window.renderDayAppointments();
+        if (showNotification) showToast('No se pudieron cargar los turnos desde Supabase.', 'error');
+        return;
+    }
+
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
         try {
@@ -193,6 +230,40 @@ export async function loadAppointments(showNotification = false) {
             showToast("Sin conexión a la nube. Mostrando turnos guardados localmente.", "warning");
         }
     }
+}
+
+export async function updateAppointmentInSupabase(appointmentId, updates) {
+    if (!supabase || !state.currentUser?.authId) return null;
+
+    const lookup = supabase.from('turnos').select('id').eq('legacy_id', appointmentId).maybeSingle();
+    const { data: existing, error: lookupError } = await lookup;
+    if (lookupError) throw lookupError;
+    if (!existing) throw new Error('No se encontró el turno en Supabase.');
+
+    const { data, error } = await supabase
+        .from('turnos')
+        .update(updates)
+        .eq('id', existing.id)
+        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id')
+        .single();
+    if (error) throw error;
+    return { success: true, appointment: data };
+}
+
+export async function deleteAppointmentInSupabase(appointmentId) {
+    if (!supabase || !state.currentUser?.authId) return null;
+
+    const { data: existing, error: lookupError } = await supabase
+        .from('turnos')
+        .select('id')
+        .eq('legacy_id', appointmentId)
+        .maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!existing) throw new Error('No se encontró el turno en Supabase.');
+
+    const { error } = await supabase.from('turnos').delete().eq('id', existing.id);
+    if (error) throw error;
+    return { success: true };
 }
 
 // Obtener partes de fecha de un turno (year, month (0-based), day, hour, minute)

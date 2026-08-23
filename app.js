@@ -12,13 +12,15 @@ import { apiPost, apiGet } from './src/api.js';
 // Import Font Awesome from local dependency so Vite bundles fonts correctly
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import { CONFIG_SHEET_URL } from './src/config.js';
+import { signInWithSupabase, supabase } from './src/supabase.js';
 import state from './src/state.js';
-import { loadAppointments, normalizeAppointmentList, mergeAppointmentLists, createStableAppointmentId, getAppointmentDateParts } from './src/appointments.js';
+import { loadAppointments, normalizeAppointmentList, mergeAppointmentLists, createStableAppointmentId, getAppointmentDateParts, updateAppointmentInSupabase, deleteAppointmentInSupabase } from './src/appointments.js';
 import {
     normalizeServiceRecord,
     normalizeExpenseRecord,
     loadServicesData,
     registerServiceDirectly,
+    updateServiceRecord,
     saveServicesCache,
     updateClientAutocomplete,
     renderHistoryList,
@@ -806,12 +808,28 @@ async function handleLoginSubmit(e) {
     const email = document.getElementById("login-email").value.trim();
     const password = document.getElementById("login-password").value.trim();
 
-    if (!CONFIG_SHEET_URL) {
-        showToast("Configuración requerida: Escribe la URL de tu Google Sheet en la variable CONFIG_SHEET_URL de app.js.", "error");
-        return;
-    }
-
     try {
+        const supabaseUser = await signInWithSupabase(email, password);
+        if (supabaseUser) {
+            state.currentUser = supabaseUser;
+            localStorage.setItem("evolet_session_v4", JSON.stringify(state.currentUser));
+            document.getElementById("user-display-name").textContent = state.currentUser.nombre;
+            showToast(`¡Bienvenida de vuelta, ${state.currentUser.nombre}!`, "success");
+            showAppScreen();
+            loadServicesData();
+            loadPricesFromCloud();
+            loadExpenses();
+            loadCajaMovements();
+            loadAppointments();
+            checkAdminAccess();
+            return;
+        }
+
+        if (!CONFIG_SHEET_URL) {
+            showToast("No se pudo iniciar sesión con Supabase. Verifica tus credenciales.", "error");
+            return;
+        }
+
         const data = await apiPost(CONFIG_SHEET_URL, { action: "login", email: email, password: password }, { showLoading: true, loadingText: 'Verificando credenciales...' });
 
         if (data && data.success) {
@@ -1153,10 +1171,19 @@ function handleServiceSubmit(e) {
         return;
     }
 
-    // Calcular si hay seña vinculada
+    // Descontar solo una seña pendiente y efectivamente pagada.
     let senaAmount = 0;
     if (state.linkedAppointment && state.linkedAppointment.cliente === clientName) {
-        senaAmount = Number(state.linkedAppointment.precio) || 0;
+        const pendingSena = state.servicesList.find(s => s && s.servicio &&
+            s.servicio.toString().toLowerCase().includes('seña') &&
+            s.cliente === clientName &&
+            (s.usuario ? s.usuario.toString().toLowerCase() : '') === (state.currentUser ? state.currentUser.email.toString().toLowerCase() : '') &&
+            (s.metodoPago ? s.metodoPago.toString().toLowerCase() : '') !== 'fiado' &&
+            (!s.completado || (s.completado.toString().toLowerCase() !== 'sí' && s.completado.toString().toLowerCase() !== 'si'))
+        );
+        if (pendingSena) {
+            senaAmount = Number(pendingSena.precio) || 0;
+        }
     }
 
     // Estructura de transacción pre-cobrada por completo (seña=senaAmount, completado="Sí")
@@ -1222,11 +1249,6 @@ async function confirmServiceRegistration() {
     const transaction = state.pendingTransaction;
     state.pendingTransaction = null;
 
-    if (!CONFIG_SHEET_URL) {
-        showToast("Por favor configura la URL de tu Google Sheet en app.js para poder guardar.", "error");
-        return;
-    }
-
     showLoader(true, "Registrando servicio en la nube...");
 
     try {
@@ -1237,6 +1259,7 @@ async function confirmServiceRegistration() {
             const senaCandidate = state.servicesList.find(s => s && s.servicio && s.servicio.toString().toLowerCase().includes('seña') &&
                 s.cliente === transaction.cliente &&
                 (s.usuario ? s.usuario.toString().toLowerCase() : '') === (state.currentUser ? state.currentUser.email.toString().toLowerCase() : '') &&
+                (s.metodoPago ? s.metodoPago.toString().toLowerCase() : '') !== 'fiado' &&
                 (!s.completado || s.completado.toString().toLowerCase() !== 'sí' && s.completado.toString().toLowerCase() !== 'si')
             );
 
@@ -1245,18 +1268,30 @@ async function confirmServiceRegistration() {
                 const editPayload = {
                     action: 'edit_service',
                     id: senaCandidate.id,
+                    servicio: transaction.servicio,
                     precio: transaction.precio,
+                    seña: transaction.seña,
                     metodoPago: transaction.metodoPago || senaCandidate.metodoPago,
                     completado: 'Sí'
                 };
 
-                const respData = await apiPost(CONFIG_SHEET_URL, editPayload, { showLoading: true, loadingText: 'Actualizando servicio...', swallowError: true });
+                const respData = supabase && state.currentUser.authId
+                    ? { success: !!(await updateServiceRecord(senaCandidate.id, {
+                        servicio: transaction.servicio,
+                        precio: transaction.precio,
+                        sena: transaction.seña,
+                        metodo_pago: transaction.metodoPago.toLowerCase(),
+                        completado: true
+                    })) }
+                    : await apiPost(CONFIG_SHEET_URL, editPayload, { showLoading: true, loadingText: 'Actualizando servicio...', swallowError: true });
 
                 if (respData && respData.success) {
                     // Actualizar cache local del servicio editado
                     const idx = state.servicesList.findIndex(x => x.id === senaCandidate.id);
                     if (idx !== -1) {
                         state.servicesList[idx].precio = transaction.precio;
+                        state.servicesList[idx].servicio = transaction.servicio;
+                        state.servicesList[idx].seña = transaction.seña;
                         state.servicesList[idx].metodoPago = transaction.metodoPago || state.servicesList[idx].metodoPago;
                         state.servicesList[idx].completado = 'Sí';
                         saveServicesCache();
@@ -1270,17 +1305,19 @@ async function confirmServiceRegistration() {
                     // Marcar el turno vinculado como completado en la nube
                     const aptId = apt.id;
                     try {
-                        const updateData = await apiPost(CONFIG_SHEET_URL, {
-                            action: 'edit_appointment',
-                            id: aptId,
-                            estado: 'Completado',
-                            precio: transaction.precio,
-                            servicio: apt.servicio,
-                            fecha: apt.fecha,
-                            horaInicio: apt.horaInicio,
-                            horaFin: apt.horaFin,
-                            eventId: apt.eventId
-                        }, { showLoading: true, loadingText: 'Actualizando turno...', swallowError: true });
+                        const updateData = supabase && state.currentUser.authId
+                            ? await updateAppointmentInSupabase(aptId, { estado: 'completado', precio: transaction.precio })
+                            : await apiPost(CONFIG_SHEET_URL, {
+                                action: 'edit_appointment',
+                                id: aptId,
+                                estado: 'Completado',
+                                precio: transaction.precio,
+                                servicio: apt.servicio,
+                                fecha: apt.fecha,
+                                horaInicio: apt.horaInicio,
+                                horaFin: apt.horaFin,
+                                eventId: apt.eventId
+                            }, { showLoading: true, loadingText: 'Actualizando turno...', swallowError: true });
                         if (!updateData || !updateData.success) {
                             console.warn('No se pudo actualizar el turno en la nube:', updateData && updateData.message);
                         } else {
@@ -1312,7 +1349,9 @@ async function confirmServiceRegistration() {
         }
 
         // Si no se actualizó una seña existente, crear un nuevo servicio como antes
-        const data = await apiPost(CONFIG_SHEET_URL, { action: "add_service", ...transaction }, { showLoading: true, loadingText: 'Registrando servicio...' });
+        const data = supabase && state.currentUser.authId
+            ? await registerServiceDirectly(transaction)
+            : await apiPost(CONFIG_SHEET_URL, { action: "add_service", ...transaction }, { showLoading: true, loadingText: 'Registrando servicio...' });
 
         if (data.success) {
             const wasLinked = !!state.linkedAppointment;
@@ -1356,17 +1395,19 @@ async function confirmServiceRegistration() {
                 const aptId = state.linkedAppointment.id;
 
                 try {
-                    const updateData = await apiPost(CONFIG_SHEET_URL, {
-                        action: "edit_appointment",
-                        id: aptId,
-                        estado: "Completado",
-                        precio: transaction.precio,
-                        servicio: state.linkedAppointment.servicio,
-                        fecha: state.linkedAppointment.fecha,
-                        horaInicio: state.linkedAppointment.horaInicio,
-                        horaFin: state.linkedAppointment.horaFin,
-                        eventId: state.linkedAppointment.eventId
-                    }, { showLoading: true, loadingText: 'Actualizando turno...', swallowError: true });
+                    const updateData = supabase && state.currentUser.authId
+                        ? await updateAppointmentInSupabase(aptId, { estado: 'completado', precio: transaction.precio })
+                        : await apiPost(CONFIG_SHEET_URL, {
+                            action: "edit_appointment",
+                            id: aptId,
+                            estado: "Completado",
+                            precio: transaction.precio,
+                            servicio: state.linkedAppointment.servicio,
+                            fecha: state.linkedAppointment.fecha,
+                            horaInicio: state.linkedAppointment.horaInicio,
+                            horaFin: state.linkedAppointment.horaFin,
+                            eventId: state.linkedAppointment.eventId
+                        }, { showLoading: true, loadingText: 'Actualizando turno...', swallowError: true });
 
                     if (!updateData || !updateData.success) {
                         console.warn('No se pudo actualizar el turno en la nube:', updateData && updateData.message);
@@ -1837,11 +1878,26 @@ async function loadCajaMovements() {
 
     renderCajaMovementsList();
 
-    if (!CONFIG_SHEET_URL) return;
-
     try {
-        const url = `${CONFIG_SHEET_URL}?action=get_caja_movements`;
-        const data = await apiGet(url, { showLoading: true, loadingText: 'Cargando movimientos de caja...', swallowError: true });
+        let data;
+        if (supabase && state.currentUser?.authId) {
+            const { data: movements, error } = await supabase.from('movimientos_caja').select('id, legacy_id, fecha, tipo, monto, concepto, origen, destino, perfiles(email)').order('fecha', { ascending: false });
+            if (error) throw error;
+            data = { success: true, movements: movements.map(movement => ({
+                id: movement.legacy_id || movement.id,
+                fecha: movement.fecha,
+                tipo: movement.tipo === 'retiro' ? 'extraccion' : movement.tipo,
+                monto: movement.monto,
+                concepto: movement.concepto,
+                origen: movement.origen,
+                destino: movement.destino,
+                usuario: movement.perfiles?.email || state.currentUser.email
+            })) };
+        } else if (CONFIG_SHEET_URL) {
+            data = await apiGet(`${CONFIG_SHEET_URL}?action=get_caja_movements`, { showLoading: true, loadingText: 'Cargando movimientos de caja...', swallowError: true });
+        } else {
+            return;
+        }
         if (data && data.success && Array.isArray(data.movements)) {
             state.cajaMovementsList = data.movements;
             localStorage.setItem(cacheKey, JSON.stringify(state.cajaMovementsList));
@@ -1890,7 +1946,23 @@ async function handleCajaMovementSubmit(e) {
     if (!confirmed) return;
 
     try {
-        const data = await apiPost(CONFIG_SHEET_URL, movimiento, { showLoading: true, loadingText: 'Registrando movimiento de caja...' });
+        let data;
+        if (supabase && state.currentUser.authId) {
+            const { data: movement, error } = await supabase.from('movimientos_caja').insert({
+                legacy_id: movimiento.id,
+                usuario_id: state.currentUser.authId,
+                fecha: movimiento.fecha,
+                tipo: movimiento.tipo === 'extraccion' ? 'retiro' : movimiento.tipo,
+                monto: movimiento.monto,
+                concepto: movimiento.concepto,
+                origen: movimiento.origen,
+                destino: movimiento.destino
+            }).select('id, legacy_id, fecha, tipo, monto, concepto, origen, destino').single();
+            if (error) throw error;
+            data = { success: true, movement: { ...movimiento, id: movement.legacy_id || movement.id } };
+        } else {
+            data = await apiPost(CONFIG_SHEET_URL, movimiento, { showLoading: true, loadingText: 'Registrando movimiento de caja...' });
+        }
 
         if (data && data.success) {
             state.cajaMovementsList.push(data.movement || movimiento);
@@ -1933,21 +2005,40 @@ function calculateAndRenderStats() {
     // ($20.300 efectivo y $67.921,85 MP), en formato "YYYY-MM-DD".
     const initialBalanceDate = "2026-07-01"; // <-- CAMBIAR por la fecha real
 
+    const normalizedServices = state.servicesList.map(normalizeServiceRecord);
+    const clientsWithFinalServiceSena = new Set(
+        normalizedServices
+            .filter(item => {
+                const serviceName = (item.servicio || '').toString().toLowerCase();
+                const completed = (item.completado || '').toString().toLowerCase();
+                return !serviceName.includes('seña') &&
+                    !serviceName.includes('sena') &&
+                    Number(item.seña) > 0 &&
+                    (completed === 'sí' || completed === 'si' || completed === 'yes' || completed === 'true');
+            })
+            .map(item => (item.cliente || '').toString().trim().toLowerCase())
+    );
+
     // Sumar ingresos (servicios) desde la fecha de referencia por método de pago
     let periodEfectivoIncome = 0;
     let periodMpIncome = 0;
 
-    state.servicesList.forEach(item => {
+    normalizedServices.forEach(item => {
         if (item.fecha) {
             const itemDateStr = item.fecha.substring(0, 10);
             if (itemDateStr >= initialBalanceDate) {
                 const precio = Number(item.precio) || 0;
                 const seña = Number(item.seña) || 0;
                 const neto = precio - seña;
+                const paymentMethod = (item.metodoPago || '').toString().trim().toLowerCase();
+                const serviceName = (item.servicio || '').toString().toLowerCase();
+                const clientKey = (item.cliente || '').toString().trim().toLowerCase();
+                const isDuplicateSena = (serviceName.includes('seña') || serviceName.includes('sena')) &&
+                    clientsWithFinalServiceSena.has(clientKey);
 
-                if (item.metodoPago === "Efectivo") {
+                if (!isDuplicateSena && paymentMethod === "efectivo") {
                     periodEfectivoIncome += neto;
-                } else if (item.metodoPago === "Transferencia") {
+                } else if (!isDuplicateSena && paymentMethod === "transferencia") {
                     periodMpIncome += neto;
                 }
             }
@@ -2011,6 +2102,7 @@ function calculateAndRenderStats() {
     startOfWeek.setDate(now.getDate() - 7);
 
     let totalMonthIncome = 0;
+    let totalMonthFiado = 0;
     let totalWeekIncome = 0;
     let servicesCountMonth = 0;
 
@@ -2019,24 +2111,33 @@ function calculateAndRenderStats() {
 
     const serviceCounts = {};
 
-    state.servicesList.forEach(item => {
+    normalizedServices.forEach(item => {
         const date = normalizeDateValue(item.fecha);
         const precio = Number(item.precio) || 0;
+        const paymentMethod = (item.metodoPago || '').toString().trim().toLowerCase();
+        const serviceName = (item.servicio || '').toString().toLowerCase();
+        const clientKey = (item.cliente || '').toString().trim().toLowerCase();
+        const isStandaloneSena = serviceName.includes('seña') || serviceName.includes('sena');
+        const isDuplicateSena = isStandaloneSena && clientsWithFinalServiceSena.has(clientKey);
 
         const isThisMonth = date && date >= startDate && date <= endDate;
         const isThisWeek = date && date >= startOfWeek;
 
         if (isThisMonth) {
-            totalMonthIncome += precio;
-            servicesCountMonth++;
+            if (paymentMethod === 'fiado') {
+                totalMonthFiado += precio;
+            } else if (!isDuplicateSena) {
+                totalMonthIncome += precio;
+                servicesCountMonth++;
 
-            serviceCounts[item.servicio] = (serviceCounts[item.servicio] || 0) + 1;
+                serviceCounts[item.servicio] = (serviceCounts[item.servicio] || 0) + 1;
 
-            if (item.metodoPago === "Efectivo") cashSum += precio;
-            else if (item.metodoPago === "Transferencia") transfeSum += precio;
+                if (paymentMethod === "efectivo") cashSum += precio;
+                else if (paymentMethod === "transferencia") transfeSum += precio;
+            }
         }
 
-        if (isThisWeek) {
+        if (isThisWeek && paymentMethod !== 'fiado' && !isDuplicateSena) {
             totalWeekIncome += precio;
         }
     });
@@ -2070,6 +2171,8 @@ function calculateAndRenderStats() {
     const netBalance = totalMonthIncome - totalMonthExpenses;
 
     document.getElementById("stat-month-income").textContent = `$${totalMonthIncome.toLocaleString("es-AR")}`;
+    const fiadoEl = document.getElementById("stat-month-fiado");
+    if (fiadoEl) fiadoEl.textContent = `$${totalMonthFiado.toLocaleString("es-AR")}`;
     document.getElementById("stat-month-expenses").textContent = `$${totalMonthExpenses.toLocaleString("es-AR")}`;
 
     const balanceEl = document.getElementById("stat-net-balance");
@@ -2220,7 +2323,9 @@ async function confirmDebtCollection() {
     document.getElementById("collect-debt-modal").classList.add("hidden");
 
     try {
-        const data = await apiPost(CONFIG_SHEET_URL, { action: "edit_service", id: debt.id, metodoPago: metodo, fecha: new Date().toISOString() }, { showLoading: true, loadingText: 'Registrando pago de deuda...' });
+        const data = supabase && state.currentUser.authId
+            ? { success: !!(await updateServiceRecord(debt.id, { metodo_pago: metodo.toLowerCase(), fecha: new Date().toISOString() })) }
+            : await apiPost(CONFIG_SHEET_URL, { action: "edit_service", id: debt.id, metodoPago: metodo, fecha: new Date().toISOString() }, { showLoading: true, loadingText: 'Registrando pago de deuda...' });
         if (data && data.success) {
             showToast("¡Deuda cobrada e ingresada a la caja correctamente!", "success");
 
@@ -2400,10 +2505,18 @@ window.app = {
 
 // Cargar catálogo de precios desde Google Sheets
 async function loadPricesFromCloud() {
-    if (!CONFIG_SHEET_URL) return;
     try {
-        const url = `${CONFIG_SHEET_URL}?action=get_prices`;
-        const data = await apiGet(url, { showLoading: true, loadingText: 'Cargando precios...', swallowError: true });
+        let data;
+        if (supabase && state.currentUser?.authId) {
+            const { data: prices, error } = await supabase.from('precios').select('categoria, nombre, precio').order('categoria').order('nombre');
+            if (error) throw error;
+            data = { success: true, prices: prices.map(price => ({ categoria: price.categoria, name: price.nombre, price: price.precio })) };
+        } else if (CONFIG_SHEET_URL) {
+            const url = `${CONFIG_SHEET_URL}?action=get_prices`;
+            data = await apiGet(url, { showLoading: true, loadingText: 'Cargando precios...', swallowError: true });
+        } else {
+            return;
+        }
 
         if (data && data.success && data.prices && data.prices.length > 0) {
             const newCatalog = {};
@@ -2427,7 +2540,7 @@ async function loadPricesFromCloud() {
             console.log("Catálogo actualizado desde la nube:", SERVICES_CATALOG);
         }
     } catch (error) {
-        console.warn("No se pudieron cargar los precios de la nube, usando valores locales.", error);
+        console.error("No se pudieron cargar los precios desde Supabase.", error);
     }
 }
 
@@ -2450,11 +2563,7 @@ function checkAdminAccess() {
     }
 
     if (syncBtn) {
-        if (isAdmin) {
-            syncBtn.classList.remove("hidden");
-        } else {
-            syncBtn.classList.add("hidden");
-        }
+        syncBtn.classList.add("hidden");
     }
 
     updateRegisterTabVisibility();
@@ -2539,15 +2648,10 @@ function renderPricesEditor() {
     });
 }
 
-// Guardar precios modificados en Google Sheets
+// Guardar precios modificados
 async function savePricesToCloud() {
     if (!state.currentUser || state.currentUser.rol !== "admin") {
         showToast("No tienes permisos de administrador", "error");
-        return;
-    }
-
-    if (!CONFIG_SHEET_URL) {
-        showToast("URL de Google Sheets no configurada en app.js", "error");
         return;
     }
 
@@ -2578,7 +2682,19 @@ async function savePricesToCloud() {
     }
 
     try {
-        const data = await apiPost(CONFIG_SHEET_URL, { action: "update_prices", email: state.currentUser.email, prices: updatedPrices }, { showLoading: true, loadingText: 'Guardando lista de precios...' });
+        let data;
+        if (supabase && state.currentUser.authId) {
+            const { error } = await supabase.from('precios').upsert(updatedPrices.map(price => ({
+                categoria: price.categoria,
+                nombre: price.name,
+                precio: price.price,
+                actualizado_por: state.currentUser.authId
+            })), { onConflict: 'categoria,nombre' });
+            if (error) throw error;
+            data = { success: true };
+        } else {
+            data = await apiPost(CONFIG_SHEET_URL, { action: "update_prices", email: state.currentUser.email, prices: updatedPrices }, { showLoading: true, loadingText: 'Guardando lista de precios...' });
+        }
 
         if (data && data.success) {
             state.isEditingPrices = false;
@@ -2955,7 +3071,9 @@ async function handleSenaSubmit(e) {
     showLoader(true, "Actualizando turno en la nube...");
 
     try {
-        const data = await apiPost(CONFIG_SHEET_URL, { action: "edit_appointment", id: apt.id, cliente: apt.cliente, fecha: apt.fecha, estado: newStatus, precio: sena }, { showLoading: false, swallowError: true });
+        const data = supabase && state.currentUser.authId
+            ? await updateAppointmentInSupabase(apt.id, { estado: newStatus.toLowerCase(), precio: sena })
+            : await apiPost(CONFIG_SHEET_URL, { action: "edit_appointment", id: apt.id, cliente: apt.cliente, fecha: apt.fecha, estado: newStatus, precio: sena }, { showLoading: false, swallowError: true });
         if (data && data.success) {
             apt.estado = newStatus;
             apt.precio = sena;
@@ -3052,7 +3170,9 @@ async function handleRescheduleSubmit(e) {
     showLoader(true, "Reagendando turno en la nube y Google Calendar...");
 
     try {
-        const data = await apiPost(CONFIG_SHEET_URL, { action: "edit_appointment", id: apt.id, fecha: newDate, horaInicio: startDate.toISOString(), horaFin: endIso }, { showLoading: false, swallowError: true });
+        const data = supabase && state.currentUser.authId
+            ? await updateAppointmentInSupabase(apt.id, { fecha: newDate, hora_inicio: startDate.toISOString(), hora_fin: endIso })
+            : await apiPost(CONFIG_SHEET_URL, { action: "edit_appointment", id: apt.id, fecha: newDate, horaInicio: startDate.toISOString(), horaFin: endIso }, { showLoading: false, swallowError: true });
         if (data && data.success) {
             apt.fecha = newDate;
             apt.horaInicio = startDate.toISOString();
@@ -3187,20 +3307,78 @@ async function handleScheduleSubmit(e) {
         estado: statusVal
     };
 
+    const scheduleModal = document.getElementById("schedule-modal");
+    if (scheduleModal) scheduleModal.classList.add("hidden");
+
     const confirmed = await showGenericConfirmModal(
         "Confirmar turno",
         `Clienta: ${cliente}\nFecha: ${dateVal}\nHora: ${timeVal}\nEstado: ${statusVal}\nSeña: $${senaAmount.toLocaleString("es-AR")}\nMétodo de pago de seña: ${senaPaymentMethod}\n\n¿Confirmas agendar este turno?`
     );
-    if (!confirmed) return;
+    if (!confirmed) {
+        if (scheduleModal) scheduleModal.classList.remove("hidden");
+        return;
+    }
 
     // Resetear formulario para siguientes llamadas
     document.getElementById("schedule-form").reset();
     document.getElementById("schedule-sena-fields").classList.add("hidden");
-    document.getElementById("schedule-modal").classList.add("hidden");
     showLoader(true, "Agendando turno y sincronizando con Google Calendar...");
 
     try {
-        const data = await apiPost(CONFIG_SHEET_URL, appointmentData, { showLoading: true, loadingText: 'Agendando turno y sincronizando con Google Calendar...' });
+        let data;
+
+        if (supabase && state.currentUser.authId) {
+            let { data: clientRecord, error: clientError } = await supabase
+                .from('clientes')
+                .select('id')
+                .eq('nombre_normalizado', cliente.toLowerCase())
+                .maybeSingle();
+
+            if (clientError) throw clientError;
+
+            if (!clientRecord) {
+                const { data: newClient, error: newClientError } = await supabase
+                    .from('clientes')
+                    .insert({ nombre: cliente })
+                    .select('id')
+                    .single();
+                if (newClientError) throw newClientError;
+                clientRecord = newClient;
+            }
+
+            const { data: insertedAppointment, error: appointmentError } = await supabase
+                .from('turnos')
+                .insert({
+                    legacy_id: appointmentData.id,
+                    cliente_id: clientRecord.id,
+                    usuario_id: state.currentUser.authId,
+                    fecha: appointmentData.fecha,
+                    hora_inicio: appointmentData.horaInicio,
+                    hora_fin: appointmentData.horaFin,
+                    servicio: appointmentData.servicio,
+                    precio: appointmentData.precio,
+                    estado: appointmentData.estado.toLowerCase(),
+                    event_id: null
+                })
+                .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, clientes(nombre), perfiles(email)')
+                .single();
+
+            if (appointmentError) throw appointmentError;
+            data = { success: true, appointment: {
+                id: insertedAppointment.legacy_id || insertedAppointment.id,
+                fecha: insertedAppointment.fecha,
+                horaInicio: insertedAppointment.hora_inicio,
+                horaFin: insertedAppointment.hora_fin,
+                cliente,
+                servicio: insertedAppointment.servicio,
+                precio: insertedAppointment.precio,
+                usuario: state.currentUser.email,
+                estado: insertedAppointment.estado,
+                eventId: insertedAppointment.event_id
+            }};
+        } else {
+            data = await apiPost(CONFIG_SHEET_URL, appointmentData, { showLoading: true, loadingText: 'Agendando turno y sincronizando con Google Calendar...' });
+        }
 
         if (data && data.success) {
             showToast("¡Turno agendado y sincronizado con éxito!", "success");
@@ -3267,7 +3445,9 @@ function cancelAppointment(id, clientName) {
         async () => {
             showLoader(true, "Cancelando turno...");
             try {
-                const data = await apiPost(CONFIG_SHEET_URL, { action: "delete_appointment", id: id, email: state.currentUser.email }, { showLoading: true, loadingText: 'Cancelando turno...' });
+                const data = supabase && state.currentUser.authId
+                    ? await deleteAppointmentInSupabase(id)
+                    : await apiPost(CONFIG_SHEET_URL, { action: "delete_appointment", id: id, email: state.currentUser.email }, { showLoading: true, loadingText: 'Cancelando turno...' });
 
                 if (data && data.success) {
                     showToast("Turno cancelado correctamente.", "success");
@@ -3350,10 +3530,25 @@ async function loadExpenses() {
         }
     }
 
-    if (!CONFIG_SHEET_URL) return;
-
     try {
-        const data = await apiGet(`${CONFIG_SHEET_URL}?action=get_expenses`, { showLoading: true, loadingText: 'Cargando gastos...', swallowError: true });
+        let data;
+        if (supabase && state.currentUser?.authId) {
+            const { data: expenses, error } = await supabase.from('gastos').select('id, legacy_id, fecha, concepto, monto, metodo_pago, categoria, perfiles(email)').order('fecha', { ascending: false });
+            if (error) throw error;
+            data = { success: true, expenses: expenses.map(expense => ({
+                id: expense.legacy_id || expense.id,
+                fecha: expense.fecha,
+                concepto: expense.concepto,
+                monto: expense.monto,
+                metodoPago: expense.metodo_pago,
+                categoria: expense.categoria,
+                usuario: expense.perfiles?.email || state.currentUser.email
+            })) };
+        } else if (CONFIG_SHEET_URL) {
+            data = await apiGet(`${CONFIG_SHEET_URL}?action=get_expenses`, { showLoading: true, loadingText: 'Cargando gastos...', swallowError: true });
+        } else {
+            return;
+        }
 
         if (data && data.success && data.expenses) {
             state.expensesList = Array.isArray(data.expenses) ? data.expenses.map(normalizeExpenseRecord) : [];
@@ -3504,7 +3699,22 @@ async function handleExpenseSubmit(e) {
     if (!confirmed) return;
 
     try {
-        const data = await apiPost(CONFIG_SHEET_URL, expenseData, { showLoading: true, loadingText: 'Registrando gasto en la planilla...' });
+        let data;
+        if (supabase && state.currentUser.authId) {
+            const { data: expense, error } = await supabase.from('gastos').insert({
+                legacy_id: expenseData.id,
+                usuario_id: state.currentUser.authId,
+                fecha: expenseData.fecha,
+                concepto: expenseData.concepto,
+                monto: expenseData.monto,
+                metodo_pago: expenseData.metodoPago.toLowerCase(),
+                categoria: expenseData.categoria
+            }).select('id, legacy_id, fecha, concepto, monto, metodo_pago, categoria').single();
+            if (error) throw error;
+            data = { success: true, expense: { ...expenseData, id: expense.legacy_id || expense.id, metodoPago: expense.metodo_pago, monto: expense.monto } };
+        } else {
+            data = await apiPost(CONFIG_SHEET_URL, expenseData, { showLoading: true, loadingText: 'Registrando gasto en la planilla...' });
+        }
 
         if (data && data.success) {
             showToast("¡Gasto registrado con éxito!", "success");
@@ -3557,7 +3767,14 @@ function deleteExpenseRecord(id, concepto) {
             showLoader(true, "Eliminando gasto...");
 
             try {
-                const data = await apiPost(CONFIG_SHEET_URL, { action: "delete_expense", id: id }, { showLoading: true, loadingText: 'Eliminando gasto...' });
+                let data;
+                if (supabase && state.currentUser.authId) {
+                    const { error } = await supabase.from('gastos').delete().eq('legacy_id', id);
+                    if (error) throw error;
+                    data = { success: true };
+                } else {
+                    data = await apiPost(CONFIG_SHEET_URL, { action: "delete_expense", id: id }, { showLoading: true, loadingText: 'Eliminando gasto...' });
+                }
 
                 if (data && data.success) {
                     showToast("Gasto eliminado correctamente.", "success");
