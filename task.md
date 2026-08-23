@@ -24,18 +24,18 @@
 
 ### Fase 0: Preparación
 
-- [ ] Crear una rama de trabajo para React
+- [x] Crear una rama de trabajo para React (`feature/react-migration`)
 - [ ] Confirmar que la versión vanilla actual compila con `npm run build`
 - [ ] No borrar `app.js` ni `index.html` hasta completar la migración
 - [ ] Mantener Supabase como backend y fuente única de datos
 
 ### Fase 1: Base React
 
-- [ ] Instalar `react` y `react-dom`
-- [ ] Crear `src/main.jsx` y `src/App.jsx`
-- [ ] Mantener Vite como herramienta de build
-- [ ] Mantener `src/supabase.js` como cliente único de Supabase
-- [ ] Renderizar una pantalla React mínima y comprobar el build
+- [x] Instalar `react` y `react-dom`
+- [x] Crear `src/react-main.jsx` y `src/App.jsx`
+- [x] Mantener Vite como herramienta de build
+- [x] Mantener `src/supabase.js` como cliente único de Supabase
+- [ ] Montar la pantalla React mínima en una entrada aislada y comprobar el build
 
 ### Fase 2: Componentes compartidos
 
