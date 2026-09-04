@@ -14,7 +14,7 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 import { CONFIG_SHEET_URL } from './src/config.js';
 import { signInWithSupabase, supabase } from './src/supabase.js';
 import state from './src/state.js';
-import { loadAppointments, normalizeAppointmentList, mergeAppointmentLists, createStableAppointmentId, getAppointmentDateParts, updateAppointmentInSupabase, deleteAppointmentInSupabase } from './src/appointments.js';
+import { loadAppointments, normalizeAppointmentList, mergeAppointmentLists, createStableAppointmentId, getAppointmentDateParts, updateAppointmentInSupabase, deleteAppointmentInSupabase, syncAppointmentWithGoogleCalendar } from './src/appointments.js';
 import {
     normalizeServiceRecord,
     normalizeExpenseRecord,
@@ -342,6 +342,7 @@ function initApp() {
         loadAppointments(); // Cargar turnos agendados en la nube
         loadExpenses(); // Cargar gastos registrados
         loadCajaMovements(); // Cargar movimientos entre cajas
+        loadClients();
         checkAdminAccess(); // Verificar si es admin para la pestaña Ajustes
     } else {
         showLoginScreen();
@@ -360,6 +361,86 @@ function initApp() {
 function setupEventListeners() {
     // Login
     document.getElementById("login-form").addEventListener("submit", handleLoginSubmit);
+
+    const accountForm = document.getElementById("account-form");
+    if (accountForm) accountForm.addEventListener("submit", handleAccountSubmit);
+    const accountSaveBtn = document.getElementById("account-save-btn");
+    if (accountSaveBtn) accountSaveBtn.addEventListener("click", handleAccountSubmit);
+    document.getElementById("account-edit-btn").addEventListener("click", () => setAccountEditing(true));
+    document.getElementById("account-cancel-btn").addEventListener("click", () => setAccountEditing(false));
+
+    const accountPasswordForm = document.getElementById("account-password-form");
+    if (accountPasswordForm) accountPasswordForm.addEventListener("submit", handlePasswordSubmit);
+    
+    const showPasswordBtn = document.getElementById("show-change-password-btn");
+    if (showPasswordBtn) showPasswordBtn.addEventListener("click", () => setAccountPasswordEditing(true));
+    
+    const accountPasswordCancelBtn = document.getElementById("account-password-cancel-btn");
+    if (accountPasswordCancelBtn) accountPasswordCancelBtn.addEventListener("click", () => setAccountPasswordEditing(false));
+
+    document.querySelectorAll(".password-reveal-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const targetId = btn.dataset.target;
+            const input = document.getElementById(targetId);
+            if (input) {
+                const isPassword = input.type === "password";
+                input.type = isPassword ? "text" : "password";
+                const icon = btn.querySelector("i");
+                if (icon) {
+                    icon.className = isPassword ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+                }
+            }
+        });
+    });
+    document.getElementById("client-detail-close").addEventListener("click", closeClientDetail);
+    document.getElementById("client-edit-btn").addEventListener("click", () => setClientEditing(true));
+    document.getElementById("client-cancel-btn").addEventListener("click", () => {
+        if (selectedClient) openClientDetail(selectedClient.id);
+    });
+
+    const clientForm = document.getElementById("client-form");
+    if (clientForm) clientForm.addEventListener("submit", handleClientSubmit);
+    const clientsSearch = document.getElementById("clients-search");
+    if (clientsSearch) clientsSearch.addEventListener("input", renderClientsList);
+    const clientsFilterToggle = document.getElementById("clients-filter-toggle");
+    if (clientsFilterToggle) clientsFilterToggle.addEventListener("click", () => document.getElementById("clients-filter-panel").classList.toggle("hidden"));
+    document.querySelectorAll("[data-client-status]").forEach((button) => {
+        button.addEventListener("click", () => {
+            button.parentElement.querySelectorAll(".filter-choice").forEach((item) => item.classList.remove("active"));
+            button.classList.add("active");
+            renderClientsList();
+        });
+    });
+    const scheduleClientName = document.getElementById("schedule-client-name");
+    if (scheduleClientName) scheduleClientName.addEventListener("input", () => {
+        document.getElementById("schedule-new-client-panel")?.classList.add("hidden");
+        renderScheduleSuggestions();
+    });
+    if (scheduleClientName) scheduleClientName.addEventListener("focus", renderScheduleSuggestions);
+    document.addEventListener("click", (event) => {
+        if (!event.target.closest("#schedule-client-name") && !event.target.closest("#client-suggestions")) {
+            document.getElementById("client-suggestions")?.classList.add("hidden");
+        }
+    });
+    const scheduleRegisterClient = document.getElementById("schedule-register-client");
+    if (scheduleRegisterClient) scheduleRegisterClient.addEventListener("click", registerScheduleClient);
+
+    const accountMenuButton = document.getElementById("btn-header-menu");
+    const accountMenu = document.getElementById("account-menu");
+    if (accountMenuButton && accountMenu) {
+        accountMenuButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            const isOpen = !accountMenu.classList.contains("hidden");
+            accountMenu.classList.toggle("hidden", isOpen);
+            accountMenuButton.setAttribute("aria-expanded", String(!isOpen));
+        });
+        document.addEventListener("click", () => {
+            accountMenu.classList.add("hidden");
+            accountMenuButton.setAttribute("aria-expanded", "false");
+        });
+    }
+    document.getElementById("menu-cuenta").addEventListener("click", () => switchTab("cuenta"));
+    document.getElementById("menu-ajustes").addEventListener("click", () => switchTab("ajustes"));
 
     // Navegación de Pestañas
     const navItems = document.querySelectorAll(".nav-item");
@@ -471,7 +552,15 @@ function setupEventListeners() {
 
     // Historial - Buscador y Filtros
     document.getElementById("history-search").addEventListener("input", filterHistory);
-    document.getElementById("history-filter").addEventListener("change", filterHistory);
+    document.getElementById("history-filter-toggle").addEventListener("click", () => document.getElementById("history-filter-panel").classList.toggle("hidden"));
+    document.querySelectorAll("[data-history-filter], [data-history-category], [data-history-payment]").forEach((button) => {
+        button.addEventListener("click", () => {
+            const group = button.parentElement;
+            group.querySelectorAll(".filter-choice").forEach((item) => item.classList.remove("active"));
+            button.classList.add("active");
+            filterHistory();
+        });
+    });
 
     // Modales de Seña y Reagendamiento de Turnos
     document.getElementById("sena-form").addEventListener("submit", handleSenaSubmit);
@@ -535,8 +624,20 @@ function setupEventListeners() {
         });
     }
 
+    // Mostrar/ocultar la pestaña Cajas desde Ajustes
+    const chkCajasTab = document.getElementById("chk-allow-cajas-tab");
+    if (chkCajasTab) {
+        chkCajasTab.addEventListener("change", (e) => {
+            state.allowCajasTab = e.target.checked;
+            localStorage.setItem("evolet_allow_cajas_tab", state.allowCajasTab ? "true" : "false");
+            updateCajasTabVisibility();
+            showToast(state.allowCajasTab ? "Pestaña Cajas habilitada" : "Pestaña Cajas oculta", "info");
+        });
+    }
+
     updateFiadoPaymentVisibility();
     updateRegisterTabVisibility();
+    updateCajasTabVisibility();
 
     // Ajustes de precios (Admin)
     document.getElementById("btn-edit-mode").addEventListener("click", () => {
@@ -646,7 +747,8 @@ function setupEventListeners() {
     });
 
     // Navegación desde Gastos a Historial de Gastos
-    document.getElementById("btn-view-expenses-history").addEventListener("click", () => {
+    const expensesHistoryButton = document.getElementById("btn-view-expenses-history");
+    if (expensesHistoryButton) expensesHistoryButton.addEventListener("click", () => {
         switchTab("historial-gastos");
     });
 
@@ -663,6 +765,16 @@ function setupEventListeners() {
     });
     document.getElementById("expense-filter").addEventListener("change", () => {
         renderExpensesHistoryList();
+    });
+
+    document.getElementById("expenses-search").addEventListener("input", renderExpensesList);
+    document.getElementById("expenses-filter-toggle").addEventListener("click", () => document.getElementById("expenses-filter-panel").classList.toggle("hidden"));
+    document.querySelectorAll("[data-expense-period], [data-expense-category]").forEach((button) => {
+        button.addEventListener("click", () => {
+            button.parentElement.querySelectorAll(".filter-choice").forEach((item) => item.classList.remove("active"));
+            button.classList.add("active");
+            renderExpensesList();
+        });
     });
 }
 
@@ -716,6 +828,362 @@ function updateRegisterTabVisibility() {
     }
 }
 
+async function loadClients() {
+    const container = document.getElementById("clients-list");
+    if (!container || !state.currentUser) return;
+    if (!supabase || !state.currentUser.authId) {
+        container.innerHTML = '<div class="no-appointments-placeholder">La sección Clientes requiere Supabase.</div>';
+        return;
+    }
+    container.innerHTML = '<div class="no-appointments-placeholder">Cargando clientes...</div>';
+    try {
+        const { data, error } = await supabase
+            .from("clientes")
+            .select("id, nombre, telefono, email, notas, activo, creado_en")
+            .order("nombre", { ascending: true });
+        if (error) throw error;
+        state.clientsList = Array.isArray(data) ? data : [];
+        updateScheduleClientSuggestions();
+        renderClientsList();
+    } catch (error) {
+        console.error("Error al cargar clientes:", error);
+        container.innerHTML = '<div class="no-appointments-placeholder">No se pudieron cargar los clientes.</div>';
+    }
+}
+
+function updateScheduleClientSuggestions() {
+    renderScheduleSuggestions();
+}
+
+function renderScheduleSuggestions() {
+    const container = document.getElementById("client-suggestions");
+    const input = document.getElementById("schedule-client-name");
+    if (!container || !input) return;
+    const query = input.value.trim().toLowerCase();
+    const clients = (state.clientsList || []).filter((client) => client.activo !== false && client.nombre.toLowerCase().includes(query));
+    container.innerHTML = clients.map((client) => `<button type="button" class="client-suggestion" data-client-name="${escapeHtml(client.nombre)}"><i class="fa-solid fa-user"></i>${escapeHtml(client.nombre)}</button>`).join("");
+    container.classList.toggle("hidden", clients.length === 0);
+    container.querySelectorAll(".client-suggestion").forEach((button) => button.addEventListener("click", () => {
+        input.value = button.dataset.clientName;
+        container.classList.add("hidden");
+    }));
+}
+
+async function registerScheduleClient() {
+    const nameInput = document.getElementById("schedule-client-name");
+    const panel = document.getElementById("schedule-new-client-panel");
+    const name = nameInput.value.trim();
+    if (!name || !supabase || !state.currentUser?.authId) return;
+    const button = document.getElementById("schedule-register-client");
+    button.disabled = true;
+    showLoader(true, "Registrando clienta...");
+    try {
+        const { data, error } = await supabase.from("clientes").insert({
+            nombre: name,
+            telefono: document.getElementById("schedule-new-client-phone").value.trim() || null,
+            email: document.getElementById("schedule-new-client-email").value.trim().toLowerCase() || null
+        }).select("id, nombre, telefono, email, notas, activo, creado_en").single();
+        if (error) throw error;
+        state.clientsList = [...(state.clientsList || []), data];
+        updateScheduleClientSuggestions();
+        panel.classList.add("hidden");
+        showToast("Clienta registrada. Ya podés agendar el turno.", "success");
+    } catch (error) {
+        console.error("Error registrando clienta desde agenda:", error);
+        showToast(error.code === "23505" ? "Ya existe una clienta con ese nombre." : "No se pudo registrar la clienta.", "error");
+    } finally {
+        button.disabled = false;
+        showLoader(false);
+    }
+}
+
+function renderClientsList() {
+    const container = document.getElementById("clients-list");
+    const searchInput = document.getElementById("clients-search");
+    if (!container) return;
+
+    const query = (searchInput?.value || "").trim().toLowerCase();
+    const activeClientStatus = document.querySelector("[data-client-status].active");
+    const statusFilter = activeClientStatus?.dataset.clientStatus || "activos";
+    const clients = (state.clientsList || []).filter((client) => {
+        if (statusFilter === "activos" && client.activo !== true) return false;
+        if (statusFilter === "baja" && client.activo === true) return false;
+        const searchable = [client.nombre, client.telefono, client.email, client.notas]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+        return searchable.includes(query);
+    });
+
+    if (clients.length === 0) {
+        container.innerHTML = '<div class="list-empty-state">No hay clientes que coincidan con la búsqueda.</div>';
+        return;
+    }
+
+    container.innerHTML = clients.map((client) => `
+        <article class="appointment-card client-card ${client.activo === false ? "client-inactive" : ""}" data-client-id="${client.id}">
+            <div class="client-avatar"><i class="fa-solid fa-user"></i></div>
+            <div class="appointment-info-col">
+                <div class="appointment-client-name">${escapeHtml(client.nombre)}</div>
+                <div class="appointment-service-name">
+                    ${client.telefono ? `<span><i class="fa-solid fa-phone"></i> ${escapeHtml(client.telefono)}</span>` : ""}
+                    ${client.email ? `<span><i class="fa-solid fa-envelope"></i> ${escapeHtml(client.email)}</span>` : ""}
+                    ${client.notas ? `<span><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(client.notas)}</span>` : ""}
+                </div>
+            </div>
+            <div class="card-actions-col client-actions-col">
+                <button type="button" class="btn-view-detail client-details-btn" title="Ver información del cliente" aria-label="Ver información del cliente" data-client-id="${client.id}">
+                    <i class="fa-solid fa-eye"></i>
+                </button>
+                ${state.currentUser?.rol === "admin" ? `<button type="button" class="btn-delete-card client-status-btn" title="${client.activo === false ? "Dar de alta" : "Dar de baja"}" aria-label="${client.activo === false ? "Dar de alta" : "Dar de baja"}" data-client-id="${client.id}"><i class="fa-solid ${client.activo === false ? "fa-user-check" : "fa-user-slash"}"></i></button>` : ""}
+            </div>
+        </article>
+    `).join("");
+
+    container.querySelectorAll(".client-details-btn").forEach((button) => {
+        button.addEventListener("click", () => openClientDetail(button.dataset.clientId));
+    });
+    container.querySelectorAll(".client-status-btn").forEach((button) => {
+        button.addEventListener("click", () => toggleClientStatus(button.dataset.clientId));
+    });
+}
+
+async function toggleClientStatus(clientId) {
+    if (state.currentUser?.rol !== "admin") return;
+    const client = (state.clientsList || []).find((item) => item.id === clientId);
+    if (!client) return;
+    const action = client.activo === false ? "dar de alta" : "dar de baja";
+    const confirmed = await showGenericConfirmModal("Confirmar acción", `¿Querés ${action} a ${client.nombre}?`);
+    if (!confirmed) return;
+    showLoader(true, `${action[0].toUpperCase()}${action.slice(1)} cliente...`);
+    try {
+        const { error } = await supabase.from("clientes").update({ activo: client.activo === false }).eq("id", clientId);
+        if (error) throw error;
+        showToast(`Cliente ${client.activo === false ? "dado de alta" : "dado de baja"}.`, "success");
+        await loadClients();
+    } catch (error) {
+        console.error("Error al actualizar estado del cliente:", error);
+        showToast("No se pudo actualizar el estado del cliente.", "error");
+    } finally {
+        showLoader(false);
+    }
+}
+
+let selectedClient = null;
+let clientUpdateBusy = false;
+
+async function openClientDetail(clientId) {
+    selectedClient = (state.clientsList || []).find((client) => client.id === clientId);
+    if (!selectedClient) return;
+    document.getElementById("client-detail-title").textContent = selectedClient.nombre;
+    document.getElementById("detail-client-name").value = selectedClient.nombre || "";
+    document.getElementById("detail-client-phone").value = selectedClient.telefono || "";
+    document.getElementById("detail-client-email").value = selectedClient.email || "";
+    document.getElementById("detail-client-notes").value = selectedClient.notas || "";
+    setClientEditing(false);
+    document.getElementById("client-detail-modal").classList.remove("hidden");
+    document.getElementById("client-detail-history").innerHTML = "";
+    document.getElementById("client-history-status").textContent = "Cargando...";
+
+    try {
+        const { data, error } = await supabase
+            .from("turnos")
+            .select("id, legacy_id, fecha, hora_inicio, servicio, estado, precio")
+            .eq("cliente_id", clientId)
+            .order("hora_inicio", { ascending: false });
+        if (error) throw error;
+        if (!data?.length) {
+            document.getElementById("client-detail-history").innerHTML = '<span class="subtle-text">Todavía no hay turnos registrados.</span>';
+            document.getElementById("client-history-status").textContent = "0 turnos";
+            return;
+        }
+        document.getElementById("client-detail-history").innerHTML = data.map((appointment) => `
+            <div class="client-history-item">
+                <span><strong>${escapeHtml(appointment.servicio || "Turno")}</strong><br>${escapeHtml(formatClientDate(appointment.hora_inicio || appointment.fecha))}</span>
+                <span>${escapeHtml(appointment.estado || "Provisional")}<br><strong>$${(Number(appointment.precio) || 0).toLocaleString("es-AR")}</strong></span>
+            </div>
+        `).join("");
+        document.getElementById("client-history-status").textContent = `${data.length} turno${data.length === 1 ? "" : "s"}`;
+    } catch (error) {
+        console.error("Error al cargar historial de cliente:", error);
+        document.getElementById("client-detail-history").innerHTML = '<span class="subtle-text">No se pudo cargar el historial.</span>';
+        document.getElementById("client-history-status").textContent = "Error";
+    }
+}
+
+function setClientEditing(editing) {
+    const fields = document.getElementById("client-detail-fields");
+    fields.disabled = !editing;
+    document.getElementById("client-edit-btn").classList.toggle("hidden", editing);
+    document.getElementById("client-cancel-btn").classList.toggle("hidden", !editing);
+    document.getElementById("client-save-btn").classList.toggle("hidden", !editing);
+}
+
+function setAccountEditing(editing) {
+    const form = document.getElementById("account-form");
+    const editableFields = form?.querySelectorAll("#account-name, #account-email");
+    editableFields?.forEach((field) => { field.readOnly = !editing; });
+    
+    const editBtn = document.getElementById("account-edit-btn");
+    const actionsContainer = document.getElementById("account-actions-container");
+    if (editBtn) editBtn.classList.toggle("hidden", editing);
+    if (actionsContainer) actionsContainer.classList.toggle("hidden", !editing);
+    
+    // Deshabilitar/habilitar el botón de actualizar contraseña para asegurar exclusión mutua
+    const showPasswordBtn = document.getElementById("show-change-password-btn");
+    if (showPasswordBtn) showPasswordBtn.disabled = editing;
+    
+    if (!editing) populateAccountForm();
+}
+
+function setAccountPasswordEditing(editing) {
+    const currentPasswordInput = document.getElementById("account-current-password");
+    const passwordInput = document.getElementById("account-password");
+    const confirmPasswordInput = document.getElementById("account-confirm-password");
+    const passwordForm = document.getElementById("account-password-form");
+    const showPasswordBtn = document.getElementById("show-change-password-btn");
+    
+    if (passwordForm) passwordForm.classList.toggle("hidden", !editing);
+    if (showPasswordBtn) showPasswordBtn.classList.toggle("hidden", editing);
+    
+    // Deshabilitar/habilitar el botón de editar perfil para asegurar exclusión mutua
+    const profileEditBtn = document.getElementById("account-edit-btn");
+    if (profileEditBtn) profileEditBtn.disabled = editing;
+    
+    if (!editing) {
+        // Limpiar campos de contraseña al cancelar/guardar
+        if (currentPasswordInput) {
+            currentPasswordInput.value = "";
+            currentPasswordInput.type = "password";
+        }
+        if (passwordInput) {
+            passwordInput.value = "";
+            passwordInput.type = "password";
+        }
+        if (confirmPasswordInput) {
+            confirmPasswordInput.value = "";
+            confirmPasswordInput.type = "password";
+        }
+        // Restablecer iconos de ojo
+        document.querySelectorAll(".password-reveal-btn i").forEach(icon => {
+            icon.className = "fa-solid fa-eye";
+        });
+    }
+}
+
+function closeClientDetail() {
+    if (clientUpdateBusy) return;
+    document.getElementById("client-detail-modal").classList.add("hidden");
+    selectedClient = null;
+}
+
+function formatClientDate(value) {
+    if (!value) return "Sin fecha";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+}
+
+async function handleClientUpdate(event) {
+    event.preventDefault();
+    if (clientUpdateBusy || !selectedClient || event.currentTarget.dataset.confirming === "true") return;
+    const form = event.currentTarget;
+    const clientId = selectedClient.id;
+    const formData = new FormData(form);
+    const name = String(formData.get("nombre") || "").trim();
+    if (!name) {
+        showToast("El nombre del cliente es obligatorio.", "error");
+        return;
+    }
+
+    form.dataset.confirming = "true";
+    const confirmed = await showGenericConfirmModal("Confirmar cambios", `Se actualizarán los datos de ${name}. ¿Confirmás?`);
+    form.dataset.confirming = "false";
+    if (!confirmed) return;
+
+    clientUpdateBusy = true;
+    form.querySelectorAll("input, button").forEach((element) => { element.disabled = true; });
+    showLoader(true, "Guardando datos del cliente...");
+
+    try {
+        const { error } = await supabase.from("clientes").update({
+            nombre: name,
+            telefono: String(formData.get("telefono") || "").trim() || null,
+            email: String(formData.get("email") || "").trim().toLowerCase() || null,
+            notas: String(formData.get("notas") || "").trim() || null
+        }).eq("id", clientId);
+        if (error) throw error;
+        showToast("Datos del cliente actualizados.", "success");
+        await loadClients();
+        updateClientAutocomplete();
+        clientUpdateBusy = false;
+        closeClientDetail();
+    } catch (error) {
+        console.error("Error al actualizar cliente:", error);
+        showToast("No se pudieron actualizar los datos del cliente.", "error");
+    } finally {
+        form.dataset.confirming = "false";
+        clientUpdateBusy = false;
+        form.querySelectorAll("input, button").forEach((element) => { element.disabled = false; });
+        showLoader(false);
+    }
+}
+
+async function handleClientSubmit(event) {
+    event.preventDefault();
+    if (!supabase || !state.currentUser?.authId) {
+        showToast("La sección Clientes requiere Supabase.", "error");
+        return;
+    }
+
+    const nameInput = document.getElementById("client-record-name");
+    const name = nameInput.value.trim();
+    const phone = document.getElementById("client-record-phone").value.trim();
+    const email = document.getElementById("client-record-email").value.trim().toLowerCase();
+    const notes = document.getElementById("client-record-notes").value.trim();
+
+    if (!name) {
+        showToast("Ingresá el nombre de la clienta.", "error");
+        nameInput.focus();
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from("clientes").insert({
+            nombre: name,
+            telefono: phone || null,
+            email: email || null,
+            notas: notes || null
+        });
+        if (error) {
+            if (error.code === "23505") throw new Error("Ya existe una clienta con ese nombre.");
+            throw error;
+        }
+
+        event.currentTarget.reset();
+        showToast("Cliente agregado correctamente.", "success");
+        await loadClients();
+        updateClientAutocomplete();
+    } catch (error) {
+        console.error("Error al agregar cliente:", error);
+        showToast(error.message || "No se pudo agregar el cliente.", "error");
+    }
+}
+
+function updateCajasTabVisibility() {
+    const cajasBtn = document.getElementById("nav-btn-cajas");
+    const chkCajasTab = document.getElementById("chk-allow-cajas-tab");
+    const isAdmin = state.currentUser && state.currentUser.rol === "admin";
+    const shouldShowCajasTab = isAdmin && state.allowCajasTab;
+
+    if (chkCajasTab) {
+        chkCajasTab.checked = !!state.allowCajasTab;
+    }
+
+    if (cajasBtn) {
+        cajasBtn.classList.toggle("hidden", !shouldShowCajasTab);
+    }
+}
+
 // =========================================================================
 //                  MANEJO DE PANTALLAS Y NAVEGACIÓN
 // =========================================================================
@@ -727,10 +1195,166 @@ function showLoginScreen() {
 function showAppScreen() {
     document.getElementById("login-screen").classList.remove("active");
     document.getElementById("app-screen").classList.add("active");
+    populateAccountForm();
+}
+
+function populateAccountForm() {
+    const nameInput = document.getElementById("account-name");
+    const emailInput = document.getElementById("account-email");
+    const currentPasswordInput = document.getElementById("account-current-password");
+    const passwordInput = document.getElementById("account-password");
+    if (nameInput) nameInput.value = state.currentUser?.nombre || "";
+    if (emailInput) emailInput.value = state.currentUser?.email || "";
+    if (currentPasswordInput) currentPasswordInput.value = "";
+    if (passwordInput) passwordInput.value = "";
+}
+
+async function handleAccountSubmit(event) {
+    if (event) event.preventDefault();
+
+    if (!state.currentUser) {
+        showToast("Iniciá sesión para actualizar tus datos.", "error");
+        return;
+    }
+
+    if (!supabase || !state.currentUser.authId) {
+        showToast("La actualización de datos requiere una cuenta de Supabase.", "error");
+        return;
+    }
+
+    const name = document.getElementById("account-name").value.trim();
+    const email = document.getElementById("account-email").value.trim().toLowerCase();
+    const currentEmail = (state.currentUser.email || "").trim().toLowerCase();
+    const emailChanged = email !== currentEmail;
+
+    if (!name || !email) {
+        showToast("Completá tu nombre y email.", "error");
+        return;
+    }
+
+    // Validar email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        showToast("Ingresá un formato de email válido.", "error");
+        return;
+    }
+
+    const confirmed = await showGenericConfirmModal(
+        "Confirmar cambios",
+        emailChanged
+            ? "Se modificará tu correo electrónico. Deberás verificar la nueva dirección para iniciar sesión. ¿Confirmás los cambios?"
+            : "¿Confirmás los cambios en tu perfil?"
+    );
+    if (!confirmed) return;
+
+    showLoader(true, "Actualizando tus datos...");
+
+    try {
+        const { error: profileError } = await supabase
+            .from("perfiles")
+            .update({ nombre: name })
+            .eq("id", state.currentUser.authId);
+        if (profileError) throw profileError;
+
+        let accountEmail = currentEmail;
+        if (emailChanged) {
+            const { data: updatedAuth, error: authError } = await supabase.auth.updateUser({ email });
+            if (authError) throw authError;
+
+            accountEmail = updatedAuth.user?.email || currentEmail;
+            if (accountEmail === email) {
+                const { error: emailProfileError } = await supabase
+                    .from("perfiles")
+                    .update({ email })
+                    .eq("id", state.currentUser.authId);
+                if (emailProfileError) throw emailProfileError;
+            }
+        }
+
+        state.currentUser = { ...state.currentUser, nombre: name, email: accountEmail };
+        localStorage.setItem("evolet_session_v4", JSON.stringify(state.currentUser));
+        document.getElementById("user-display-name").textContent = name;
+        populateAccountForm();
+        showToast(
+            emailChanged && accountEmail !== email
+                ? "Datos actualizados. Revisá tu email para confirmar la nueva dirección."
+                : "Tus datos se actualizaron correctamente.",
+            "success"
+        );
+        setAccountEditing(false);
+    } catch (error) {
+        console.error("Error al actualizar datos de cuenta:", error);
+        showToast(error.message || "No se pudieron actualizar tus datos.", "error");
+    } finally {
+        showLoader(false);
+    }
+}
+
+async function handlePasswordSubmit(event) {
+    if (event) event.preventDefault();
+
+    if (!state.currentUser) {
+        showToast("Iniciá sesión para cambiar tu contraseña.", "error");
+        return;
+    }
+
+    if (!supabase || !state.currentUser.authId) {
+        showToast("La actualización de contraseña requiere una cuenta de Supabase.", "error");
+        return;
+    }
+
+    const currentPassword = document.getElementById("account-current-password").value;
+    const password = document.getElementById("account-password").value;
+    const confirmPassword = document.getElementById("account-confirm-password").value;
+
+    if (!currentPassword || !password || !confirmPassword) {
+        showToast("Ingresá tu contraseña actual, la nueva contraseña y su confirmación.", "error");
+        return;
+    }
+
+    if (password.length < 8) {
+        showToast("La nueva contraseña debe tener al menos 8 caracteres.", "error");
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        showToast("La nueva contraseña y su confirmación no coinciden.", "error");
+        return;
+    }
+
+    const confirmed = await showGenericConfirmModal(
+        "Confirmar cambio de contraseña",
+        "Se modificará tu contraseña de acceso. ¿Confirmás el cambio?"
+    );
+    if (!confirmed) return;
+
+    showLoader(true, "Cambiando contraseña...");
+
+    try {
+        const currentEmail = (state.currentUser.email || "").trim().toLowerCase();
+        const { data: reauthenticated, error: reauthError } = await supabase.auth.signInWithPassword({
+            email: currentEmail,
+            password: currentPassword
+        });
+        if (reauthError || !reauthenticated.user) {
+            throw new Error("La contraseña actual no es correcta. No se modificó la contraseña.");
+        }
+
+        const { error: authError } = await supabase.auth.updateUser({ password });
+        if (authError) throw authError;
+
+        showToast("Tu contraseña se actualizó correctamente.", "success");
+        setAccountPasswordEditing(false);
+    } catch (error) {
+        console.error("Error al cambiar la contraseña:", error);
+        showToast(error.message || "No se pudo cambiar la contraseña.", "error");
+    } finally {
+        showLoader(false);
+    }
 }
 
 function switchTab(tabId) {
-    if (state.isEditingPrices && tabId !== "configuracion") {
+    if (state.isEditingPrices && tabId !== "precios") {
         showGenericConfirmModal(
             "Descartar cambios",
             "Tienes cambios sin guardar en los precios. ¿Deseas cambiar de pestaña y perder los cambios?",
@@ -782,6 +1406,8 @@ function executeSwitchTab(tabId) {
         renderHistoryList();
     } else if (tabId === "estadisticas") {
         calculateAndRenderStats();
+    } else if (tabId === "clientes") {
+        loadClients();
     } else if (tabId === "calendario") {
         renderCalendar();
         renderDayAppointments();
@@ -793,7 +1419,7 @@ function executeSwitchTab(tabId) {
             expDateInput.value = todayStr;
         }
         renderExpensesList();
-    } else if (tabId === "configuracion") {
+    } else if (tabId === "precios") {
         renderPricesEditor();
     } else if (tabId === "historial-gastos") {
         renderExpensesHistoryList();
@@ -820,6 +1446,7 @@ async function handleLoginSubmit(e) {
             loadPricesFromCloud();
             loadExpenses();
             loadCajaMovements();
+            loadClients();
             loadAppointments();
             checkAdminAccess();
             return;
@@ -842,6 +1469,7 @@ async function handleLoginSubmit(e) {
             loadPricesFromCloud(); // Cargar precios dinámicos
             loadExpenses(); // Cargar gastos registrados
             loadCajaMovements(); // Cargar movimientos entre cajas
+            loadClients();
             checkAdminAccess(); // Chequear permisos
         } else {
             showToast((data && data.message) ? data.message : "Email o contraseña incorrectos", "error");
@@ -857,9 +1485,14 @@ function handleLogout() {
     state.currentUser = null;
     state.servicesList = [];
 
-    // Ocultar botón de configuración al cerrar sesión
-    const configBtn = document.getElementById("nav-btn-config");
-    if (configBtn) configBtn.classList.add("hidden");
+    const pricesNavButton = document.getElementById("nav-btn-config");
+    if (pricesNavButton) pricesNavButton.classList.add("hidden");
+
+    // Ocultar accesos administrativos al cerrar sesión
+    const accountMenu = document.getElementById("account-menu");
+    const accountMenuButton = document.getElementById("btn-header-menu");
+    if (accountMenu) accountMenu.classList.add("hidden");
+    if (accountMenuButton) accountMenuButton.setAttribute("aria-expanded", "false");
 
     updateRegisterTabVisibility();
     showLoginScreen();
@@ -1349,7 +1982,7 @@ async function confirmServiceRegistration() {
         }
 
         // Si no se actualizó una seña existente, crear un nuevo servicio como antes
-        const data = supabase && state.currentUser.authId
+        const data = supabase && state.currentUser.authId && !CONFIG_SHEET_URL
             ? await registerServiceDirectly(transaction)
             : await apiPost(CONFIG_SHEET_URL, { action: "add_service", ...transaction }, { showLoading: true, loadingText: 'Registrando servicio...' });
 
@@ -1494,7 +2127,7 @@ function viewServiceDetail(id) {
         senaRow.style.display = "none";
     }
 
-    document.getElementById("detail-metodo").textContent = item.metodoPago;
+    document.getElementById("detail-metodo").textContent = (item.metodoPago || '').toLowerCase() === 'fiado' ? 'Pendiente de pago' : item.metodoPago;
 
     const dateObj = normalizeDateValue(item.fecha) || new Date();
     const formattedFullDate = dateObj.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit', year: 'numeric' }) +
@@ -1812,7 +2445,7 @@ function renderCajaMovementsList() {
 
     if (!state.cajaMovementsList || state.cajaMovementsList.length === 0) {
         container.innerHTML = `
-            <div class="no-appointments-placeholder">
+            <div class="list-empty-state">
                 <i class="fa-solid fa-right-left" style="font-size: 20px; color: var(--text-light); margin-bottom: 5px; display: block;"></i>
                 Todavía no hay movimientos entre cajas.
             </div>
@@ -2104,7 +2737,34 @@ function calculateAndRenderStats() {
     let totalMonthIncome = 0;
     let totalMonthFiado = 0;
     let totalWeekIncome = 0;
+    let totalWeekExpenses = 0;
     let servicesCountMonth = 0;
+    const categoryIncomeSums = {
+        "Semi": 0,
+        "Kapping": 0,
+        "Softgel": 0,
+        "Esculpidas": 0,
+        "Personalizado": 0,
+        "Retiro": 0,
+        "Otro": 0
+    };
+
+    const incomeCategory = (service, category) => {
+        const normalized = (service || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (normalized.includes("semi")) return "Semi";
+        if (normalized.includes("kapping")) return "Kapping";
+        if (normalized.includes("softgel") || normalized.includes("soft gel")) return "Softgel";
+        if (normalized.includes("esculpid")) return "Esculpidas";
+        if (normalized.includes("remoc") || normalized.includes("retiro")) return "Retiro";
+        const fallback = (category || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (fallback.includes("semi")) return "Semi";
+        if (fallback.includes("kapping")) return "Kapping";
+        if (fallback.includes("softgel") || fallback.includes("soft gel")) return "Softgel";
+        if (fallback.includes("esculpid")) return "Esculpidas";
+        if (fallback.includes("personal") || fallback.includes("otro")) return "Personalizado";
+        if (fallback.includes("remoc") || fallback.includes("retiro")) return "Retiro";
+        return "Otro";
+    };
 
     let cashSum = 0;
     let transfeSum = 0;
@@ -2129,6 +2789,9 @@ function calculateAndRenderStats() {
             } else if (!isDuplicateSena) {
                 totalMonthIncome += precio;
                 servicesCountMonth++;
+                if (!isStandaloneSena) {
+                    categoryIncomeSums[incomeCategory(item.servicio, item.categoria)] += precio;
+                }
 
                 serviceCounts[item.servicio] = (serviceCounts[item.servicio] || 0) + 1;
 
@@ -2156,6 +2819,9 @@ function calculateAndRenderStats() {
 
     state.expensesList.forEach(item => {
         const date = normalizeDateValue(item.fecha);
+        if (date && date >= startOfWeek) {
+            totalWeekExpenses += Number(item.monto) || 0;
+        }
         if (date && date >= startDate && date <= endDate) {
             const monto = Number(item.monto) || 0;
             totalMonthExpenses += monto;
@@ -2190,6 +2856,8 @@ function calculateAndRenderStats() {
     }
 
     document.getElementById("stat-week-income").textContent = `$${totalWeekIncome.toLocaleString("es-AR")}`;
+    const weekExpensesEl = document.getElementById("stat-week-expenses");
+    if (weekExpensesEl) weekExpensesEl.textContent = `$${totalWeekExpenses.toLocaleString("es-AR")}`;
     document.getElementById("stat-count-month").textContent = servicesCountMonth;
     document.getElementById("stat-average-ticket").textContent = `$${averageTicket.toLocaleString("es-AR")}`;
 
@@ -2216,22 +2884,13 @@ function calculateAndRenderStats() {
             .map(([name, sum]) => ({ name, sum }))
             .sort((a, b) => b.sum - a.sum);
 
-        const catIcons = {
-            "Insumos": '<i class="fa-solid fa-box-open" style="color: var(--barbie-pink);"></i>',
-            "Servicios": '<i class="fa-solid fa-bolt" style="color: #FFD700;"></i>',
-            "Comida": '<i class="fa-solid fa-utensils" style="color: #FFA500;"></i>',
-            "Gasto propio": '<i class="fa-solid fa-user-tag" style="color: #9370DB;"></i>',
-            "Otro": '<i class="fa-solid fa-circle-question" style="color: var(--text-light);"></i>'
-        };
-
         sortedCats.forEach(cat => {
             const pct = totalMonthExpenses > 0 ? Math.round((cat.sum / totalMonthExpenses) * 100) : 0;
-            const icon = catIcons[cat.name] || catIcons["Otro"];
 
             const row = document.createElement("div");
             row.className = "payment-stat-row";
             row.innerHTML = `
-                <div class="payment-stat-label">${icon} ${cat.name}</div>
+                <div class="payment-stat-label">${cat.name}</div>
                 <div class="payment-progress-bar">
                     <div class="progress" style="width: ${pct}%"></div>
                 </div>
@@ -2241,12 +2900,33 @@ function calculateAndRenderStats() {
         });
     }
 
+    const incomeStatsContainer = document.getElementById("category-income-stats");
+    if (incomeStatsContainer) {
+        incomeStatsContainer.innerHTML = "";
+        Object.entries(categoryIncomeSums)
+            .map(([name, sum]) => ({ name, sum }))
+            .sort((a, b) => b.sum - a.sum)
+            .forEach(category => {
+                const pct = totalMonthIncome > 0 ? Math.round((category.sum / totalMonthIncome) * 100) : 0;
+                const row = document.createElement("div");
+                row.className = "payment-stat-row";
+                row.innerHTML = `
+                    <div class="payment-stat-label">${category.name}</div>
+                    <div class="payment-progress-bar">
+                        <div class="progress income-progress" style="width: ${pct}%"></div>
+                    </div>
+                    <div class="payment-stat-val">$${category.sum.toLocaleString("es-AR")} (${pct}%)</div>
+                `;
+                incomeStatsContainer.appendChild(row);
+            });
+    }
+
     renderPopularServices(serviceCounts);
     renderDebtorsList();
     renderCajaMovementsList();
 }
 
-// Renderizar el listado dinámico de deudores (fiados)
+// Renderizar el listado dinámico de pagos pendientes
 function renderDebtorsList() {
     const debtors = state.servicesList.filter(item => item.metodoPago === "Fiado");
     const panel = document.getElementById("debtors-panel");
@@ -2323,11 +3003,11 @@ async function confirmDebtCollection() {
     document.getElementById("collect-debt-modal").classList.add("hidden");
 
     try {
-        const data = supabase && state.currentUser.authId
+        const data = supabase && state.currentUser.authId && !CONFIG_SHEET_URL
             ? { success: !!(await updateServiceRecord(debt.id, { metodo_pago: metodo.toLowerCase(), fecha: new Date().toISOString() })) }
             : await apiPost(CONFIG_SHEET_URL, { action: "edit_service", id: debt.id, metodoPago: metodo, fecha: new Date().toISOString() }, { showLoading: true, loadingText: 'Registrando pago de deuda...' });
         if (data && data.success) {
-            showToast("¡Deuda cobrada e ingresada a la caja correctamente!", "success");
+            showToast("¡Pago pendiente cobrado e ingresado a la caja correctamente!", "success");
 
             // Actualizar localmente el servicio
             debt.metodoPago = metodo;
@@ -2546,27 +3226,28 @@ async function loadPricesFromCloud() {
 
 // Chequear acceso de administrador y ajustar visibilidad del botón de Ajustes e importación
 function checkAdminAccess() {
-    const configBtn = document.getElementById("nav-btn-config");
+    const pricesNavButton = document.getElementById("nav-btn-config");
     const syncBtn = document.getElementById("btn-sync-history");
     const isAdmin = state.currentUser && state.currentUser.rol === "admin";
 
-    if (configBtn) {
-        if (isAdmin) {
-            configBtn.classList.remove("hidden");
-        } else {
-            configBtn.classList.add("hidden");
-            const activeTabBtn = document.querySelector(".nav-item.active");
-            if (activeTabBtn && activeTabBtn.getAttribute("data-tab") === "configuracion") {
-                switchTab("calendario");
-            }
+    if (pricesNavButton) pricesNavButton.classList.toggle("hidden", !isAdmin);
+
+    if (!isAdmin) {
+        const activeTabBtn = document.querySelector(".nav-item.active");
+        if (activeTabBtn && ["precios", "ajustes"].includes(activeTabBtn.getAttribute("data-tab"))) {
+            switchTab("calendario");
         }
     }
+
+    const settingsMenuItem = document.getElementById("menu-ajustes");
+    if (settingsMenuItem) settingsMenuItem.classList.toggle("hidden", !isAdmin);
 
     if (syncBtn) {
         syncBtn.classList.add("hidden");
     }
 
     updateRegisterTabVisibility();
+    updateCajasTabVisibility();
 }
 
 // Renderizar el editor de precios dinámico en Ajustes
@@ -2683,7 +3364,7 @@ async function savePricesToCloud() {
 
     try {
         let data;
-        if (supabase && state.currentUser.authId) {
+        if (supabase && state.currentUser.authId && !CONFIG_SHEET_URL) {
             const { error } = await supabase.from('precios').upsert(updatedPrices.map(price => ({
                 categoria: price.categoria,
                 nombre: price.name,
@@ -2917,7 +3598,7 @@ function renderDayAppointments() {
 
     if (dayApts.length === 0) {
         container.innerHTML = `
-            <div class="no-appointments-placeholder" style="cursor: pointer;" id="btn-empty-schedule">
+            <div class="no-appointments-placeholder empty-schedule-state" style="cursor: pointer;" id="btn-empty-schedule">
                 <i class="fa-solid fa-calendar-plus" style="font-size: 24px; color: var(--barbie-pink); margin-bottom: 8px; display: block;"></i>
                 No hay turnos agendados para este día.
                 <span style="font-size: 11px; color: var(--barbie-dark); font-weight: 700; display: block; margin-top: 4px;">
@@ -3025,7 +3706,8 @@ function openSenaModal(apt) {
     if (sub) sub.textContent = `Cargar seña para ${apt.cliente}:`;
 
     const amt = document.getElementById("sena-modal-amount");
-    if (amt) amt.value = apt.precio ? apt.precio : "2500";
+    const defaultSena = Number(apt && apt.precio) || 0;
+    if (amt) amt.value = defaultSena > 0 ? String(defaultSena) : "2500";
 
     const modal = document.getElementById("sena-modal");
     if (modal) modal.classList.remove("hidden");
@@ -3041,21 +3723,28 @@ async function handleSenaSubmit(e) {
     e.preventDefault();
     if (!currentSenaAppointment) return;
 
+    const amountInput = document.getElementById("sena-modal-amount");
+    if (!amountInput) {
+        showToast("No se pudo cargar la información de la seña del turno.", "error");
+        return;
+    }
+
     const apt = currentSenaAppointment;
-    const sena = Number(document.getElementById("sena-modal-amount").value) || 0;
-    const metodo = document.querySelector('input[name="sena-modal-payment"]:checked').value;
+    const sena = Number(amountInput.value) || 0;
+    const paymentInput = document.querySelector('input[name="sena-modal-payment"]:checked');
+    const metodo = paymentInput ? paymentInput.value : "Transferencia";
 
     if (sena < 0) {
         showToast("Ingresá un monto de seña válido para confirmar el turno.", "error");
-        document.getElementById("sena-modal-amount").focus();
-        document.getElementById("sena-modal-amount").select();
+        amountInput.focus();
+        amountInput.select();
         return;
     }
 
     if (sena > 0 && sena < 1000) {
         window.alert('La seña debe ser 0 o mayor a 1000. Revisá el monto ingresado antes de guardar.');
-        document.getElementById("sena-modal-amount").focus();
-        document.getElementById("sena-modal-amount").select();
+        amountInput.focus();
+        amountInput.select();
         return;
     }
 
@@ -3079,13 +3768,22 @@ async function handleSenaSubmit(e) {
             apt.precio = sena;
             state.appointmentsList = normalizeAppointmentList(state.appointmentsList);
 
+            const calendarSync = await syncAppointmentWithGoogleCalendar('update', {
+                ...apt,
+                eventId: apt.eventId || apt.event_id || null,
+                id: apt.id
+            });
+            if (!calendarSync.success && calendarSync.warning) {
+                showToast("Turno guardado en Supabase; la sincronización con Google Calendar falló.", "warning");
+            }
+
             await registerServiceDirectly({
                 id: "serv_" + new Date().getTime(),
                 fecha: new Date().toISOString(),
                 usuario: state.currentUser ? state.currentUser.email : "Evolet",
                 cliente: apt.cliente,
                 servicio: "Seña",
-                categoria: "Manicuría",
+                categoria: "Otro",
                 precio: sena,
                 seña: 0,
                 metodoPago: metodo,
@@ -3177,6 +3875,18 @@ async function handleRescheduleSubmit(e) {
             apt.fecha = newDate;
             apt.horaInicio = startDate.toISOString();
             apt.horaFin = endIso;
+
+            const calendarSync = await syncAppointmentWithGoogleCalendar('update', {
+                ...apt,
+                eventId: apt.eventId || apt.event_id || null,
+                id: apt.id,
+                fecha: newDate,
+                horaInicio: startDate.toISOString(),
+                horaFin: endIso
+            });
+            if (!calendarSync.success && calendarSync.warning) {
+                showToast("Turno guardado en Supabase; no pudo actualizarse en Google Calendar.", "warning");
+            }
 
             const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
             localStorage.setItem(cacheKey, JSON.stringify(state.appointmentsList));
@@ -3273,6 +3983,27 @@ async function handleScheduleSubmit(e) {
 
     if (!cliente || !dateVal || !timeVal) {
         showToast("Por favor, completa todos los campos obligatorios.", "error");
+        return;
+    }
+
+    if (!supabase || !state.currentUser.authId) {
+        showToast("Para agendar un turno necesitás una clienta registrada en Supabase.", "error");
+        return;
+    }
+
+    const { data: registeredClient, error: clientLookupError } = await supabase
+        .from("clientes")
+        .select("id, nombre, activo")
+        .eq("nombre_normalizado", cliente.toLowerCase())
+        .maybeSingle();
+    if (clientLookupError) {
+        console.error("Error validando cliente del turno:", clientLookupError);
+        showToast("No se pudo validar la clienta. Intentá nuevamente.", "error");
+        return;
+    }
+    if (!registeredClient || registeredClient.activo === false) {
+        document.getElementById("schedule-new-client-panel")?.classList.remove("hidden");
+        showToast("Elegí una clienta activa o registrá esta clienta para continuar.", "error");
         return;
     }
 
@@ -3381,13 +4112,20 @@ async function handleScheduleSubmit(e) {
         }
 
         if (data && data.success) {
-            showToast("¡Turno agendado y sincronizado con éxito!", "success");
-
             const normalizedAppointment = {
                 ...(data.appointment || appointmentData),
                 estado: statusVal,
-                precio: statusVal === "Reservado" ? senaAmount : 0
+                precio: statusVal === "Reservado" ? senaAmount : 0,
+                id: appointmentData.id,
+                eventId: data.appointment?.eventId || null
             };
+
+            const calendarSync = await syncAppointmentWithGoogleCalendar('create', normalizedAppointment);
+            if (!calendarSync.success && calendarSync.warning) {
+                showToast("Turno guardado en Supabase; la sincronización con Google Calendar falló.", "warning");
+            } else {
+                showToast("¡Turno agendado y sincronizado con éxito!", "success");
+            }
 
             // Añadir localmente, ordenar y recargar
             state.appointmentsList = normalizeAppointmentList([
@@ -3411,7 +4149,7 @@ async function handleScheduleSubmit(e) {
                     usuario: state.currentUser.email,
                     cliente: cliente,
                     servicio: "Seña",
-                    categoria: "Manicuría",
+                    categoria: "Otro",
                     precio: senaAmount,
                     seña: 0,
                     metodoPago: senaPaymentMethod,
@@ -3445,12 +4183,23 @@ function cancelAppointment(id, clientName) {
         async () => {
             showLoader(true, "Cancelando turno...");
             try {
-                const data = supabase && state.currentUser.authId
+                const data = supabase && state.currentUser.authId && !CONFIG_SHEET_URL
                     ? await deleteAppointmentInSupabase(id)
                     : await apiPost(CONFIG_SHEET_URL, { action: "delete_appointment", id: id, email: state.currentUser.email }, { showLoading: true, loadingText: 'Cancelando turno...' });
 
                 if (data && data.success) {
-                    showToast("Turno cancelado correctamente.", "success");
+                    const existingAppointment = state.appointmentsList.find(apt => apt.id === id) || {};
+                    const calendarSync = await syncAppointmentWithGoogleCalendar('delete', {
+                        id,
+                        eventId: existingAppointment.eventId || existingAppointment.event_id || null,
+                        cliente: existingAppointment.cliente || clientName
+                    });
+
+                    if (!calendarSync.success && calendarSync.warning) {
+                        showToast("Turno eliminado de Supabase; la eliminación del evento en Google Calendar falló.", "warning");
+                    } else {
+                        showToast("Turno cancelado correctamente.", "success");
+                    }
 
                     // Remover de la lista local sin perder el resto de turnos
                     state.appointmentsList = normalizeAppointmentList(
@@ -3568,26 +4317,35 @@ async function loadExpenses() {
     }
 }
 
-// Renderizar el historial de gastos del mes actual
+// Renderizar el listado completo de gastos
 function renderExpensesList() {
     const container = document.getElementById("expenses-list");
-    const totalEl = document.getElementById("expense-month-total");
-    if (!container || !totalEl) return;
+    if (!container) return;
 
     container.innerHTML = "";
 
     const now = new Date();
-    const { startDate, endDate } = getMonthWindowRange(now);
-
-    // Filtrar los gastos del periodo desde el día equivalente del mes anterior hasta hoy
-    const monthExpenses = state.expensesList.filter(item => {
+    const activePeriod = document.querySelector("[data-expense-period].active");
+    const activeCategory = document.querySelector("[data-expense-category].active");
+    const period = activePeriod?.dataset.expensePeriod || "todos";
+    const category = activeCategory?.dataset.expenseCategory || "todos";
+    const search = document.getElementById("expenses-search")?.value.trim().toLowerCase() || "";
+    const expenses = state.expensesList.filter((item) => {
         const date = normalizeDateValue(item.fecha);
-        return date && date >= startDate && date <= endDate;
+        const searchable = `${item.concepto || ""} ${item.categoria || ""} ${item.metodoPago || ""}`.toLowerCase();
+        if (search && !searchable.includes(search)) return false;
+        if (category !== "todos" && (item.categoria || "").toLowerCase() !== category) return false;
+        if (period === "hoy" && (!date || date.toDateString() !== now.toDateString())) return false;
+        if (period === "semana") {
+            const weekAgo = new Date(now);
+            weekAgo.setDate(now.getDate() - 7);
+            if (!date || date < weekAgo) return false;
+        }
+        if (period === "mes" && (!date || date.getMonth() !== now.getMonth() || date.getFullYear() !== now.getFullYear())) return false;
+        return true;
     });
 
-
-    // Ordenar de más nuevo a más viejo
-    monthExpenses.sort((a, b) => {
+    expenses.sort((a, b) => {
         const dateA = normalizeDateValue(a.fecha);
         const dateB = normalizeDateValue(b.fecha);
         if (!dateA && !dateB) return 0;
@@ -3598,21 +4356,17 @@ function renderExpensesList() {
 
 
 
-    let totalSum = 0;
-
-    if (monthExpenses.length === 0) {
+    if (expenses.length === 0) {
         container.innerHTML = `
-            <div class="no-appointments-placeholder">
+            <div class="list-empty-state">
                 <i class="fa-solid fa-receipt" style="font-size: 20px; color: var(--text-light); margin-bottom: 5px; display: block;"></i>
-                No hay gastos registrados este mes
+                No hay gastos que coincidan con los filtros
             </div>
         `;
-        totalEl.textContent = "$0";
         return;
     }
 
-    monthExpenses.forEach(exp => {
-        totalSum += exp.monto;
+    expenses.forEach(exp => {
 
         const date = normalizeDateValue(exp.fecha) || new Date();
         const day = String(date.getDate()).padStart(2, '0');
@@ -3658,7 +4412,6 @@ function renderExpensesList() {
         container.appendChild(card);
     });
 
-    totalEl.textContent = `$${totalSum.toLocaleString("es-AR")}`;
 }
 
 // Registrar gasto (Submit de formulario)
@@ -3719,9 +4472,11 @@ async function handleExpenseSubmit(e) {
         if (data && data.success) {
             showToast("¡Gasto registrado con éxito!", "success");
 
-            // Limpiar formulario
-            document.getElementById("expense-concept").value = "";
-            document.getElementById("expense-amount").value = "";
+            // Limpiar formulario y preparar la fecha del próximo registro
+            const expenseForm = document.getElementById("expense-form");
+            if (expenseForm) expenseForm.reset();
+            const expenseDate = document.getElementById("expense-date");
+            if (expenseDate) expenseDate.value = new Date().toISOString().split('T')[0];
 
             // Añadir localmente
             state.expensesList.push(normalizeExpenseRecord(data.expense || expenseData));

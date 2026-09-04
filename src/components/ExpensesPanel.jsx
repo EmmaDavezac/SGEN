@@ -1,0 +1,427 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '../supabase.js';
+import { ConfirmModal } from './Modal.jsx';
+
+const EXPENSE_PERIOD_OPTIONS = [
+    { key: 'todos', label: 'Todos' },
+    { key: 'hoy', label: 'Hoy' },
+    { key: 'semana', label: 'Esta semana' },
+    { key: 'mes', label: 'Este mes' }
+];
+
+const EXPENSE_CATEGORY_OPTIONS = [
+    { key: 'todos', label: 'Todas' },
+    { key: 'Insumos', label: 'Insumos' },
+    { key: 'Servicios', label: 'Servicios' },
+    { key: 'Comida', label: 'Comida' },
+    { key: 'Gasto propio', label: 'Gasto propio' },
+    { key: 'Otro', label: 'Otro' }
+];
+
+const CATEGORY_SELECT_OPTIONS = ['Insumos', 'Servicios', 'Comida', 'Gasto propio', 'Otro'];
+
+const normalizeExpenseRecord = (item) => {
+    return {
+        id: item?.id || `exp_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        fecha: item?.fecha || new Date().toISOString(),
+        concepto: (item?.concepto || 'Gasto').toString().trim() || 'Gasto',
+        categoria: (item?.categoria || 'Otro').toString().trim() || 'Otro',
+        monto: Number(item?.monto) || 0,
+        metodoPago: (item?.metodo_pago || item?.metodoPago || 'Efectivo').toString().trim() || 'Efectivo'
+    };
+};
+
+const formatDateTime = (dateValue) => {
+    if (!dateValue) return '';
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+const formatPrice = (n) => Number(n || 0).toLocaleString('es-AR');
+
+const todayISO = () => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+};
+
+const ExpensesPanel = ({ session, notify, showLoader }) => {
+    const [expenses, setExpenses] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    const [concepto, setConcepto] = useState('');
+    const [categoria, setCategoria] = useState('Otro');
+    const [monto, setMonto] = useState('');
+    const [fecha, setFecha] = useState(todayISO());
+    const [metodoPago, setMetodoPago] = useState('Efectivo');
+    const [submitting, setSubmitting] = useState(false);
+    const [confirmation, setConfirmation] = useState(null);
+    const confirmBypassRef = useRef(false);
+
+    const [search, setSearch] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+    const [period, setPeriod] = useState('todos');
+    const [filterCategory, setFilterCategory] = useState('todos');
+
+    useEffect(() => {
+        let ignore = false;
+
+        const load = async () => {
+            if (!session?.authId || !supabase) return;
+            setLoading(true);
+            if (showLoader) showLoader(true, 'Cargando gastos...');
+            try {
+                const { data, error } = await supabase
+                    .from('gastos')
+                    .select('id, fecha, concepto, categoria, monto, metodo_pago')
+                    .order('fecha', { ascending: false });
+
+                if (error) throw error;
+                const normalized = (data || []).map(normalizeExpenseRecord);
+                if (!ignore) setExpenses(normalized);
+            } catch (err) {
+                console.error(err);
+                if (notify) notify('No se pudo cargar el listado de gastos.', 'error');
+            } finally {
+                if (!ignore) {
+                    setLoading(false);
+                    if (showLoader) showLoader(false);
+                }
+            }
+        };
+
+        load();
+        return () => { ignore = true; };
+    }, [session, notify, showLoader]);
+
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const weekStart = new Date(todayStart);
+        weekStart.setDate(todayStart.getDate() - 7);
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        return expenses.filter((e) => {
+            const concepto = (e.concepto || '').toLowerCase();
+            const cat = (e.categoria || '').toLowerCase();
+            if (q && !concepto.includes(q) && !cat.includes(q)) return false;
+
+            if (filterCategory !== 'todos' && (e.categoria || '') !== filterCategory) return false;
+
+            const d = new Date(e.fecha);
+            if (period === 'hoy' && d < todayStart) return false;
+            if (period === 'semana' && d < weekStart) return false;
+            if (period === 'mes' && d < monthStart) return false;
+            return true;
+        });
+    }, [expenses, search, filterCategory, period]);
+
+    const resetForm = () => {
+        setConcepto('');
+        setCategoria('Otro');
+        setMonto('');
+        setFecha(todayISO());
+        setMetodoPago('Efectivo');
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!session?.authId || !supabase) return;
+        if (!concepto.trim() || !monto || Number(monto) <= 0) {
+            if (notify) notify('Completá concepto y monto válidos.', 'error');
+            return;
+        }
+        if (!confirmBypassRef.current) {
+            setConfirmation({
+                title: 'Registrar gasto',
+                message: `¿Confirmás registrar el gasto de $${Number(monto).toLocaleString('es-AR')} por ${concepto.trim()}?`,
+                action: () => handleSubmit({ preventDefault() {} })
+            });
+            return;
+        }
+        confirmBypassRef.current = false;
+
+        setSubmitting(true);
+        if (showLoader) showLoader(true, 'Guardando gasto...');
+        try {
+            const { data, error } = await supabase
+                .from('gastos')
+                .insert({
+                    usuario_id: session.authId,
+                    concepto: concepto.trim(),
+                    categoria: categoria,
+                    monto: Number(monto),
+                    metodo_pago: metodoPago,
+                    fecha: new Date(fecha).toISOString()
+                })
+                .select('id, fecha, concepto, categoria, monto, metodo_pago')
+                .single();
+
+            if (error) throw error;
+            if (!data) throw new Error('Supabase no devolvió el gasto creado.');
+            const newExpense = normalizeExpenseRecord(data);
+            setExpenses((prev) => [newExpense, ...prev]);
+            resetForm();
+            if (notify) notify('Gasto registrado con éxito ✨', 'success');
+        } catch (err) {
+            console.error(err);
+            if (notify) notify(err?.message || 'No se pudo guardar el gasto.', 'error');
+        } finally {
+            setSubmitting(false);
+            if (showLoader) showLoader(false);
+        }
+    };
+
+    const paymentIcon = (method) => {
+        const m = (method || '').toLowerCase();
+        if (m === 'efectivo') return 'fa-money-bill-wave';
+        return 'fa-mobile-screen-button';
+    };
+
+    const categoryIcon = (cat) => {
+        const c = (cat || '').toLowerCase();
+        if (c === 'insumos') return 'fa-flask';
+        if (c === 'servicios') return 'fa-briefcase';
+        if (c === 'comida') return 'fa-utensils';
+        if (c.includes('propio')) return 'fa-user';
+        return 'fa-receipt';
+    };
+
+    return (
+        <section style={{ display: 'grid', gap: '18px' }}>
+            <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                <div>
+                    <h3>Registro de Gastos</h3>
+                    <p>Controla tus egresos diarios para optimizar tu negocio.</p>
+                </div>
+            </div>
+
+            <div className="chart-section">
+                <h4>Registrar Nuevo Gasto</h4>
+                <form className="cute-form" style={{ marginTop: '15px' }} onSubmit={handleSubmit}>
+                    <div className="form-group">
+                        <label htmlFor="expense-concept">Concepto / Descripción</label>
+                        <div className="input-wrapper">
+                            <i className="fa-solid fa-pen input-icon"></i>
+                            <input
+                                type="text"
+                                id="expense-concept"
+                                placeholder="Ej: Luz, Esmaltes..."
+                                value={concepto}
+                                onChange={(e) => setConcepto(e.target.value)}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="expense-category">Categoría</label>
+                        <div className="input-wrapper">
+                            <i className="fa-solid fa-tags input-icon"></i>
+                            <select
+                                id="expense-category"
+                                value={categoria}
+                                onChange={(e) => setCategoria(e.target.value)}
+                                required
+                            >
+                                {CATEGORY_SELECT_OPTIONS.map((opt) => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="form-row-2">
+                        <div className="form-group">
+                            <label htmlFor="expense-amount">Monto ($)</label>
+                            <div className="input-wrapper">
+                                <i className="fa-solid fa-dollar-sign input-icon"></i>
+                                <input
+                                    type="number"
+                                    id="expense-amount"
+                                    placeholder="0"
+                                    min="1"
+                                    value={monto}
+                                    onChange={(e) => setMonto(e.target.value)}
+                                    inputMode="numeric"
+                                    required
+                                />
+                            </div>
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="expense-date">Fecha</label>
+                            <div className="input-wrapper">
+                                <i className="fa-solid fa-calendar-day input-icon"></i>
+                                <input
+                                    type="date"
+                                    id="expense-date"
+                                    value={fecha}
+                                    onChange={(e) => setFecha(e.target.value)}
+                                    required
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label>Método de Pago</label>
+                        <div className="payment-method-selector">
+                            <label className="pay-btn">
+                                <input
+                                    type="radio"
+                                    name="expense-payment-form"
+                                    value="Efectivo"
+                                    checked={metodoPago === 'Efectivo'}
+                                    onChange={() => setMetodoPago('Efectivo')}
+                                />
+                                <div className="pay-btn-content">
+                                    <i className="fa-solid fa-money-bill-wave pay-icon"></i>
+                                    Efectivo
+                                </div>
+                            </label>
+                            <label className="pay-btn">
+                                <input
+                                    type="radio"
+                                    name="expense-payment-form"
+                                    value="Transferencia"
+                                    checked={metodoPago === 'Transferencia'}
+                                    onChange={() => setMetodoPago('Transferencia')}
+                                />
+                                <div className="pay-btn-content">
+                                    <i className="fa-solid fa-mobile-screen-button pay-icon"></i>
+                                    Transferencia
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button
+                        type="submit"
+                        className="btn btn-primary btn-block"
+                        style={{ marginTop: '20px' }}
+                        disabled={submitting}
+                    >
+                        <i className="fa-solid fa-check"></i>
+                        {submitting ? 'Guardando…' : 'Registrar'}
+                    </button>
+                </form>
+            </div>
+
+            <div className="chart-section" style={{ marginTop: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h4 style={{ marginBottom: 0 }}>Todos los gastos</h4>
+                </div>
+
+                <div className="filters-container expense-filters">
+                    <div className="search-box-container">
+                        <i className="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input
+                            type="search"
+                            placeholder="Buscar gasto..."
+                            className="search-input"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        className="filter-toggle-btn"
+                        title="Filtrar gastos"
+                        onClick={() => setShowFilters((v) => !v)}
+                    >
+                        <i className="fa-solid fa-filter"></i>
+                    </button>
+
+                    {showFilters && (
+                        <div className="filter-button-panel">
+                            <div className="filter-button-group">
+                                {EXPENSE_PERIOD_OPTIONS.map((opt) => (
+                                    <button
+                                        key={opt.key}
+                                        type="button"
+                                        className={`filter-choice ${period === opt.key ? 'active' : ''}`}
+                                        onClick={() => setPeriod(opt.key)}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="filter-button-group">
+                                {EXPENSE_CATEGORY_OPTIONS.map((opt) => (
+                                    <button
+                                        key={opt.key}
+                                        type="button"
+                                        className={`filter-choice ${filterCategory === opt.key ? 'active' : ''}`}
+                                        onClick={() => setFilterCategory(opt.key)}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="day-appointments-container">
+                    {loading && filtered.length === 0 && (
+                        <div className="list-empty-state"><p>Cargando gastos...</p></div>
+                    )}
+                    {!loading && filtered.length === 0 && (
+                        <div className="no-appointments-placeholder">
+                            No hay gastos para mostrar 💸
+                        </div>
+                    )}
+
+                    {filtered.map((exp) => (
+                        <div key={exp.id} className="appointment-card">
+                            <div className="appointment-time-col">
+                                <div style={{ fontSize: '22px', color: '#ff4d4d' }}>
+                                    <i className={`fa-solid ${categoryIcon(exp.categoria)}`}></i>
+                                </div>
+                                <div className="appointment-time-duration" style={{ marginTop: '4px' }}>
+                                    {formatDateTime(exp.fecha)}
+                                </div>
+                            </div>
+                            <div className="appointment-info-col">
+                                <div className="appointment-client-name">{exp.concepto}</div>
+                                <div className="appointment-service-name">
+                                    <span className="pay-badge" style={{ marginRight: '6px' }}>
+                                        <i className={`fa-solid ${paymentIcon(exp.metodoPago)}`}></i> {exp.metodoPago}
+                                    </span>
+                                    <span style={{ color: 'var(--barbie-dark)', fontWeight: 600 }}>
+                                        {exp.categoria}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="appointment-actions-col">
+                                <div className="card-price" style={{ color: '#ff4d4d', fontSize: '16px', fontWeight: 700 }}>
+                                    -${formatPrice(exp.monto)}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <ConfirmModal
+                open={!!confirmation}
+                title={confirmation?.title}
+                message={confirmation?.message}
+                confirmText="Confirmar"
+                onConfirm={() => {
+                    const action = confirmation?.action;
+                    setConfirmation(null);
+                    confirmBypassRef.current = true;
+                    if (action) action();
+                }}
+                onCancel={() => setConfirmation(null)}
+            />
+        </section>
+    );
+};
+
+export default ExpensesPanel;

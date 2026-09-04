@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#fff0f5">
+  <link rel="icon" type="image/x-icon" href="/public/icons/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/favicon-16.png">
+    <link rel="apple-touch-icon" href="/public/icons/apple-touch-icon-180.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>404 | Evolet Nails</title>
+    <style>
+        :root {
+            --pink: #ff1493;
+            --soft-pink: #fff0f5;
+            --ink: #5a3d46;
+            --cream: #fcf9f5;
+            --gold: #e6b800;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 15% 18%, rgba(255, 192, 203, .55) 0 2px, transparent 3px),
+                radial-gradient(circle at 86% 78%, rgba(255, 215, 0, .45) 0 2px, transparent 3px),
+                linear-gradient(135deg, var(--soft-pink), var(--cream) 55%, #fff7fb);
+            background-size: 44px 44px, 68px 68px, auto;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        main {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 32px 20px;
+        }
+
+        .error-layout {
+            width: min(920px, 100%);
+            display: grid;
+            grid-template-columns: minmax(220px, .8fr) minmax(280px, 1.2fr);
+            align-items: center;
+            gap: clamp(28px, 7vw, 76px);
+        }
+
+        .brand-mark {
+            width: min(310px, 72vw);
+            aspect-ratio: 1;
+            margin: auto;
+            padding: 14px;
+            border: 1px solid rgba(255, 20, 147, .22);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, .62);
+            box-shadow: 0 22px 50px rgba(255, 20, 147, .16);
+            transform: rotate(-4deg);
+        }
+
+        .brand-mark img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .error-copy { max-width: 510px; }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            color: var(--pink);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+        }
+
+        .eyebrow::before {
+            content: '✦';
+            color: var(--gold);
+            font-size: 18px;
+        }
+
+        h1 {
+            margin: 12px 0 4px;
+            color: var(--pink);
+            font-family: 'Comfortaa', sans-serif;
+            font-size: clamp(78px, 15vw, 158px);
+            line-height: .88;
+            letter-spacing: 0;
+        }
+
+        h2 {
+            margin: 20px 0 12px;
+            color: var(--ink);
+            font-family: 'Comfortaa', sans-serif;
+            font-size: clamp(24px, 4vw, 39px);
+            line-height: 1.15;
+        }
+
+        p {
+            max-width: 420px;
+            margin: 0 0 26px;
+            color: #856b73;
+            font-size: 17px;
+            line-height: 1.6;
+        }
+
+        .home-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 48px;
+            padding: 0 20px;
+            border-radius: 12px;
+            color: #fff;
+            background: var(--pink);
+            box-shadow: 0 10px 18px rgba(255, 20, 147, .2);
+            font-weight: 700;
+            text-decoration: none;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .home-link:hover, .home-link:focus-visible {
+            box-shadow: 0 14px 24px rgba(255, 20, 147, .28);
+            transform: translateY(-2px);
+        }
+
+        .home-link:focus-visible { outline: 3px solid rgba(230, 184, 0, .65); outline-offset: 4px; }
+
+        @media (max-width: 650px) {
+            body { overflow: auto; }
+            .error-layout { grid-template-columns: 1fr; text-align: center; gap: 24px; }
+            .brand-mark { width: min(230px, 62vw); }
+            .error-copy { margin: auto; }
+            p { margin-left: auto; margin-right: auto; }
+            .eyebrow { justify-content: center; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .home-link { transition: none; }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <div class="error-layout">
+            <div class="brand-mark" aria-hidden="true">
+                <img src="/logo.png" alt="">
+            </div>
+            <section class="error-copy" aria-labelledby="error-title">
+                <div class="eyebrow">Evolet Nails</div>
+                <h1>404</h1>
+                <h2 id="error-title">Esta página se fue a hacerse las uñas.</h2>
+                <p>No encontramos el lugar que buscabas, pero tu agenda sigue intacta. Volvamos al inicio.</p>
+                <a class="home-link" href="/">
+                    <span aria-hidden="true">←</span>
+                    Volver al inicio
+                </a>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

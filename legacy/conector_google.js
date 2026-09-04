@@ -1,50 +1,27 @@
 /**
  * =========================================================================
- *                   CONECTOR DE GOOGLE SHEETS PARA EVOLET NAILS
+ *                   CONECTOR DE GOOGLE CALENDAR PARA EVOLET NAILS
  * =========================================================================
  * 
  * INSTRUCCIONES DE CONFIGURACIÓN:
  * 
- * 1. Crea una nueva Planilla de Google (Google Sheets).
- * 2. Renombra la primera pestaña como "Servicios".
- * 3. En la primera fila (Fila 1), escribe los siguientes encabezados en las columnas A hasta J:
- *    A1: ID
- *    B1: Fecha
- *    C1: Usuario
- *    D1: Cliente
- *    E1: Servicio
- *    F1: Categoria
- *    G1: Precio
- *    H1: Seña
- *    I1: MetodoPago
- *    J1: Completado
- * 
- * 4. Crea una segunda pestaña haciendo clic en el botón "+" abajo a la izquierda y renombrala como "Usuarios".
- * 5. En la primera fila (Fila 1), escribe los siguientes encabezados en las columnas A hasta C:
- *    A1: Email
- *    B1: Password
- *    C1: Nombre
- * 
- * 6. Agrega al menos un usuario autorizado en la pestaña "Usuarios" (Fila 2):
- *    Email: elcorreo@ejemplo.com (en minúsculas)
- *    Password: tucontraseña
- *    Nombre: Tu Nombre (ej. Evolet)
- * 
- * 7. En el menú superior de la planilla, ve a: Extensiones > Apps Script.
- * 8. Borra todo el código que aparezca en el editor y pega todo el contenido de este archivo.
- * 9. Haz clic en el icono del disquete (Guardar proyecto).
- * 10. Arriba a la derecha, haz clic en: Implementar (Deploy) > Nueva implementación (New deployment).
- * 11. Haz clic en el engranaje "Seleccionar tipo" y elige "Aplicación web" (Web app).
- * 12. Configura los siguientes campos:
+ * 1. La planilla debe tener una pestaña "Turnos" con las columnas:
+ *    ID, Fecha, HoraInicio, HoraFin, Cliente, Servicio, Precio, Usuario, EventID, Estado.
+ * 2. En el menú superior de la planilla, ve a: Extensiones > Apps Script.
+ * 3. Borra todo el código que aparezca en el editor y pega todo el contenido de este archivo.
+ * 4. Haz clic en el icono del disquete (Guardar proyecto).
+ * 5. Arriba a la derecha, haz clic en: Implementar (Deploy) > Nueva implementación (New deployment).
+ * 6. Haz clic en el engranaje "Seleccionar tipo" y elige "Aplicación web" (Web app).
+ * 7. Configura los siguientes campos:
  *     - Descripción: Conector Evolet Nails App
  *     - Ejecutar como: Yo (tu correo de Google)
  *     - Quién tiene acceso: Cualquier persona (Anyone) -> IMPORTANTE para que la app móvil pueda conectarse.
- * 13. Haz clic en "Implementar".
- * 14. Google te pedirá autorizar permisos. Haz clic en "Autorizar acceso", selecciona tu cuenta, 
+ * 8. Haz clic en "Implementar".
+ * 9. Google te pedirá autorizar permisos. Haz clic en "Autorizar acceso", selecciona tu cuenta, 
  *     luego haz clic en "Avanzado" (Advanced) y después en "Ir a Proyecto sin nombre (no seguro)" (Go to Untitled project). 
  *     Por último, haz clic en "Permitir" (Allow).
- * 15. Copia la "URL de la aplicación web" (debe terminar en "/exec").
- * 16. Pega esa URL en la configuración de la App de Contabilidad Móvil.
+ * 10. Copia la "URL de la aplicación web" (debe terminar en "/exec").
+ * 11. Pega esa URL como VITE_SHEET_URL en la aplicación.
  */
 
 const SPREADSHEET_ID = "REPLACE_WITH_YOUR_SHEET_ID";
@@ -79,33 +56,11 @@ function doGet(e) {
       return jsonResponse({ success: true, message: "Conexión exitosa con Google Sheets!" });
     }
     
-    if (action === "login") {
-      const email = e.parameter.email ? e.parameter.email.toLowerCase().trim() : "";
-      const password = e.parameter.password ? e.parameter.password.trim() : "";
-      return handleLogin(email, password);
-    }
-    
-    if (action === "get_services") {
-      const email = e.parameter.email ? e.parameter.email.toLowerCase().trim() : "";
-      return getServices(email);
-    }
-    
-    if (action === "get_prices") {
-      return getPrices();
-    }
-
     if (action === "get_appointments") {
       const email = e.parameter.email ? e.parameter.email.toLowerCase().trim() : "";
       return getAppointments(email);
     }
 
-    if (action === "get_expenses") {
-      return getExpenses();
-    }
-
-    if (action === "get_caja_movements") {
-      return getCajaMovements();
-    }
   } catch (error) {
     return jsonResponse({ success: false, message: "Error en el servidor: " + error.toString() });
   }
@@ -124,41 +79,6 @@ function doPost(e) {
     const data = JSON.parse(e.postData.contents);
     const action = data.action;
     
-    if (action === "login") {
-      const email = data.email ? data.email.toLowerCase().trim() : "";
-      const password = data.password ? data.password.trim() : "";
-      return handleLogin(email, password);
-    }
-    
-    if (action === "add_service") {
-      return addService(data);
-    }
-    
-    if (action === "delete_service") {
-      return deleteService(data.id, data.email);
-    }
-    
-    if (action === "edit_service") {
-      return editService(data);
-    }
-    
-    if (action === "get_services") {
-      const email = data.email ? data.email.toLowerCase().trim() : "";
-      return getServices(email);
-    }
-    
-    if (action === "get_prices") {
-      return getPrices();
-    }
-    
-    if (action === "update_prices") {
-      const email = data.email ? data.email.toLowerCase().trim() : "";
-      if (!isAdmin(email)) {
-        return jsonResponse({ success: false, message: "No tienes permisos de administrador para realizar esta acción" });
-      }
-      return updatePrices(data);
-    }
-
     if (action === "get_appointments") {
       const email = data.email ? data.email.toLowerCase().trim() : "";
       return getAppointments(email);
@@ -179,24 +99,6 @@ function doPost(e) {
     if (action === "import_services") {
       const email = data.email ? data.email.toLowerCase().trim() : "";
       return importServicesToAppointments(email);
-    }
-
-    if (action === "deduplicate") {
-      const email = data.email ? data.email.toLowerCase().trim() : "";
-      const fix = data.fix === true || data.fix === "true";
-      return deduplicateUserData(email, fix);
-    }
-
-    if (action === "add_expense") {
-      return addExpense(data);
-    }
-
-    if (action === "delete_expense") {
-      return deleteExpense(data.id);
-    }
-
-    if (action === "add_caja_movement") {
-      return addCajaMovement(data);
     }
     
     return jsonResponse({ success: false, message: "Acción POST no soportada" });

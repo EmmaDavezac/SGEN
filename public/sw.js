@@ -1,7 +1,7 @@
 import { precacheAndRoute } from 'workbox-precaching';
 
 // Service Worker con versionado y precache generado por Vite (Workbox)
-const CACHE_VERSION = 'v16';
+const CACHE_VERSION = 'v17';
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
 // precache manifest será inyectado por `vite-plugin-pwa` durante el build

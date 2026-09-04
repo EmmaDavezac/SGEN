@@ -128,11 +128,13 @@ export async function registerServiceDirectly(transaction) {
                 clientRecord = newClient;
             }
 
+            const turnoId = transaction.turno_id || transaction.turnoId || null;
             const { data, error } = await supabase
                 .from('servicios')
                 .insert({
                     legacy_id: transaction.id,
                     cliente_id: clientRecord.id,
+                    turno_id: turnoId,
                     usuario_id: state.currentUser.authId,
                     fecha: transaction.fecha,
                     servicio: transaction.servicio,
@@ -143,7 +145,7 @@ export async function registerServiceDirectly(transaction) {
                     completado: transaction.completado === true || ['sí', 'si', 'yes', 'true'].includes(String(transaction.completado).toLowerCase()),
                     vuelto: Number(transaction.vuelto) || 0
                 })
-                .select('id, legacy_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre)')
+                .select('id, legacy_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
                 .single();
             if (error) throw error;
 
@@ -157,7 +159,8 @@ export async function registerServiceDirectly(transaction) {
                 seña: data.sena,
                 metodoPago: data.metodo_pago,
                 completado: data.completado ? 'Sí' : 'No',
-                vuelto: data.vuelto
+                vuelto: data.vuelto,
+                usuario: data.perfiles?.nombre || data.perfiles?.email || state.currentUser?.nombre || state.currentUser?.email
             }) };
         } catch (error) {
             console.error('Error al registrar servicio en Supabase:', error);
@@ -176,7 +179,7 @@ export async function updateServiceRecord(id, updates) {
         .from('servicios')
         .update(updates)
         .eq('legacy_id', id)
-        .select('id, legacy_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre)')
+        .select('id, legacy_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
         .maybeSingle();
     if (error) throw error;
     if (!data) throw new Error('No se encontró el servicio en Supabase.');
@@ -194,13 +197,78 @@ export async function updateServiceRecord(id, updates) {
     });
 }
 
+export async function updateLinkedTurnoStatus(serviceId, serviceOverride = null) {
+    if (!supabase) return { updated: false, reason: 'missing_supabase' };
+
+    let serviceRecord = serviceOverride;
+    if (!serviceRecord) {
+        const { data, error } = await supabase
+            .from('servicios')
+            .select('id, turno_id, cliente_id, fecha, servicio, precio')
+            .eq('id', serviceId)
+            .maybeSingle();
+        if (error) throw error;
+        serviceRecord = data;
+    }
+
+    if (!serviceRecord) return { updated: false, reason: 'missing_service' };
+
+    if (serviceRecord.turno_id) {
+        const { error } = await supabase
+            .from('turnos')
+            .update({ estado: 'completado', precio: Number(serviceRecord.precio) || 0 })
+            .eq('id', serviceRecord.turno_id);
+        if (error) throw error;
+        return { updated: true, turnoId: serviceRecord.turno_id };
+    }
+
+    const clienteId = serviceRecord.cliente_id;
+    if (!clienteId) return { updated: false, reason: 'missing_cliente' };
+
+    const serviceDate = serviceRecord.fecha ? new Date(serviceRecord.fecha).toISOString().slice(0, 10) : null;
+    let turnoQuery = supabase
+        .from('turnos')
+        .select('id, fecha, servicio, precio, cliente_id')
+        .eq('cliente_id', clienteId)
+        .order('fecha', { ascending: false });
+
+    if (serviceDate) {
+        turnoQuery = turnoQuery.eq('fecha', serviceDate);
+    }
+
+    const { data: turnoCandidates, error: turnoError } = await turnoQuery;
+    if (turnoError) throw turnoError;
+
+    const match = (turnoCandidates || []).find((turno) => {
+        const current = (turno.servicio || '').toLowerCase();
+        const target = (serviceRecord.servicio || '').toLowerCase();
+        return current.includes(target) || target.includes(current) || current === 'turno' || target === 'turno';
+    }) || (turnoCandidates || [])[0];
+
+    if (!match) return { updated: false, reason: 'no_matching_turno' };
+
+    const { error: updateError } = await supabase
+        .from('turnos')
+        .update({ estado: 'completado', precio: Number(serviceRecord.precio) || Number(match.precio) || 0 })
+        .eq('id', match.id);
+    if (updateError) throw updateError;
+
+    const { error: serviceUpdateError } = await supabase
+        .from('servicios')
+        .update({ turno_id: match.id })
+        .eq('id', serviceRecord.id);
+    if (serviceUpdateError) throw serviceUpdateError;
+
+    return { updated: true, turnoId: match.id };
+}
+
 export async function loadServicesData() {
     if (!state.currentUser) return;
 
     if (supabase && state.currentUser.authId) {
         const { data, error } = await supabase
             .from('servicios')
-            .select('id, legacy_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre)')
+            .select('id, legacy_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
             .order('fecha', { ascending: false });
 
         if (!error && Array.isArray(data)) {
@@ -214,7 +282,8 @@ export async function loadServicesData() {
                 seña: item.sena,
                 metodoPago: item.metodo_pago,
                 completado: item.completado ? 'Sí' : 'No',
-                vuelto: item.vuelto
+                vuelto: item.vuelto,
+                usuario: item.perfiles?.nombre || item.perfiles?.email || state.currentUser?.nombre || state.currentUser?.email
             }));
             saveServicesCache();
             renderHistoryList();
@@ -262,9 +331,24 @@ export function updateClientAutocomplete() {
 
 export function getFilteredHistory() {
     const searchInput = document.getElementById('history-search');
-    const filterSelect = document.getElementById('history-filter');
     const searchVal = searchInput ? searchInput.value.toLowerCase().trim() : '';
-    const filterVal = filterSelect ? filterSelect.value : 'todos';
+    const activePeriod = document.querySelector('[data-history-filter].active');
+    const activeCategory = document.querySelector('[data-history-category].active');
+    const activePayment = document.querySelector('[data-history-payment].active');
+    const filterVal = activePeriod ? activePeriod.dataset.historyFilter : 'todos';
+    const selectedCategory = activeCategory ? activeCategory.dataset.historyCategory : 'todos';
+    const selectedPayment = activePayment ? activePayment.dataset.historyPayment : 'todos';
+
+    const normalizeCategory = (value) => {
+        const normalized = (value || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (normalized.includes('semi')) return 'semi';
+        if (normalized.includes('kapping')) return 'kapping';
+        if (normalized.includes('softgel') || normalized.includes('soft gel')) return 'softgel';
+        if (normalized.includes('esculpid')) return 'esculpidas';
+        if (normalized.includes('personal') || normalized.includes('otro')) return 'personalizado';
+        if (normalized.includes('remoc') || normalized.includes('retiro')) return 'remocion';
+        return normalized;
+    };
 
     const list = Array.isArray(state.servicesList) ? state.servicesList.map(normalizeServiceRecord) : [];
     list.sort((a, b) => {
@@ -282,6 +366,10 @@ export function getFilteredHistory() {
         const matchesSearch = clienteText.includes(searchVal) || servicioText.includes(searchVal);
 
         if (!matchesSearch) return false;
+
+        const categoriaText = normalizeCategory(item.categoria);
+        if (selectedCategory !== 'todos' && categoriaText !== normalizeCategory(selectedCategory)) return false;
+        if (selectedPayment !== 'todos' && (item.metodoPago || '').toLowerCase() !== selectedPayment) return false;
 
         if (filterVal === 'todos') return true;
 
@@ -320,7 +408,7 @@ export function renderHistoryList() {
 
     if (filteredList.length === 0) {
         listElement.innerHTML = `
-            <div class="card-info-box" style="text-align: center;">
+            <div class="list-empty-state">
                 <p>No se encontraron registros</p>
             </div>
         `;
@@ -340,6 +428,8 @@ export function renderHistoryList() {
             Efectivo: '<i class="fa-solid fa-money-bill-wave"></i>'
         };
         const payIcon = payIcons[item.metodoPago] || '<i class="fa-solid fa-money-check-dollar"></i>';
+        const paymentLabel = (item.metodoPago || '').toLowerCase() === 'fiado' ? 'Pendiente de pago' : item.metodoPago;
+        const registeredBy = item.usuario || state.currentUser?.nombre || state.currentUser?.email || '-';
 
         const totalFormatted = `$${Number(item.precio || 0).toLocaleString('es-AR')}`;
         const clienteLabel = (item.cliente || 'Cliente').toString().trim() || 'Cliente';
@@ -353,7 +443,7 @@ export function renderHistoryList() {
         <div class="card-service">${escapeHtml(servicioLabel)}</div>
         <div class="card-meta">
             <span><i class="fa-regular fa-calendar" style="color: var(--barbie-pink); margin-right: 3px;"></i>${formattedDate}</span>
-            <span class="pay-badge" title="Método de pago">${payIcon} ${item.metodoPago}</span>
+            <span class="pay-badge" title="Método de pago">${payIcon} ${paymentLabel}</span>
         </div>
     </div>
     <div class="card-amount-box">

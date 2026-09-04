@@ -134,7 +134,7 @@ export async function loadAppointments(showNotification = false) {
     if (!state.currentUser) return;
     const cacheKey = `evolet_appointments_v4_${state.currentUser.email}`;
 
-    if (supabase && state.currentUser.authId) {
+    if (supabase && state.currentUser.authId && !CONFIG_SHEET_URL) {
         const { data, error } = await supabase
             .from('turnos')
             .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, clientes(nombre), perfiles(email)')
@@ -264,6 +264,41 @@ export async function deleteAppointmentInSupabase(appointmentId) {
     const { error } = await supabase.from('turnos').delete().eq('id', existing.id);
     if (error) throw error;
     return { success: true };
+}
+
+export async function syncAppointmentWithGoogleCalendar(action, appointment) {
+    if (CONFIG_SHEET_URL) {
+        return { success: true, skipped: true, provider: 'google-apps-script' };
+    }
+
+    if (!supabase || !state.currentUser?.authId) {
+        return { success: true, skipped: true };
+    }
+
+    try {
+        const payload = {
+            action,
+            appointment: {
+                id: appointment?.id || appointment?.legacy_id || null,
+                legacy_id: appointment?.legacy_id || appointment?.id || null,
+                cliente: appointment?.cliente || '',
+                fecha: appointment?.fecha || '',
+                hora_inicio: appointment?.horaInicio || appointment?.hora_inicio || null,
+                hora_fin: appointment?.horaFin || appointment?.hora_fin || null,
+                servicio: appointment?.servicio || 'Turno',
+                estado: appointment?.estado || 'provisional',
+                precio: Number(appointment?.precio) || 0,
+                event_id: appointment?.eventId || appointment?.event_id || null
+            }
+        };
+
+        const { data, error } = await supabase.functions.invoke('google-calendar', { body: payload });
+        if (error) throw error;
+        return { success: true, data: data || {} };
+    } catch (error) {
+        console.warn(`Fallo de sincronización con Google Calendar (${action}):`, error);
+        return { success: false, warning: true, error };
+    }
 }
 
 // Obtener partes de fecha de un turno (year, month (0-based), day, hour, minute)

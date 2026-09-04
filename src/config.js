@@ -1,4 +1,4 @@
-export const CONFIG_SHEET_URL = '';
+export const CONFIG_SHEET_URL = import.meta.env.VITE_SHEET_URL || '';
 
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 export const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '';

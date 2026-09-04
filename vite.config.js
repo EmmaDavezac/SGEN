@@ -17,10 +17,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         app: 'index.html',
-        reactPreview: 'react-preview.html'
+        notFound: '404.html'
       },
       output: {
-        // Usa hashes en los nombres para asegurar invalidación de caché
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]'
