@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase.js';
 import Modal, { ConfirmModal } from './Modal.jsx';
+import { loadAppointmentsFromDatabase, loadClientsFromDatabase, registerPaymentRecord, saveAppointmentToDatabase, saveClientToDatabase, updateAppointmentInDatabase } from '../services.js';
 
 const ESTADOS_VALIDOS = ['provisional', 'reservado', 'completado'];
 const DAYS_OF_WEEK = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -184,12 +185,14 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
   const [senaAmount, setSenaAmount] = useState(0);
   const [senaPayment, setSenaPayment] = useState('Transferencia');
   const [savingSena, setSavingSena] = useState(false);
+  const senaInitialRef = useRef(null);
 
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [savingReschedule, setSavingReschedule] = useState(false);
+  const rescheduleInitialRef = useRef(null);
 
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -227,24 +230,15 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
         }
       }
 
-      const [apptRes, clientRes] = await Promise.all([
-        supabase
-          .from('turnos')
-          .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, cliente_id, usuario_id')
-          .order('hora_inicio', { ascending: true }),
-        supabase
-          .from('clientes')
-          .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
-          .order('nombre', { ascending: true })
+      const [appointmentsData, clientsData] = await Promise.all([
+        loadAppointmentsFromDatabase(),
+        loadClientsFromDatabase()
       ]);
 
-      if (apptRes.error) throw apptRes.error;
-      if (clientRes.error) throw clientRes.error;
-
-      const clientesNorm = (clientRes.data || []).map(normalizeClientRecord).filter(Boolean);
+      const clientesNorm = clientsData.map(normalizeClientRecord).filter(Boolean);
       const clienteById = new Map(clientesNorm.map(c => [c.id, c.nombre]));
 
-      const turnosNorm = (apptRes.data || [])
+      const turnosNorm = appointmentsData
         .map(apt => normalizeAppointmentRecord(apt, clienteById.get(apt.cliente_id)))
         .filter(Boolean);
 
@@ -335,17 +329,12 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
     }
     confirmBypassRef.current = false;
     try {
-      const { data, error } = await supabase
-        .from('clientes')
-        .insert({
+      const data = await saveClientToDatabase({
           nombre,
           telefono: quickClient.telefono || null,
           email: quickClient.email || null,
           notas: ''
-        })
-        .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
-        .single();
-      if (error) throw error;
+      }, { usuarioId: session.authId });
       const record = normalizeClientRecord(data);
       setClients(prev => {
         const next = [...prev.filter(c => c.id !== record.id), record];
@@ -372,12 +361,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
     const existente = clients.find(c => (c.nombre || '').toLowerCase() === nombre.toLowerCase());
     if (existente) return existente.id;
     try {
-      const { data, error } = await supabase
-        .from('clientes')
-        .insert({ nombre, telefono: null, email: null, notas: '' })
-        .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
-        .single();
-      if (error) throw error;
+      const data = await saveClientToDatabase({ nombre, telefono: null, email: null, notas: '' }, { usuarioId: session.authId });
       const record = normalizeClientRecord(data);
       setClients(prev => {
         const next = [...prev.filter(c => c.id !== record.id), record];
@@ -418,9 +402,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
       const horaInicio = new Date(`${scheduleForm.fecha}T${scheduleForm.horaInicio}:00`);
       const horaFin = new Date(horaInicio.getTime() + 60 * 60 * 1000);
       const senaAmountFinal = 0;
-      const { data, error } = await supabase
-        .from('turnos')
-        .insert({
+      const data = await saveAppointmentToDatabase({
           cliente_id: clienteId,
           usuario_id: session.authId,
           fecha: scheduleForm.fecha,
@@ -429,30 +411,19 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
           servicio: 'Turno',
           precio: 0,
           estado: 'provisional'
-        })
-        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, cliente_id, usuario_id')
-        .single();
-      if (error) throw error;
+      });
 
       const clienteNombre = (clients.find(c => c.id === clienteId)?.nombre) || clientName;
       const newApt = { ...normalizeAppointmentRecord(data, clienteNombre), sena: senaAmountFinal };
 
       if (senaAmountFinal > 0) {
-        try {
-          await supabase
-            .from('pagos')
-            .insert({
-              servicio_id: null,
-              turno_id: data.id,
-              usuario_id: session.authId,
-              fecha: new Date().toISOString(),
-              monto: senaAmountFinal,
-              metodo_pago: (scheduleForm.senaPayment || 'Transferencia').toLowerCase() === 'efectivo' ? 'efectivo' : 'transferencia',
-              tipo: 'sena'
-            });
-        } catch (senaErr) {
-          console.warn('No se pudo registrar el pago de seña en pagos:', senaErr);
-        }
+        await registerPaymentRecord({
+          turnoId: data.id,
+          usuarioId: session.authId,
+          amount: senaAmountFinal,
+          paymentMethod: scheduleForm.senaPayment,
+          type: 'sena'
+        });
       }
 
       try {
@@ -496,9 +467,26 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
 
   const openSenaModal = (apt) => {
     setSenaTarget(apt);
-    setSenaAmount(Math.round(Number(apt.precio || 0) / 2));
+    const initialAmount = Math.round(Number(apt.precio || 0) / 2);
+    setSenaAmount(initialAmount);
     setSenaPayment('Transferencia');
+    senaInitialRef.current = JSON.stringify({ amount: initialAmount, payment: 'Transferencia' });
     setSenaOpen(true);
+  };
+
+  const closeSenaModal = (force = false) => {
+    if (savingSena) return;
+    const current = JSON.stringify({ amount: Number(senaAmount) || 0, payment: senaPayment });
+    if (!force && senaInitialRef.current && current !== senaInitialRef.current) {
+      requestConfirmation(
+        'Descartar seña',
+        'Hay datos sin guardar en la seña. ¿Querés descartarlos?',
+        () => closeSenaModal(true)
+      );
+      return;
+    }
+    setSenaOpen(false);
+    setSenaTarget(null);
   };
 
   const submitSena = async (e) => {
@@ -520,27 +508,15 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
         estado: 'reservado',
         precio: amount
       };
-      const { error } = await supabase
-        .from('turnos')
-        .update(updates)
-        .eq('id', senaTarget.rawId);
-      if (error) throw error;
+      await updateAppointmentInDatabase({ id: senaTarget.rawId, updates });
 
-      try {
-        await supabase
-          .from('pagos')
-          .insert({
-            servicio_id: null,
-            turno_id: senaTarget.rawId,
-            usuario_id: session.authId,
-            fecha: new Date().toISOString(),
-            monto: amount,
-            metodo_pago: senaPayment.toLowerCase() === 'efectivo' ? 'efectivo' : 'transferencia',
-            tipo: 'sena'
-          });
-      } catch (senaErr) {
-        console.warn('No se pudo registrar el pago de seña en pagos:', senaErr);
-      }
+      await registerPaymentRecord({
+        turnoId: senaTarget.rawId,
+        usuarioId: session.authId,
+        amount,
+        paymentMethod: senaPayment,
+        type: 'sena'
+      });
 
       setAppointments(prev => {
         const next = prev.map(a =>
@@ -562,9 +538,27 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
 
   const openRescheduleModal = (apt) => {
     setRescheduleTarget(apt);
-    setRescheduleDate(formatDateInput(apt.fecha || apt.horaInicio));
-    setRescheduleTime(formatTimeInput(apt.horaInicio));
+    const initialDate = formatDateInput(apt.fecha || apt.horaInicio);
+    const initialTime = formatTimeInput(apt.horaInicio);
+    setRescheduleDate(initialDate);
+    setRescheduleTime(initialTime);
+    rescheduleInitialRef.current = JSON.stringify({ date: initialDate, time: initialTime });
     setRescheduleOpen(true);
+  };
+
+  const closeRescheduleModal = (force = false) => {
+    if (savingReschedule) return;
+    const current = JSON.stringify({ date: rescheduleDate, time: rescheduleTime });
+    if (!force && rescheduleInitialRef.current && current !== rescheduleInitialRef.current) {
+      requestConfirmation(
+        'Descartar cambios',
+        'Hay una nueva fecha u hora sin guardar. ¿Querés descartarla?',
+        () => closeRescheduleModal(true)
+      );
+      return;
+    }
+    setRescheduleOpen(false);
+    setRescheduleTarget(null);
   };
 
   const submitReschedule = async (e) => {
@@ -597,17 +591,15 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
       const inicio = new Date(`${rescheduleDate}T${rescheduleTime}:00`);
       const durMs = new Date(rescheduleTarget.horaFin) - new Date(rescheduleTarget.horaInicio);
       const fin = new Date(inicio.getTime() + (durMs > 0 ? durMs : 60 * 60 * 1000));
-      let updateQuery = supabase
-        .from('turnos')
-        .update({
+      await updateAppointmentInDatabase({
+        id: databaseId,
+        legacyId,
+        updates: {
           fecha: rescheduleDate,
           hora_inicio: inicio.toISOString(),
           hora_fin: fin.toISOString()
-        });
-      updateQuery = databaseId ? updateQuery.eq('id', databaseId) : updateQuery.eq('legacy_id', legacyId);
-      const { data: updatedRows, error } = await updateQuery.select('id').maybeSingle();
-      if (error) throw error;
-      if (!updatedRows) throw new Error('No se encontró el turno para actualizar. Recargá la agenda e intentá nuevamente.');
+        }
+      });
 
       setAppointments(prev => {
         const next = prev.map(a =>
@@ -641,11 +633,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
     if (!deleteConfirm || !supabase || !session?.authId) return;
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from('turnos')
-        .update({ estado: 'cancelado' })
-        .eq('id', deleteConfirm.rawId);
-      if (error) throw error;
+      await updateAppointmentInDatabase({ id: deleteConfirm.rawId, updates: { estado: 'cancelado' } });
       setAppointments(prev => {
         const next = prev.filter(a => a.rawId !== deleteConfirm.rawId);
         try { localStorage.setItem(cacheKeyAppointments, JSON.stringify(next)); } catch (e) { /* ignore */ }
@@ -667,29 +655,20 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
     }
   };
 
-  const refreshBtnStyleInline = { width: 'auto', padding: '8px 12px', fontSize: '12px', whiteSpace: 'nowrap' };
-  const historyBtnStyleInline = { width: 'auto', padding: '8px 12px', fontSize: '12px', whiteSpace: 'nowrap' };
-  const sectionTitleStyleInline = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' };
-  const turnosHeaderStyleInline = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' };
-  const selectedDayDateStyleInline = { fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' };
-  const calendarCardStyleInline = { position: 'relative', marginTop: '20px' };
-  const headerBtnsWrapperStyleInline = { display: 'flex', gap: '8px', flexWrap: 'wrap' };
-
   const selectedDayTitleText = `Turnos del ${selectedDay.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}`;
   const selectedDayDateShort = `${String(selectedDay.getDate()).padStart(2, '0')}/${String(selectedDay.getMonth() + 1).padStart(2, '0')}/${selectedDay.getFullYear()}`;
 
   return (
     <div id="tab-calendario" className="tab-pane active">
-      <div className="section-title" style={sectionTitleStyleInline}>
+      <div className="section-title section-title-with-action">
         <div>
           <h3>Agenda de Turnos</h3>
           <p>Visualiza y organiza tus citas sincronizadas en la nube.</p>
         </div>
-        <div style={headerBtnsWrapperStyleInline}>
+        <div className="calendar-header-actions">
           <button
             type="button"
-            className="btn btn-secondary btn-sm"
-            style={refreshBtnStyleInline}
+            className="btn btn-secondary btn-sm calendar-header-button"
             onClick={() => loadAll(true)}
             disabled={refreshing}
             title="Actualizar agenda"
@@ -700,8 +679,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
             <button
               type="button"
               id="btn-view-history"
-              className="btn btn-secondary btn-sm"
-              style={historyBtnStyleInline}
+              className="btn btn-secondary btn-sm calendar-header-button"
               onClick={onGoHistory}
             >
               <i className="fa-solid fa-clock-rotate-left" /> Historial
@@ -710,25 +688,24 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
         </div>
       </div>
 
-      <div className="chart-section" style={{ marginTop: '20px' }}>
-        <div style={turnosHeaderStyleInline}>
-          <h4 id="selected-day-title" style={{ marginBottom: 0 }}>{selectedDayTitleText}</h4>
-          <span id="selected-day-date" style={selectedDayDateStyleInline}>
+      <div className="chart-section calendar-day-section">
+        <div className="calendar-selected-day-header">
+          <h4 id="selected-day-title">{selectedDayTitleText}</h4>
+          <span id="selected-day-date" className="calendar-selected-day-date">
             {selectedDayDateShort}
           </span>
         </div>
 
-        <div id="day-appointments-container" className="day-appointments-container">
+        <div id="day-appointments-container" className="day-appointments-container list-scroll">
           {selectedDayAppointments.length === 0 && (
             <div
-              className="no-appointments-placeholder empty-schedule-state"
-              style={{ cursor: 'pointer' }}
+              className="no-appointments-placeholder empty-schedule-state calendar-empty-schedule"
               id="btn-empty-schedule"
               onClick={openNewAppointment}
             >
-              <i className="fa-solid fa-calendar-plus" style={{ fontSize: '24px', color: 'var(--barbie-pink)', marginBottom: '8px', display: 'block' }} />
+              <i className="fa-solid fa-calendar-plus calendar-empty-icon" />
               No hay turnos agendados para este día.
-              <span style={{ fontSize: '11px', color: 'var(--barbie-dark)', fontWeight: 700, display: 'block', marginTop: '4px' }}>
+              <span className="calendar-empty-action">
                 <i className="fa-solid fa-plus"></i> Presiona aquí para agendar
               </span>
             </div>
@@ -749,42 +726,42 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
                 <div className="appointment-info-col">
                   <div className="appointment-client-name">{apt.cliente || 'Cliente'}</div>
                   <div className="appointment-service-name">
-                    <i className="fa-solid fa-sparkles" style={{ color: 'var(--barbie-pink)', fontSize: '9px' }}></i>
+                    <i className="fa-solid fa-sparkles appointment-service-icon"></i>
                     {' '}{estadoTextoLegacy}
                   </div>
                 </div>
-                <div className="appointment-actions-col" style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
+                <div className="appointment-actions-col calendar-appointment-actions">
                   {estadoLower !== 'completado' && estadoLower !== 'completed' && estadoLower !== 'cobrado' && estadoLower !== 'pagado' && (
                     <button
                       type="button"
-                      className="btn-reschedule-appointment"
                       title="Reagendar Turno"
+                      aria-label={`Reagendar turno de ${apt.cliente || 'cliente'}`}
                       onClick={() => openRescheduleModal(apt)}
-                      style={{ background: '#fff3e0', color: '#e65100', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                      className="btn-reschedule-appointment calendar-appointment-action calendar-appointment-action--reschedule"
                     >
-                      <i className="fa-regular fa-calendar-plus" style={{ fontSize: '11px' }}></i>
+                      <i className="fa-regular fa-calendar-plus calendar-appointment-action-icon"></i>
                     </button>
                   )}
                   {estadoLower === 'provisional' && (
                     <button
                       type="button"
-                      className="btn-confirm-appointment-sena"
+                      className="btn-confirm-appointment-sena calendar-appointment-action calendar-appointment-action--deposit"
                       title="Cargar Seña"
+                      aria-label={`Cargar seña de ${apt.cliente || 'cliente'}`}
                       onClick={() => openSenaModal(apt)}
-                      style={{ background: '#e3f2fd', color: '#0d47a1', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                     >
-                      <i className="fa-solid fa-check-double" style={{ fontSize: '11px' }}></i>
+                      <i className="fa-solid fa-check-double calendar-appointment-action-icon"></i>
                     </button>
                   )}
                   {estadoLower === 'reservado' && (
                     <button
                       type="button"
-                      className="btn-checkout-appointment"
+                      className="btn-checkout-appointment calendar-appointment-action calendar-appointment-action--checkout"
                       title="Cobrar Turno"
+                      aria-label={`Cobrar turno de ${apt.cliente || 'cliente'}`}
                       onClick={() => checkout(apt)}
-                      style={{ background: '#e8f5e9', color: '#2e7d32', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
                     >
-                      <i className="fa-solid fa-dollar-sign" style={{ fontSize: '11px' }}></i>
+                      <i className="fa-solid fa-dollar-sign calendar-appointment-action-icon"></i>
                     </button>
                   )}
                   {isAdmin && (
@@ -792,6 +769,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
                       type="button"
                       className="btn-delete-appointment"
                       title="Cancelar Turno"
+                      aria-label={`Cancelar turno de ${apt.cliente || 'cliente'}`}
                       onClick={() => askDeleteAppointment(apt)}
                     >
                       <i className="fa-regular fa-trash-can"></i>
@@ -804,7 +782,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
         </div>
       </div>
 
-      <div className="calendar-card" style={calendarCardStyleInline}>
+      <div className="calendar-card calendar-card-spaced">
         <div className="calendar-header">
           <button
             type="button"
@@ -914,12 +892,12 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
               onClick={submitNewAppointment}
               disabled={savingAppointment}
             >
-              {savingAppointment ? 'Guardando…' : (<><i className="fa-solid fa-check" /> Agendar</>)}
+              {savingAppointment ? 'Guardando…' : (<><i className="fa-solid fa-floppy-disk" /> Guardar</>)}
             </button>
           </>
         }
       >
-        <form className="cute-form" onSubmit={submitNewAppointment} style={{ marginTop: 0 }}>
+        <form className="cute-form modal-form" onSubmit={submitNewAppointment}>
           <div className="form-group schedule-client-field">
             <label htmlFor="schedule-client-name">
               <i className="fa-solid fa-user" /> Cliente
@@ -937,7 +915,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
               />
             </div>
             {scheduleSuggestions.length > 0 && (
-              <div className="client-suggestions" style={{ position: 'static' }}>
+              <div className="client-suggestions client-suggestions--static">
                 {scheduleSuggestions.map(c => (
                   <button
                     key={c.id}
@@ -947,10 +925,10 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
                   >
                     <strong>{c.nombre}</strong>
                     {(c.telefono || c.email) && (
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        {c.telefono && <span><i className="fa-solid fa-phone" style={{ marginRight: '4px' }} />{c.telefono}</span>}
-                        {c.telefono && c.email && <span style={{ margin: '0 6px' }}>·</span>}
-                        {c.email && <span><i className="fa-solid fa-envelope" style={{ marginRight: '4px' }} />{c.email}</span>}
+                      <div className="client-suggestion-meta">
+                        {c.telefono && <span><i className="fa-solid fa-phone client-suggestion-icon" />{c.telefono}</span>}
+                        {c.telefono && c.email && <span className="client-suggestion-separator">·</span>}
+                        {c.email && <span><i className="fa-solid fa-envelope client-suggestion-icon" />{c.email}</span>}
                       </div>
                     )}
                   </button>
@@ -987,14 +965,14 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
                   className="btn btn-secondary btn-block"
                   onClick={registerQuickClient}
                 >
-                  <i className="fa-solid fa-user-check" /> Registrar clienta
+                  <i className="fa-solid fa-floppy-disk" /> Guardar Cliente
                 </button>
               </div>
             )}
           </div>
 
-          <div className="form-group" style={{ display: 'flex', gap: '10px' }}>
-            <div style={{ flex: 1 }}>
+          <div className="form-group schedule-date-time-row">
+            <div className="schedule-date-time-field">
               <label htmlFor="schedule-date">
                 <i className="fa-solid fa-calendar-day" /> Fecha
               </label>
@@ -1009,7 +987,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
                 />
               </div>
             </div>
-            <div style={{ flex: 1 }}>
+            <div className="schedule-date-time-field">
               <label htmlFor="schedule-time">
                 <i className="fa-solid fa-clock" /> Hora de Inicio
               </label>
@@ -1083,7 +1061,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
 
       <Modal
         open={senaOpen}
-        onClose={() => !savingSena && setSenaOpen(false)}
+        onClose={closeSenaModal}
         closeOnBackdrop={!savingSena}
         title="Cargar Seña y Reservar"
         subtitle={senaTarget ? `Turno de ${senaTarget.cliente || 'Cliente'} · ${formatDateArgentina(senaTarget.fecha)} ${formatTimeLabel(senaTarget.horaInicio)}` : ''}
@@ -1093,7 +1071,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => setSenaOpen(false)}
+              onClick={closeSenaModal}
               disabled={savingSena}
             >
               <i className="fa-solid fa-xmark" /> Cancelar
@@ -1109,7 +1087,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
           </>
         }
       >
-        <form className="cute-form" onSubmit={submitSena} style={{ marginTop: 0 }}>
+        <form className="cute-form modal-form" onSubmit={submitSena}>
           <div className="form-group">
             <label htmlFor="sena-amount-input">
               <i className="fa-solid fa-dollar-sign" /> Monto de la Seña ($)
@@ -1164,7 +1142,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
 
       <Modal
         open={rescheduleOpen}
-        onClose={() => !savingReschedule && setRescheduleOpen(false)}
+        onClose={closeRescheduleModal}
         closeOnBackdrop={!savingReschedule}
         title="Reagendar Turno"
         subtitle={rescheduleTarget ? `${rescheduleTarget.cliente || 'Cliente'} · ${rescheduleTarget.servicio || 'Turno'}` : ''}
@@ -1174,7 +1152,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => setRescheduleOpen(false)}
+              onClick={closeRescheduleModal}
               disabled={savingReschedule}
             >
               <i className="fa-solid fa-xmark" /> Cancelar
@@ -1190,9 +1168,9 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
           </>
         }
       >
-        <form className="cute-form" onSubmit={submitReschedule} style={{ marginTop: 0 }}>
-          <div className="form-group" style={{ display: 'flex', gap: '10px' }}>
-            <div style={{ flex: 1 }}>
+        <form className="cute-form modal-form" onSubmit={submitReschedule}>
+          <div className="form-group schedule-date-time-row">
+            <div className="schedule-date-time-field">
               <label htmlFor="reschedule-date-input">
                 <i className="fa-solid fa-calendar-day" /> Nueva Fecha
               </label>
@@ -1207,7 +1185,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
                 />
               </div>
             </div>
-            <div style={{ flex: 1 }}>
+            <div className="schedule-date-time-field">
               <label htmlFor="reschedule-time-input">
                 <i className="fa-solid fa-clock" /> Nueva Hora
               </label>

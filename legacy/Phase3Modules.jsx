@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { supabase } from '../supabase.js';
-import Button from './Button.jsx';
+import { supabase } from '../src/supabase.js';
+import Button from '../src/components/Button.jsx';
 
 const moneyFormatter = new Intl.NumberFormat('es-AR', {
   style: 'currency',

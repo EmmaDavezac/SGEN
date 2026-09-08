@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase.js';
-import { updateLinkedTurnoStatus } from '../services.js';
+import { completePendingPayment, deleteServiceFromDatabase, loadServicesFromDatabase } from '../services.js';
 import Modal, { ConfirmModal } from './Modal.jsx';
-import TicketCanvas, { shareServiceTicketAsImage, downloadServiceTicketAsPng } from './TicketCanvas.jsx';
+import ServiceDetailModal from './ServiceDetailModal.jsx';
 
 const PERIOD_OPTIONS = [
     { key: 'todos', label: 'Todos' },
@@ -105,34 +105,28 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
     const [serviceToDelete, setServiceToDelete] = useState(null);
     const [deleting, setDeleting] = useState(false);
 
-    const ticketCanvasRef = useRef(null);
+    const loadServices = async () => {
+        if (!session?.authId || !supabase) return;
+        setLoading(true);
+        if (showLoader) showLoader(true, 'Cargando historial...');
+        try {
+            const data = await loadServicesFromDatabase();
+            setServices(data.map(normalizeServiceRecord));
+        } catch (err) {
+            console.error(err);
+            if (notify) notify('No se pudo cargar el historial de ventas.', 'error');
+        } finally {
+            setLoading(false);
+            if (showLoader) showLoader(false);
+        }
+    };
 
     useEffect(() => {
         let ignore = false;
 
         const load = async () => {
             if (!session?.authId || !supabase) return;
-            setLoading(true);
-            if (showLoader) showLoader(true, 'Cargando historial...');
-            try {
-                const { data, error } = await supabase
-                    .from('servicios')
-                    .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
-                    .order('fecha', { ascending: false });
-
-                if (error) throw error;
-
-                const normalized = (data || []).map(normalizeServiceRecord);
-                if (!ignore) setServices(normalized);
-            } catch (err) {
-                console.error(err);
-                if (notify) notify('No se pudo cargar el historial de ventas.', 'error');
-            } finally {
-                if (!ignore) {
-                    setLoading(false);
-                    if (showLoader) showLoader(false);
-                }
-            }
+            await loadServices();
         };
 
         load();
@@ -170,14 +164,6 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
         setDetailOpen(true);
     };
 
-    const shareTicket = async (svc) => {
-        await shareServiceTicketAsImage(svc, ticketCanvasRef, notify);
-    };
-
-    const downloadTicket = async (svc) => {
-        await downloadServiceTicketAsPng(svc, ticketCanvasRef, notify);
-    };
-
     const requestDelete = (svc) => {
         if (!isAdmin) return;
         setServiceToDelete(svc);
@@ -189,11 +175,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
         setDeleting(true);
         if (showLoader) showLoader(true, 'Eliminando...');
         try {
-            const { error } = await supabase
-                .from('servicios')
-                .delete()
-                .eq('legacy_id', serviceToDelete.id);
-            if (error) throw error;
+            await deleteServiceFromDatabase(serviceToDelete.id);
             setServices((prev) => prev.filter((x) => x.id !== serviceToDelete.id));
             if (notify) notify('Registro eliminado con éxito ✨', 'success');
         } catch (err) {
@@ -218,25 +200,29 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
         if (showLoader) showLoader(true, 'Registrando cobro...');
         try {
             const rawServiceId = serviceToPay.rawId || serviceToPay.id;
-            const { error } = await supabase
-                .from('servicios')
-                .update({ metodo_pago: 'transferencia', completado: true })
-                .eq('id', rawServiceId)
-                .or(`legacy_id.eq.${serviceToPay.id}`);
-            if (error) throw error;
-
-            await updateLinkedTurnoStatus(rawServiceId, {
-                id: rawServiceId,
-                turno_id: serviceToPay.turnoId || null,
-                cliente_id: serviceToPay.clienteId || null,
-                fecha: serviceToPay.fecha,
-                servicio: serviceToPay.servicio,
-                precio: serviceToPay.precio
+            await completePendingPayment({
+                serviceId: rawServiceId,
+                serviceOverride: {
+                    id: rawServiceId,
+                    legacy_id: serviceToPay.id,
+                    turno_id: serviceToPay.turnoId || null,
+                    cliente_id: serviceToPay.clienteId || null,
+                    fecha: serviceToPay.fecha,
+                    servicio: serviceToPay.servicio,
+                    precio: serviceToPay.precio,
+                    metodo_pago: 'transferencia',
+                    completado: true
+                },
+                paymentMethod: 'transferencia',
+                vuelto: 0,
+                finalizeTurno: true,
+                usuarioId: session.authId
             });
 
             setServices((prev) =>
                 prev.map((x) => x.id === serviceToPay.id ? { ...x, metodoPago: 'Transferencia', completado: 'Sí' } : x)
             );
+            await loadServices();
             if (notify) notify('Cobro registrado con éxito 💖', 'success');
         } catch (err) {
             console.error(err);
@@ -250,13 +236,13 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
     };
 
     return (
-        <section style={{ display: 'grid', gap: '18px' }}>
-            <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+            <section className="panel-stack">
+            <div className="section-title section-title-with-action">
                 <div>
                     <h3>Historial de Ventas</h3>
                     <p>Visualiza y administra los servicios cargados.</p>
                 </div>
-                <button type="button" className="btn btn-secondary" onClick={onBack} style={{ width: 'auto', padding: '8px 12px', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                <button type="button" className="btn btn-secondary btn-back" onClick={onBack}>
                     <i className="fa-solid fa-arrow-left"></i> Volver
                 </button>
             </div>
@@ -323,7 +309,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
                 )}
             </div>
 
-            <div className="history-list">
+            <div className="history-list list-scroll">
                 {loading && filtered.length === 0 && (
                     <div className="list-empty-state"><p>Cargando registros...</p></div>
                 )}
@@ -340,7 +326,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
                                 <div className="card-service">{svc.servicio}</div>
                                 <div className="card-meta">
                                     <span>
-                                        <i className="fa-regular fa-calendar" style={{ color: 'var(--barbie-pink)', marginRight: '3px' }}></i>
+                                        <i className="fa-regular fa-calendar card-meta-icon"></i>
                                         {formatDateTime(svc.fecha)}
                                     </span>
                                     <span className="pay-badge" title="Método de pago">
@@ -351,7 +337,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
                                 </div>
                             </div>
                             <div className="card-amount-box">
-                                <div className="card-price" style={{ fontSize: '18px', color: 'var(--barbie-dark)' }}>
+                                <div className="card-price history-card-price">
                                     ${formatPrice(svc.precio)}
                                 </div>
                             </div>
@@ -370,81 +356,15 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
                 })}
             </div>
 
-            <Modal
+            <ServiceDetailModal
                 open={detailOpen && !!selectedService}
-                title="Detalle del Servicio"
-                subtitle={`Comprobante #${selectedService?.id?.toString().slice(-6) || ''}`}
+                service={selectedService}
+                notify={notify}
                 onClose={() => { setDetailOpen(false); setSelectedService(null); }}
-                actions={
-                    <>
-                        <button type="button" className="btn btn-secondary" onClick={() => { setDetailOpen(false); setSelectedService(null); }}>
-                            Cerrar
-                        </button>
-                        {selectedService && (selectedService.metodoPago || '').toLowerCase() === 'fiado' && (
-                            <button type="button" className="btn btn-primary" onClick={() => { setDetailOpen(false); requestPayFiado(selectedService); }}>
-                                <i className="fa-solid fa-sack-dollar"></i> Cobrar
-                            </button>
-                        )}
-                        {selectedService && (
-                            <button type="button" className="btn btn-secondary" onClick={() => downloadTicket(selectedService)}>
-                                <i className="fa-solid fa-file-image"></i> Descargar PNG
-                            </button>
-                        )}
-                        {selectedService && (
-                            <button type="button" className="btn btn-primary" onClick={() => shareTicket(selectedService)}>
-                                <i className="fa-solid fa-share-nodes"></i> Compartir
-                            </button>
-                        )}
-                    </>
-                }
-            >
-                {selectedService && (
-                    <div style={{ display: 'grid', gap: '10px' }}>
-                        <div className="confirm-item">
-                            <span className="confirm-label">Cliente</span>
-                            <strong>{selectedService.cliente}</strong>
-                        </div>
-                        <div className="confirm-item">
-                            <span className="confirm-label">Servicio</span>
-                            <strong>{selectedService.servicio}</strong>
-                        </div>
-                        <div className="confirm-item">
-                            <span className="confirm-label">Categoría</span>
-                            <strong>{selectedService.categoria}</strong>
-                        </div>
-                        <div className="confirm-item">
-                            <span className="confirm-label">Fecha y hora</span>
-                            <strong>{formatDateTime(selectedService.fecha)}</strong>
-                        </div>
-                        <div className="confirm-item">
-                            <span className="confirm-label">Método de pago</span>
-                            <strong>{selectedService.metodoPago}</strong>
-                        </div>
-                        {selectedService.sena > 0 && (
-                            <div className="confirm-item">
-                                <span className="confirm-label">Seña pagada</span>
-                                <strong>${formatPrice(selectedService.sena)}</strong>
-                            </div>
-                        )}
-                        {selectedService.vuelto > 0 && (
-                            <div className="confirm-item">
-                                <span className="confirm-label">Vuelto</span>
-                                <strong>${formatPrice(selectedService.vuelto)}</strong>
-                            </div>
-                        )}
-                        <div className="confirm-item">
-                            <span className="confirm-label">Completado</span>
-                            <strong>{selectedService.completado}</strong>
-                        </div>
-                        <div className="cash-summary-card">
-                            <div className="cash-summary-row cash-summary-row--highlight">
-                                <span>Total</span>
-                                <strong>${formatPrice(selectedService.precio)}</strong>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </Modal>
+                onPay={selectedService && (selectedService.metodoPago || '').toLowerCase() === 'fiado'
+                    ? () => { setDetailOpen(false); requestPayFiado(selectedService); }
+                    : null}
+            />
 
             <ConfirmModal
                 open={payConfirmOpen && !!serviceToPay}
@@ -468,7 +388,6 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
                 onCancel={() => { setDeleteConfirmOpen(false); setServiceToDelete(null); setDeleting(false); }}
             />
 
-            <TicketCanvas ref={ticketCanvasRef} />
         </section>
     );
 };

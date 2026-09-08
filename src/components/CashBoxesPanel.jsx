@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabase.js';
 import Button from './Button.jsx';
+import { ConfirmModal } from './Modal.jsx';
+import { loadCashboxDataFromDatabase, saveCashMovementToDatabase } from '../services.js';
 
 function todayISO() {
     return new Date().toISOString().slice(0, 10);
@@ -16,6 +18,8 @@ function CashBoxesPanel({ session, notify, showLoader }) {
     const [fecha, setFecha] = useState(todayISO());
     const [concepto, setConcepto] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [formOpen, setFormOpen] = useState(false);
+    const [confirmation, setConfirmation] = useState(null);
 
     useEffect(() => {
         loadData();
@@ -25,17 +29,13 @@ function CashBoxesPanel({ session, notify, showLoader }) {
         if (!supabase) return;
         showLoader && showLoader(true, 'Cargando caja...');
         try {
-            const [servRes, movRes, gasRes] = await Promise.all([
-                supabase.from('servicios').select('precio, sena, metodo_pago, completado'),
-                supabase.from('movimientos_caja').select('*').order('fecha', { ascending: false }).limit(50),
-                supabase.from('gastos').select('monto, metodo_pago')
-            ]);
+            const { services, movements, expenses } = await loadCashboxDataFromDatabase();
 
             let cash = 0;
             let mp = 0;
 
-            if (!servRes.error && Array.isArray(servRes.data)) {
-                servRes.data.forEach(s => {
+            if (Array.isArray(services)) {
+                services.forEach(s => {
                     const metodo = (s.metodo_pago || 'transferencia').toLowerCase();
                     const neto = Math.max(0, Number(s.precio) - Number(s.sena));
                     if (metodo === 'efectivo') cash += neto;
@@ -45,8 +45,8 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                 });
             }
 
-            if (!gasRes.error && Array.isArray(gasRes.data)) {
-                gasRes.data.forEach(g => {
+            if (Array.isArray(expenses)) {
+                expenses.forEach(g => {
                     const metodo = (g.metodo_pago || 'efectivo').toLowerCase();
                     const m = Number(g.monto) || 0;
                     if (metodo === 'efectivo') cash -= m;
@@ -54,8 +54,8 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                 });
             }
 
-            if (!movRes.error && Array.isArray(movRes.data)) {
-                movRes.data.forEach(m => {
+            if (Array.isArray(movements)) {
+                movements.forEach(m => {
                     const monto = Number(m.monto) || 0;
                     if (m.tipo === 'deposito') {
                         cash -= monto;
@@ -65,7 +65,7 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                         mp -= monto;
                     }
                 });
-                setMovimientos(movRes.data);
+                setMovimientos(movements);
             }
 
             setTotalEfectivo(Math.max(0, cash));
@@ -101,23 +101,21 @@ function CashBoxesPanel({ session, notify, showLoader }) {
             const origen = tipo === 'deposito' ? 'efectivo' : 'mp';
             const destino = tipo === 'deposito' ? 'mp' : 'efectivo';
 
-            const { error } = await supabase
-                .from('movimientos_caja')
-                .insert({
-                    usuario_id: session.authId,
-                    fecha: fecha || todayISO(),
-                    tipo,
-                    monto: montoNum,
-                    concepto: concepto.trim(),
-                    origen,
-                    destino
-                });
-            if (error) throw error;
+            await saveCashMovementToDatabase({
+                usuario_id: session.authId,
+                fecha: fecha || todayISO(),
+                tipo,
+                monto: montoNum,
+                concepto: concepto.trim(),
+                origen,
+                destino
+            });
 
             notify && notify('Movimiento registrado con éxito', 'success');
             setMonto('');
             setConcepto('');
             setFecha(todayISO());
+            setFormOpen(false);
             await loadData();
         } catch (err) {
             console.error('Error inserting movimiento:', err);
@@ -130,37 +128,94 @@ function CashBoxesPanel({ session, notify, showLoader }) {
 
     const total = totalEfectivo + totalMP;
 
+    const resetMovementForm = () => {
+        setTipo('deposito');
+        setMonto('');
+        setConcepto('');
+        setFecha(todayISO());
+    };
+
+    const closeMovementForm = () => {
+        const hasChanges = Boolean(
+            monto ||
+            concepto.trim() ||
+            tipo !== 'deposito' ||
+            fecha !== todayISO()
+        );
+        if (!hasChanges) {
+            setFormOpen(false);
+            return;
+        }
+        setConfirmation({
+            title: 'Descartar movimiento',
+            message: 'Hay datos sin guardar en el movimiento. ¿Querés descartarlos?',
+            action: () => {
+                resetMovementForm();
+                setFormOpen(false);
+            }
+        });
+    };
+
+    const toggleMovementForm = () => {
+        if (formOpen) {
+            closeMovementForm();
+            return;
+        }
+        setFormOpen(true);
+    };
+
     return (
         <div id="tab-cajas" className="tab-pane active">
+            <ConfirmModal
+                open={!!confirmation}
+                title={confirmation?.title}
+                message={confirmation?.message}
+                onConfirm={() => {
+                    const action = confirmation?.action;
+                    setConfirmation(null);
+                    action?.();
+                }}
+                onCancel={() => setConfirmation(null)}
+            />
             <div className="section-title">
                 <div>
                     <h3>Gestión de Caja</h3>
                     <p>Control de efectivo y medios de pago.</p>
                 </div>
+                <button
+                    type="button"
+                    className="btn btn-primary btn-sm panel-header-action"
+                    onClick={toggleMovementForm}
+                    aria-expanded={formOpen}
+                    aria-controls="cash-movement-form"
+                >
+                    <i className={`fa-solid ${formOpen ? 'fa-xmark' : 'fa-plus'}`} aria-hidden="true" />
+                    {formOpen ? 'Cerrar' : 'Nuevo movimiento'}
+                </button>
             </div>
 
-            <div className="stats-cards-grid" style={{ gridTemplateColumns: '1fr' }}>
-                <div className="stat-card pink-glow" style={{ gridColumn: '1 / -1' }}>
+            <div className="stats-cards-grid cash-total-grid">
+                <div className="stat-card pink-glow cash-total-card">
                     <div className="stat-icon">
-                        <i className="fa-solid fa-piggy-bank" style={{ color: 'var(--barbie-pink)' }}></i>
+                        <i className="fa-solid fa-piggy-bank cash-pink-icon"></i>
                     </div>
                     <div className="stat-info">
                         <span className="stat-label">Caja Total</span>
                         <h2>${Number(total).toLocaleString("es-AR")}</h2>
-                        <span className="stat-label" style={{ marginTop: '4px' }}>
-                            <i className="fa-solid fa-money-bill-wave" style={{ color: '#2e7d32', marginRight: '4px' }}></i>
+                        <span className="stat-label cash-breakdown-label">
+                            <i className="fa-solid fa-money-bill-wave cash-cash-icon"></i>
                             Efectivo: ${Number(totalEfectivo).toLocaleString("es-AR")}
-                            <span style={{ margin: '0 8px', color: 'var(--text-light)' }}>|</span>
-                            <i className="fa-solid fa-mobile-screen-button" style={{ color: '#0284c7', marginRight: '4px' }}></i>
+                            <span className="cash-breakdown-separator">|</span>
+                            <i className="fa-solid fa-mobile-screen-button cash-transfer-icon"></i>
                             MP: ${Number(totalMP).toLocaleString("es-AR")}
                         </span>
                     </div>
                 </div>
             </div>
 
-            <div className="chart-section">
-                <h4><i className="fa-solid fa-right-left" style={{ color: 'var(--barbie-pink)', marginRight: '6px' }}></i>Nuevo Movimiento</h4>
-                <form className="cute-form caja-movement-form" onSubmit={handleSubmit} style={{ marginTop: '10px' }}>
+            {formOpen && <div className="chart-section">
+                <h4><i className="fa-solid fa-right-left panel-heading-icon"></i>Nuevo Movimiento</h4>
+                <form id="cash-movement-form" className="cute-form caja-movement-form panel-form-top-spaced" onSubmit={handleSubmit}>
                     <div className="form-row-2">
                         <div className="form-group">
                             <label>Tipo de Movimiento</label>
@@ -225,14 +280,14 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                         <i className="fa-solid fa-plus"></i> {submitting ? 'Guardando...' : 'Registrar Movimiento'}
                     </Button>
                 </form>
-            </div>
+            </div>}
 
             <div className="chart-section">
-                <h4><i className="fa-solid fa-clock-rotate-left" style={{ color: 'var(--barbie-pink)', marginRight: '6px' }}></i>Movimientos Recientes</h4>
-                <div className="day-appointments-container" style={{ marginTop: '10px' }}>
+                <h4><i className="fa-solid fa-clock-rotate-left panel-heading-icon"></i>Movimientos Recientes</h4>
+                <div className="day-appointments-container list-scroll panel-list-top-spaced">
                     {movimientos.length === 0 ? (
                         <div className="no-appointments-placeholder">
-                            <i className="fa-solid fa-inbox" style={{ marginRight: '6px' }}></i>
+                            <i className="fa-solid fa-inbox cash-inbox-icon"></i>
                             No hay movimientos registrados todavía.
                         </div>
                     ) : (
@@ -243,7 +298,7 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                             return (
                                 <div key={m.id || m.legacy_id} className="appointment-card">
                                     <div className="appointment-time-col">
-                                        <div className="appointment-time-start" style={{ fontSize: '18px', color: isDeposito ? 'var(--barbie-pink)' : '#D27D2D' }}>
+                                        <div className={`appointment-time-start cash-movement-icon ${isDeposito ? 'is-deposit' : 'is-withdrawal'}`}>
                                             <i className={`fa-solid ${isDeposito ? 'fa-arrow-up-right-dots' : 'fa-arrow-down-wide-short'}`}></i>
                                         </div>
                                         <div className="appointment-time-duration">{fechaStr}</div>
@@ -254,12 +309,12 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                                         </div>
                                         <div className="appointment-service-name">
                                             {m.concepto || 'Sin concepto'}
-                                            <span style={{ margin: '0 6px' }}>·</span>
-                                            <span style={{ textTransform: 'capitalize' }}>{m.origen} → {m.destino}</span>
+                                            <span className="cash-movement-separator">·</span>
+                                            <span className="cash-movement-route">{m.origen} → {m.destino}</span>
                                         </div>
                                     </div>
                                     <div className="card-amount-box">
-                                        <div className="card-price" style={{ color: isDeposito ? '#0284c7' : '#D27D2D' }}>
+                                        <div className={`card-price cash-movement-amount ${isDeposito ? 'is-deposit' : 'is-withdrawal'}`}>
                                             ${Number(m.monto).toLocaleString("es-AR")}
                                         </div>
                                     </div>

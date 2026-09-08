@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { normalizeAppointmentList, normalizeAppointmentRecord, createStableAppointmentId, updateAppointmentInSupabase, deleteAppointmentInSupabase, syncAppointmentWithGoogleCalendar } from '../appointments.js';
 import { supabase } from '../supabase.js';
-import { registerServiceDirectly } from '../services.js';
+import { loadAppointmentsFromDatabase, loadClientsFromDatabase, registerServiceDirectly } from '../services.js';
 import Modal, { ConfirmModal } from './Modal.jsx';
 import Button from './Button.jsx';
 
@@ -53,6 +53,7 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
     const [createSenaPayment, setCreateSenaPayment] = useState('Transferencia');
     const [createSuggestions, setCreateSuggestions] = useState([]);
     const [createSubmitting, setCreateSubmitting] = useState(false);
+    const createInitialRef = useRef(null);
 
     // Confirm modales generales
     const [confirmOpen, setConfirmOpen] = useState(false);
@@ -92,11 +93,7 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                 } catch { /* ignore */ }
             }
 
-            const { data, error } = await supabase
-                .from('turnos')
-                .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, clientes(nombre), perfiles(email)')
-                .order('hora_inicio', { ascending: true });
-            if (error) throw error;
+            const data = await loadAppointmentsFromDatabase();
 
             const normalized = normalizeAppointmentList(
                 (data || []).map((item) => normalizeAppointmentRecord({
@@ -125,12 +122,8 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
     const loadClients = useCallback(async () => {
         if (!supabase || !session?.authId) return;
         try {
-            const { data, error } = await supabase
-                .from('clientes')
-                .select('id, nombre, activo')
-                .order('nombre');
-            if (error) return;
-            setClients((data || []).filter(c => c.activo !== false));
+            const data = await loadClientsFromDatabase();
+            setClients(data.filter(c => c.activo !== false));
         } catch { /* ignore */ }
     }, [session]);
 
@@ -154,21 +147,36 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
         const yyyy = today.getFullYear();
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         const dd = String(today.getDate()).padStart(2, '0');
-        setCreateDraft({
+        const nextDraft = {
             ...DEFAULT_APPT,
             fecha: prefill?.fecha || `${yyyy}-${mm}-${dd}`,
             horaInicio: prefill?.horaInicio || '09:00',
             horaFin: prefill?.horaFin || '',
             servicio: 'Turno',
             estado: 'Provisional'
-        });
+        };
+        setCreateDraft(nextDraft);
+        createInitialRef.current = JSON.stringify({ draft: nextDraft, sena: '', payment: 'Transferencia' });
         setCreateSena('');
         setCreateSenaPayment('Transferencia');
         setCreateSuggestions([]);
         setCreateOpen(true);
     };
 
-    const closeCreate = () => {
+    const closeCreate = (force = false) => {
+        const current = JSON.stringify({ draft: createDraft, sena: createSena, payment: createSenaPayment });
+        const hasChanges = createInitialRef.current && current !== createInitialRef.current;
+        if (!force && hasChanges) {
+            setConfirmConfig({
+                title: 'Descartar turno',
+                message: 'Hay datos sin guardar en este turno. ¿Querés descartarlos?',
+                variant: 'danger',
+                busy: false,
+                action: () => closeCreate(true)
+            });
+            setConfirmOpen(true);
+            return;
+        }
         setCreateOpen(false);
         setCreateDraft({ ...DEFAULT_APPT });
         setCreateSena('');
@@ -304,12 +312,13 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                             precio: senaNum,
                             seña: 0,
                             metodoPago: createSenaPayment,
+                            usuario_id: session.authId,
                             completado: true,
                             vuelto: 0
                         });
                     }
 
-                    closeCreate();
+                    closeCreate(true);
                     await loadAgenda();
                 } catch (error) {
                     console.error('Error al agendar turno React:', error);
@@ -370,6 +379,7 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                 precio: monto,
                 seña: 0,
                 metodoPago: senaPayment,
+                usuario_id: session.authId,
                 completado: true
             });
 
@@ -515,13 +525,13 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
     };
 
     return (
-        <section aria-label="Agenda de turnos" style={{ display: 'grid', gap: '18px' }}>
-            <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+        <section aria-label="Agenda de turnos" className="panel-stack">
+            <div className="section-title section-title-with-action">
                 <div>
                     <h3>Agenda y turnos</h3>
                     <p>Vista reactiva de los próximos turnos sincronizados con Supabase.</p>
                 </div>
-                <Button onClick={() => openCreate({})} style={{ width: 'auto', padding: '8px 16px', whiteSpace: 'nowrap', fontSize: '13px' }}>
+                <Button onClick={() => openCreate({})} className="agenda-new-action">
                     <i className="fa-solid fa-calendar-plus"></i> Nuevo turno
                 </Button>
             </div>
@@ -529,88 +539,51 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
             {loading && <p className="subtle-text">Cargando turnos...</p>}
 
             {!loading && (!appointments || appointments.length === 0) && (
-                <div className="modal-card" style={{ padding: '20px', borderRadius: '18px' }}>
-                    <p className="subtle-text" style={{ margin: 0 }}>No hay turnos cargados para esta sesión.</p>
+                <div className="modal-card agenda-empty-card">
+                    <p className="subtle-text agenda-empty-message">No hay turnos cargados para esta sesión.</p>
                 </div>
             )}
 
             {!loading && Object.entries(grouped).map(([dayKey, dayAppointments]) => (
-                <div key={dayKey} className="modal-card" style={{ padding: '18px', borderRadius: '18px' }}>
-                    <h4 style={{ margin: '0 0 12px', color: 'var(--barbie-dark)' }}>{formatDateLabel(dayKey)}</h4>
-                    <div style={{ display: 'grid', gap: '10px' }}>
+                <div key={dayKey} className="modal-card agenda-day-card">
+                    <h4 className="agenda-day-title">{formatDateLabel(dayKey)}</h4>
+                    <div className="agenda-day-list">
                         {dayAppointments.map((appt) => {
                             const s = getStateStyle(appt.estado);
                             const menuOpen = menuOpenId === appt.id;
                             return (
                                 <div
                                     key={appt.id}
-                                    style={{
-                                        border: '1px solid rgba(255,105,180,0.2)',
-                                        background: '#fff8fb',
-                                        borderRadius: '12px',
-                                        padding: '12px 14px',
-                                        display: 'grid',
-                                        gap: '4px',
-                                        position: 'relative'
-                                    }}
+                                    className="agenda-appointment-card"
                                 >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                                    <div className="agenda-appointment-header">
                                         <div>
-                                            <strong style={{ color: 'var(--barbie-dark)' }}>{appt.cliente}</strong>
-                                            <div style={{ fontSize: '12px', color: '#5e5e5e', marginTop: '2px' }}>
+                                            <strong className="agenda-client-name">{appt.cliente}</strong>
+                                            <div className="agenda-appointment-meta agenda-appointment-meta--top">
                                                 {appt.servicio || 'Turno'} · {formatTime(appt.horaInicio || appt.fecha)}
                                             </div>
-                                            <div style={{ fontSize: '12px', color: '#5e5e5e' }}>
+                                            <div className="agenda-appointment-meta">
                                                 Precio: ${Number(appt.precio || 0).toLocaleString('es-AR')}
                                             </div>
                                             <span
-                                                style={{
-                                                    display: 'inline-block',
-                                                    padding: '2px 8px',
-                                                    borderRadius: '10px',
-                                                    fontSize: '11px',
-                                                    fontWeight: 600,
-                                                    background: s.color,
-                                                    color: '#fff',
-                                                    marginTop: '6px'
-                                                }}
+                                                className="agenda-status-badge"
+                                                style={{ background: s.color }}
                                             >
                                                 {s.label}
                                             </span>
                                         </div>
-                                        <div style={{ position: 'relative' }}>
+                                        <div className="agenda-menu-wrapper">
                                             <button
                                                 type="button"
                                                 title="Acciones"
-                                                style={{
-                                                    border: 'none',
-                                                    background: 'rgba(255,105,180,0.12)',
-                                                    width: '28px', height: '28px',
-                                                    borderRadius: '50%',
-                                                    color: 'var(--barbie-pink)',
-                                                    cursor: 'pointer',
-                                                    padding: 0
-                                                }}
+                                                className="agenda-menu-toggle"
                                                 onClick={() => setMenuOpenId(menuOpen ? null : appt.id)}
                                             >
                                                 <i className="fa-solid fa-ellipsis-vertical"></i>
                                             </button>
                                             {menuOpen && (
                                                 <div
-                                                    style={{
-                                                        position: 'absolute',
-                                                        right: 0,
-                                                        top: '34px',
-                                                        zIndex: 20,
-                                                        background: '#fff',
-                                                        border: '1px solid rgba(255,105,180,0.25)',
-                                                        borderRadius: '12px',
-                                                        padding: '6px',
-                                                        boxShadow: '0 6px 14px rgba(150, 60, 120, 0.15)',
-                                                        minWidth: '200px',
-                                                        display: 'grid',
-                                                        gap: '2px'
-                                                    }}
+                                                    className="agenda-actions-menu"
                                                     onBlur={() => setMenuOpenId(null)}
                                                 >
                                                     <MenuItem label={<><i className="fa-solid fa-peso-sign"></i> Cargar seña</>} onClick={() => openSena(appt)} />
@@ -652,10 +625,10 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
 
             {/* Modal: Crear turno */}
             <Modal open={createOpen} onClose={closeCreate} title="Agendar turno">
-                <form onSubmit={(e) => { e.preventDefault(); handleCreateSubmit(e); }} className="cute-form" style={{ display: 'grid', gap: '12px' }}>
+                <form onSubmit={(e) => { e.preventDefault(); handleCreateSubmit(e); }} className="cute-form agenda-modal-form">
                     <div className="form-group">
                         <label><i className="fa-solid fa-user"></i> Clienta</label>
-                        <div style={{ position: 'relative' }}>
+                        <div className="agenda-client-input-wrapper">
                             <input
                                 type="text"
                                 value={createDraft.cliente}
@@ -667,33 +640,13 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                             />
                             {createSuggestions.length > 0 && (
                                 <div
-                                    style={{
-                                        position: 'absolute',
-                                        left: 0, right: 0, top: '100%', marginTop: '4px',
-                                        background: '#fff',
-                                        border: '1px solid rgba(255,105,180,0.2)',
-                                        borderRadius: '10px',
-                                        padding: '4px',
-                                        zIndex: 50,
-                                        maxHeight: '180px',
-                                        overflowY: 'auto'
-                                    }}
+                                    className="agenda-client-suggestions"
                                 >
                                     {createSuggestions.map(c => (
                                         <button
                                             key={c.id}
                                             type="button"
-                                            style={{
-                                                display: 'block',
-                                                width: '100%',
-                                                textAlign: 'left',
-                                                padding: '8px 10px',
-                                                border: 'none',
-                                                background: 'transparent',
-                                                borderRadius: '8px',
-                                                cursor: 'pointer',
-                                                fontSize: '14px'
-                                            }}
+                                            className="agenda-client-suggestion"
                                             onClick={() => {
                                                 setCreateDraft(prev => ({ ...prev, cliente: c.nombre }));
                                                 setCreateSuggestions([]);
@@ -707,8 +660,8 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <div className="form-group" style={{ margin: 0 }}>
+                    <div className="agenda-form-grid">
+                        <div className="form-group agenda-form-field">
                             <label><i className="fa-solid fa-calendar-day"></i> Fecha</label>
                             <input
                                 type="date"
@@ -717,7 +670,7 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                                 required
                             />
                         </div>
-                        <div className="form-group" style={{ margin: 0 }}>
+                        <div className="form-group agenda-form-field">
                             <label><i className="fa-solid fa-clock"></i> Hora inicio</label>
                             <input
                                 type="time"
@@ -728,8 +681,8 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <div className="form-group" style={{ margin: 0 }}>
+                    <div className="agenda-form-grid">
+                        <div className="form-group agenda-form-field">
                             <label><i className="fa-solid fa-clock"></i> Hora fin (opcional)</label>
                             <input
                                 type="time"
@@ -737,7 +690,7 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                                 onChange={(e) => setCreateDraft(prev => ({ ...prev, horaFin: e.target.value }))}
                             />
                         </div>
-                        <div className="form-group" style={{ margin: 0 }}>
+                        <div className="form-group agenda-form-field">
                             <label><i className="fa-solid fa-list-check"></i> Estado</label>
                             <select
                                 value={createDraft.estado}
@@ -763,8 +716,8 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
 
                     {createDraft.estado === 'Reservado' && (
                         <>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                <div className="form-group" style={{ margin: 0 }}>
+                            <div className="agenda-form-grid">
+                                <div className="form-group agenda-form-field">
                                     <label><i className="fa-solid fa-hand-holding-dollar"></i> Monto seña ($)</label>
                                     <input
                                         type="number"
@@ -775,7 +728,7 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                                         placeholder="0 o mayor a 1000"
                                     />
                                 </div>
-                                <div className="form-group" style={{ margin: 0 }}>
+                                <div className="form-group agenda-form-field">
                                     <label><i className="fa-solid fa-credit-card"></i> Método de pago</label>
                                     <select value={createSenaPayment} onChange={(e) => setCreateSenaPayment(e.target.value)}>
                                         <option value="Transferencia">Transferencia</option>
@@ -787,7 +740,7 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                         </>
                     )}
 
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                    <div className="agenda-form-actions">
                         <Button type="button" variant="secondary" onClick={closeCreate}>Cancelar</Button>
                         <Button type="submit" busy={createSubmitting}>Agendar</Button>
                     </div>
@@ -796,12 +749,12 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
 
             {/* Modal: Cargar seña */}
             <Modal open={senaOpen} onClose={closeSena} title="Cargar seña">
-                <form onSubmit={submitSena} className="cute-form" style={{ display: 'grid', gap: '12px' }}>
-                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                <form onSubmit={submitSena} className="cute-form agenda-modal-form">
+                    <p className="agenda-form-context">
                         Clienta: <strong>{senaAppt?.cliente || ''}</strong>
                     </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <div className="form-group" style={{ margin: 0 }}>
+                    <div className="agenda-form-grid">
+                        <div className="form-group agenda-form-field">
                             <label><i className="fa-solid fa-hand-holding-dollar"></i> Monto ($)</label>
                             <input
                                 type="number"
@@ -813,7 +766,7 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                                 required
                             />
                         </div>
-                        <div className="form-group" style={{ margin: 0 }}>
+                        <div className="form-group agenda-form-field">
                             <label><i className="fa-solid fa-credit-card"></i> Método de pago</label>
                             <select value={senaPayment} onChange={(e) => setSenaPayment(e.target.value)}>
                                 <option value="Transferencia">Transferencia</option>
@@ -822,7 +775,7 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
                             </select>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                    <div className="agenda-form-actions">
                         <Button type="button" variant="secondary" onClick={closeSena}>Cancelar</Button>
                         <Button type="submit" busy={senaBusy}>Guardar seña</Button>
                     </div>
@@ -831,21 +784,21 @@ function AgendaBoard({ session, notify = () => {}, showLoader = () => {} }) {
 
             {/* Modal: Reagendar */}
             <Modal open={reschedOpen} onClose={closeResched} title="Reagendar turno">
-                <form onSubmit={submitResched} className="cute-form" style={{ display: 'grid', gap: '12px' }}>
-                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+                <form onSubmit={submitResched} className="cute-form agenda-modal-form">
+                    <p className="agenda-form-context">
                         Turno: <strong>{reschedAppt?.cliente || ''}</strong>
                     </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <div className="form-group" style={{ margin: 0 }}>
+                    <div className="agenda-form-grid">
+                        <div className="form-group agenda-form-field">
                             <label><i className="fa-solid fa-calendar-day"></i> Nueva fecha</label>
                             <input type="date" value={reschedDate} onChange={(e) => setReschedDate(e.target.value)} required />
                         </div>
-                        <div className="form-group" style={{ margin: 0 }}>
+                        <div className="form-group agenda-form-field">
                             <label><i className="fa-solid fa-clock"></i> Nueva hora</label>
                             <input type="time" value={reschedTime} onChange={(e) => setReschedTime(e.target.value)} required />
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                    <div className="agenda-form-actions">
                         <Button type="button" variant="secondary" onClick={closeResched}>Cancelar</Button>
                         <Button type="submit" busy={reschedBusy}>Reagendar</Button>
                     </div>
@@ -870,23 +823,8 @@ function MenuItem({ label, onClick, danger }) {
         <button
             type="button"
             onClick={onClick}
-            style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '7px 10px',
-                border: 'none',
-                borderRadius: '8px',
-                background: 'transparent',
-                fontSize: '13px',
-                color: danger ? '#ef5350' : 'var(--text-muted)',
-                cursor: 'pointer',
-                textAlign: 'left',
-                width: '100%'
-            }}
+            className={`agenda-menu-item ${danger ? 'is-danger' : ''}`}
             onMouseDown={(e) => e.preventDefault()}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,105,180,0.08)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
             {label}
         </button>
@@ -894,7 +832,7 @@ function MenuItem({ label, onClick, danger }) {
 }
 
 function Divider() {
-    return <div style={{ height: '1px', background: 'rgba(150, 60, 120, 0.15)', margin: '4px 0' }} />;
+    return <div className="agenda-menu-divider" />;
 }
 
 export default AgendaBoard;

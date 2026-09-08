@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../supabase.js';
-import { registerServiceDirectly } from '../services.js';
+import { finalizeRegisteredService, registerServiceDirectly, saveExpenseToDatabase } from '../services.js';
 import Button from './Button.jsx';
 import Modal, { ConfirmModal } from './Modal.jsx';
 
@@ -52,7 +52,7 @@ function hasSuspiciousPrice(rawValue) {
     return num > 0 && num < 1000;
 }
 
-function RegisterServiceForm({ session, onBack, initialAppointment = null, onRegisterSuccess, allowFiado = true }) {
+function RegisterServiceForm({ session, onBack, initialAppointment = null, onRegisterSuccess, allowFiado = true, notify, showLoader }) {
     const [clients, setClients] = useState([]);
     const [clientName, setClientName] = useState('');
     const [catalog, setCatalog] = useState(DEFAULT_CATALOG);
@@ -74,7 +74,9 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     const [loading, setLoading] = useState(false);
 
     const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [showRegisterDiscardConfirm, setShowRegisterDiscardConfirm] = useState(false);
     const [showCashModal, setShowCashModal] = useState(false);
+    const [showCashDiscardConfirm, setShowCashDiscardConfirm] = useState(false);
     const [amountGiven, setAmountGiven] = useState('');
 
     const [pendingSubmitData, setPendingSubmitData] = useState(null);
@@ -82,6 +84,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     const [cashAmountGivenNum, setCashAmountGivenNum] = useState(0);
     const [sena, setSena] = useState('');
     const [vueltoReturnMethod, setVueltoReturnMethod] = useState('Efectivo');
+    const cashInitialRef = useRef(null);
 
     const priceInputRef = useRef(null);
 
@@ -278,6 +281,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
 
         if (paymentMethod === 'Efectivo') {
             setAmountGiven(String(netoACobrar));
+            cashInitialRef.current = JSON.stringify({ amount: String(netoACobrar), returnMethod: 'Efectivo' });
             setShowCashModal(true);
         } else {
             setShowConfirmModal(true);
@@ -297,7 +301,19 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     };
 
     const handleCashCancel = () => {
+        const current = JSON.stringify({ amount: amountGiven, returnMethod: vueltoReturnMethod });
+        if (cashInitialRef.current && current !== cashInitialRef.current) {
+            setShowCashDiscardConfirm(true);
+            return;
+        }
         setShowCashModal(false);
+    };
+
+    const discardCashEntry = () => {
+        setShowCashDiscardConfirm(false);
+        setShowCashModal(false);
+        setAmountGiven('');
+        setVueltoReturnMethod('Efectivo');
     };
 
     const doFinalSubmit = async () => {
@@ -306,6 +322,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         setLoading(true);
 
         const senaNum = Number(pendingSubmitData.seña) || 0;
+        const neto = Math.max(0, Number(pendingSubmitData.precio) - senaNum);
         const vueltoNum = pendingSubmitData.metodoPago === 'Efectivo' ? cashVuelto : 0;
         const vueltoReturn = vueltoNum > 0 ? (vueltoReturnMethod || 'Efectivo') : null;
 
@@ -319,58 +336,66 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
             precio: pendingSubmitData.precio,
             seña: senaNum,
             metodoPago: pendingSubmitData.metodoPago,
+            usuario_id: session?.authId,
             completado: true,
             vuelto: vueltoNum
         };
 
         try {
             const resp = await registerServiceDirectly(transaction);
-            if (resp && resp.success) {
-                const appointmentDatabaseId = initialAppointment?.rawId;
-                const appointmentLegacyId = initialAppointment?.legacy_id || (!appointmentDatabaseId ? initialAppointment?.id : null);
-                if ((appointmentDatabaseId || appointmentLegacyId) && supabase && session?.authId) {
-                    let appointmentQuery = supabase
-                        .from('turnos')
-                        .update({ estado: 'completado', precio: pendingSubmitData.precio });
-                    appointmentQuery = appointmentDatabaseId
-                        ? appointmentQuery.eq('id', appointmentDatabaseId)
-                        : appointmentQuery.eq('legacy_id', appointmentLegacyId);
-                    const { error: appointmentError } = await appointmentQuery;
-                    if (appointmentError) {
-                        console.warn('El cobro se registró, pero no se pudo completar el turno:', appointmentError);
-                    }
-                }
-                if (vueltoNum > 0 && vueltoReturn && vueltoReturn !== 'Efectivo' && supabase && session?.authId) {
-                    try {
-                        await supabase
-                            .from('gastos')
-                            .insert({
-                                legacy_id: `exp_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-                                usuario_id: session.authId,
-                                fecha: new Date().toISOString(),
-                                concepto: `Vuelto - ${pendingSubmitData.cliente} - ${pendingSubmitData.servicio}`,
-                                monto: vueltoNum,
-                                metodo_pago: vueltoReturn.toLowerCase(),
-                                categoria: 'Vuelto'
-                            });
-                    } catch (gErr) {
-                        console.warn('No se pudo registrar el egreso de vuelto en gastos:', gErr);
-                    }
-                }
-                setClientName('');
-                setSena('');
-                setSelectedCategory('semi');
-                setHasExternalRemoval(false);
-                setSelectedRemoval(null);
-                setPaymentMethod('Transferencia');
-                setVueltoReturnMethod('Efectivo');
-                if (priceInputRef.current) {
-                    delete priceInputRef.current.dataset.priceAlertShown;
-                }
-                if (onRegisterSuccess) onRegisterSuccess();
+            if (!resp || !resp.success) {
+                if (notify) notify('No se pudo registrar el servicio en la base de datos.', 'error');
+                return;
             }
+
+            const appointmentDatabaseId = initialAppointment?.rawId;
+            const appointmentLegacyId = initialAppointment?.legacy_id || (!appointmentDatabaseId ? initialAppointment?.id : null);
+            if ((appointmentDatabaseId || appointmentLegacyId) && session?.authId) {
+                await finalizeRegisteredService({
+                    turnoId: appointmentDatabaseId,
+                    turnoLegacyId: appointmentLegacyId,
+                    precio: pendingSubmitData.precio,
+                    serviceId: resp.service?.rawId || null,
+                    paymentAmount: pendingSubmitData.metodoPago === 'Fiado' ? 0 : neto,
+                    paymentMethod: pendingSubmitData.metodoPago,
+                    usuarioId: session.authId
+                });
+                if (notify) notify('Turno actualizado a completado.', 'success');
+            }
+
+            if (vueltoNum > 0 && vueltoReturn && vueltoReturn !== 'Efectivo' && supabase && session?.authId) {
+                try {
+                    await saveExpenseToDatabase({
+                        legacy_id: `exp_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+                        usuario_id: session.authId,
+                        fecha: new Date().toISOString(),
+                        concepto: `Vuelto - ${pendingSubmitData.cliente} - ${pendingSubmitData.servicio}`,
+                        monto: vueltoNum,
+                        metodo_pago: vueltoReturn.toLowerCase(),
+                        categoria: 'Vuelto'
+                    });
+                    if (notify) notify('Vuelto registrado correctamente.', 'success');
+                } catch (gErr) {
+                    console.warn('No se pudo registrar el egreso de vuelto en gastos:', gErr);
+                    if (notify) notify('Se registró el servicio, pero falló el vuelto.', 'warning');
+                }
+            }
+
+            setClientName('');
+            setSena('');
+            setSelectedCategory('semi');
+            setHasExternalRemoval(false);
+            setSelectedRemoval(null);
+            setPaymentMethod('Transferencia');
+            setVueltoReturnMethod('Efectivo');
+            if (priceInputRef.current) {
+                delete priceInputRef.current.dataset.priceAlertShown;
+            }
+            if (notify) notify('Servicio registrado con éxito.', 'success');
+            if (onRegisterSuccess) onRegisterSuccess();
         } catch (err) {
-            console.error("Error submitting service form React:", err);
+            console.error('Error submitting service form React:', err);
+            if (notify) notify(err?.message || 'No se pudo registrar el servicio.', 'error');
         } finally {
             setLoading(false);
             setPendingSubmitData(null);
@@ -386,6 +411,21 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         setCashAmountGivenNum(0);
     };
 
+    const handleRegisterBack = () => {
+        const hasChanges = Boolean(
+            clientName.trim() ||
+            sena ||
+            paymentMethod !== 'Transferencia' ||
+            hasExternalRemoval ||
+            selectedRemoval
+        );
+        if (!hasChanges) {
+            onBack?.();
+            return;
+        }
+        setShowRegisterDiscardConfirm(true);
+    };
+
     const confirmMessageLines = pendingSubmitData ? (
         <>
             <div className="confirm-item">
@@ -397,21 +437,27 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                 <strong>{pendingSubmitData.servicio}</strong>
             </div>
             <div className="confirm-item">
-                <span className="confirm-label">Precio</span>
-                <strong>
-                    ${Number(pendingSubmitData.precio).toLocaleString("es-AR")}
-                    {(pendingSubmitData.seña || 0) > 0 && (
-                        <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            Seña: -${Number(pendingSubmitData.seña).toLocaleString("es-AR")} | Neto: <strong style={{ color: 'var(--barbie-dark)' }}>${(Number(pendingSubmitData.precio) - Number(pendingSubmitData.seña || 0)).toLocaleString("es-AR")}</strong></span>
-                    )}
-                </strong>
+                <span className="confirm-label">Precio total</span>
+                <strong>${Number(pendingSubmitData.precio).toLocaleString("es-AR")}</strong>
             </div>
+            {(pendingSubmitData.seña || 0) > 0 && (
+                <div className="confirm-item">
+                    <span className="confirm-label">Seña</span>
+                    <strong>${Number(pendingSubmitData.seña).toLocaleString("es-AR")}</strong>
+                </div>
+            )}
+            {(pendingSubmitData.seña || 0) > 0 && (
+                <div className="confirm-item">
+                    <span className="confirm-label">Neto</span>
+                    <strong>${Math.max(0, Number(pendingSubmitData.precio) - Number(pendingSubmitData.seña || 0)).toLocaleString("es-AR")}</strong>
+                </div>
+            )}
             <div className="confirm-item">
                 <span className="confirm-label">Método</span>
                 <strong>
                     {pendingSubmitData.metodoPago === 'Fiado' ? 'Pendiente de pago' : pendingSubmitData.metodoPago}
                     {pendingSubmitData.metodoPago === 'Efectivo' && cashVuelto > 0 && (
-                        <span style={{ display: 'block', fontSize: '12px', color: 'var(--barbie-dark)', marginTop: '2px' }}>
+                        <span className="cash-change-note">
                             (Vuelto: ${Number(cashVuelto).toLocaleString("es-AR")}{vueltoReturnMethod && vueltoReturnMethod !== 'Efectivo' ? ` · ${vueltoReturnMethod}` : ''})
                         </span>
                     )}
@@ -422,7 +468,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
 
     return (
         <div id="tab-registrar" className="tab-pane active">
-            <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+            <div className="section-title section-title-with-action">
                 <div>
                     <h3>Registrar Servicio</h3>
                     <p>Agrega un nuevo trabajo realizado en segundos.</p>
@@ -431,9 +477,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                     <button
                         type="button"
                         id="btn-cancel-checkout"
-                        className="btn btn-secondary btn-sm"
-                        onClick={onBack}
-                        style={{ width: 'auto', padding: '8px 12px', fontSize: '12px' }}
+                        className="btn btn-secondary btn-sm btn-back"
+                        onClick={handleRegisterBack}
                     >
                         <i className="fa-solid fa-arrow-left"></i> Volver
                     </button>
@@ -502,20 +547,19 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                         </div>
                     </div>
                 ) : (
-                    <div id="combined-service-builder" style={{ marginBottom: '15px', padding: '14px', background: '#fff8f9', border: '2px solid var(--barbie-light)', borderRadius: 'var(--radius-md)' }}>
-                        <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--barbie-dark)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <i className="fa-solid fa-puzzle-piece" style={{ color: 'var(--barbie-pink)' }}></i>
+                    <div id="combined-service-builder" className="combined-service-builder">
+                        <div className="combined-service-heading">
+                            <i className="fa-solid fa-puzzle-piece combined-service-icon"></i>
                             Combinación de 2 Servicios (10 uñas en total)
                         </div>
 
-                        <div className="form-row-2 custom-service-row" style={{ marginBottom: '10px', alignItems: 'end' }}>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label style={{ fontSize: '11px' }}>Servicio 1 (Principal)</label>
+                        <div className="form-row-2 custom-service-row combined-service-row--first">
+                            <div className="form-group combined-service-field">
+                                <label className="combined-service-label">Servicio 1 (Principal)</label>
                                 <select
                                     value={combinedService1}
                                     onChange={(e) => setCombinedService1(e.target.value)}
-                                    className="filter-select"
-                                    style={{ height: '40px', fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                                    className="filter-select combined-service-select"
                                 >
                                     {allBasicOptions.map(o => (
                                         <option key={`c1-${o.name}`} value={o.name} data-price={o.price}>
@@ -524,13 +568,12 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                                     ))}
                                 </select>
                             </div>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label style={{ fontSize: '11px' }}>Uñas Serv. 1</label>
+                            <div className="form-group combined-service-field">
+                                <label className="combined-service-label">Uñas Serv. 1</label>
                                 <select
                                     value={combinedCount1}
                                     onChange={(e) => setCombinedCount1(Number(e.target.value))}
-                                    className="filter-select"
-                                    style={{ height: '40px', fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                                    className="filter-select combined-service-select"
                                 >
                                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
                                         <option key={n} value={n}>{n} {n === 1 ? 'uña' : 'uñas'}</option>
@@ -539,14 +582,13 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                             </div>
                         </div>
 
-                        <div className="form-row-2 custom-service-row" style={{ alignItems: 'end' }}>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label style={{ fontSize: '11px' }}>Servicio 2 (Secundario)</label>
+                        <div className="form-row-2 custom-service-row combined-service-row--second">
+                            <div className="form-group combined-service-field">
+                                <label className="combined-service-label">Servicio 2 (Secundario)</label>
                                 <select
                                     value={combinedService2}
                                     onChange={(e) => setCombinedService2(e.target.value)}
-                                    className="filter-select"
-                                    style={{ height: '40px', fontSize: '12px', padding: '4px 8px', width: '100%' }}
+                                    className="filter-select combined-service-select"
                                 >
                                     {allBasicOptions.map(o => (
                                         <option key={`c2-${o.name}`} value={o.name} data-price={o.price}>
@@ -555,12 +597,11 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                                     ))}
                                 </select>
                             </div>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                                <label style={{ fontSize: '11px' }}>Uñas Serv. 2</label>
+                            <div className="form-group combined-service-field">
+                                <label className="combined-service-label">Uñas Serv. 2</label>
                                 <select
                                     value={10 - combinedCount1}
-                                    className="filter-select"
-                                    style={{ height: '40px', fontSize: '12px', padding: '4px 8px', width: '100%', background: '#f3f4f6' }}
+                                    className="filter-select combined-service-select combined-service-select--disabled"
                                     disabled
                                 >
                                     <option value={10 - combinedCount1}>{10 - combinedCount1} {10 - combinedCount1 === 1 ? 'uña' : 'uñas'}</option>
@@ -590,12 +631,12 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
 
                 {selectedCategory !== 'remocion' && (
                     <>
-                        <div className="form-group" style={{ marginTop: '10px' }}>
-                            <div className="cute-toggle-card" style={{ display: 'flex', alignItems: 'center', justifySpaceBetween: 'space-between', padding: '12px 14px', background: 'var(--white)', border: '2px solid var(--barbie-light)', borderRadius: 'var(--radius-md)' }}>
-                                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className="form-group external-removal-group">
+                            <div className="cute-toggle-card external-removal-card">
+                                <span className="external-removal-label">
                                     ¿Tiene retiro previo externo?
                                 </span>
-                                <label className="switch-toggle" style={{ marginLeft: 'auto' }}>
+                                <label className="switch-toggle external-removal-toggle">
                                     <input
                                         type="checkbox"
                                         checked={hasExternalRemoval}
@@ -607,11 +648,11 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                         </div>
 
                         {hasExternalRemoval && (
-                            <div style={{ marginTop: '8px', marginBottom: '12px', padding: '4px 0' }}>
-                                <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-color)', marginBottom: '8px', display: 'block' }}>
+                            <div className="sub-services-section">
+                                <span className="sub-services-label">
                                     Tipo de Retiro:
                                 </span>
-                                <div className="sub-services-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
+                                <div className="sub-services-grid">
                                     {removalOptions.map((rem) => (
                                         <button
                                             key={rem.name}
@@ -635,9 +676,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                         {paymentMethods.map((method) => (
                             <label
                                 key={method}
-                                className="pay-btn"
+                                className={`pay-btn ${!allowFiado && method === 'Fiado' ? 'pay-btn-hidden' : ''}`}
                                 id={method === 'Fiado' ? 'pay-btn-fiado-wrapper' : undefined}
-                                style={(!allowFiado && method === 'Fiado') ? { display: 'none' } : undefined}
                             >
                                 <input
                                     type="radio"
@@ -681,7 +721,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                     </>
                 }
             >
-                <div className="form-group" style={{ marginBottom: '0' }}>
+                <div className="form-group form-group--flush">
                     <label htmlFor="cash-amount-given">Entrega de clienta ($)</label>
                     <div className="input-wrapper">
                         <i className="fa-solid fa-hand-holding-dollar input-icon" />
@@ -707,7 +747,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                     {(Number(sena) || 0) > 0 && (
                         <div className="cash-summary-row">
                             <span>Seña (anticipo)</span>
-                            <strong style={{ color: 'var(--barbie-pink)' }}>-${Number(sena || 0).toLocaleString("es-AR")}</strong>
+                            <strong className="deposit-amount">-${Number(sena || 0).toLocaleString("es-AR")}</strong>
                         </div>
                     )}
                     <div className="cash-summary-row">
@@ -725,22 +765,14 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                 </div>
 
                 {computedCashChange > 0 && (
-                    <div style={{ marginTop: '14px' }}>
-                        <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-color)', marginBottom: '6px', display: 'block' }}>
-                            <i className="fa-solid fa-sack-dollar" style={{ color: 'var(--barbie-pink)', marginRight: '4px' }}></i>
+                    <div className="cash-payment-section">
+                        <label className="cash-payment-label">
+                            <i className="fa-solid fa-sack-dollar cash-payment-icon"></i>
                             Modo de entrega del vuelto
                         </label>
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '8px'
-                        }}>
+                        <div className="cash-return-method-grid">
                             <label
-                                className="pay-btn"
-                                style={{
-                                    border: vueltoReturnMethod === 'Efectivo' ? '2px solid var(--barbie-pink)' : '2px solid rgba(255,105,180,0.2)',
-                                    background: vueltoReturnMethod === 'Efectivo' ? 'rgba(255,105,180,0.08)' : '#fff'
-                                }}
+                                className={`pay-btn ${vueltoReturnMethod === 'Efectivo' ? 'is-selected' : ''}`}
                             >
                                 <input
                                     type="radio"
@@ -755,11 +787,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                                 </div>
                             </label>
                             <label
-                                className="pay-btn"
-                                style={{
-                                    border: vueltoReturnMethod === 'Transferencia' ? '2px solid var(--barbie-pink)' : '2px solid rgba(255,105,180,0.2)',
-                                    background: vueltoReturnMethod === 'Transferencia' ? 'rgba(255,105,180,0.08)' : '#fff'
-                                }}
+                                className={`pay-btn ${vueltoReturnMethod === 'Transferencia' ? 'is-selected' : ''}`}
                             >
                                 <input
                                     type="radio"
@@ -777,16 +805,39 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                     </div>
                 )}
 
-                <p className="cash-helper-text" style={{ marginTop: '10px' }}>
-                    <i className="fa-solid fa-circle-info" style={{ color: 'var(--barbie-pink)', marginRight: '4px' }}></i>
+                <p className="cash-helper-text cash-helper-text--spaced">
+                    <i className="fa-solid fa-circle-info cash-payment-icon"></i>
                     Verificá bien el monto de entrega antes de confirmar.
                 </p>
             </Modal>
 
             <ConfirmModal
+                open={showRegisterDiscardConfirm}
+                title="Descartar registro"
+                message="Hay datos ingresados en el servicio. ¿Querés salir y descartarlos?"
+                confirmText="Descartar"
+                confirmVariant="danger"
+                onConfirm={() => {
+                    setShowRegisterDiscardConfirm(false);
+                    onBack?.();
+                }}
+                onCancel={() => setShowRegisterDiscardConfirm(false)}
+            />
+
+            <ConfirmModal
+                open={showCashDiscardConfirm}
+                title="Descartar cobro"
+                message="Hay datos sin confirmar en el cobro en efectivo. ¿Querés descartarlos?"
+                confirmText="Descartar"
+                confirmVariant="danger"
+                onConfirm={discardCashEntry}
+                onCancel={() => setShowCashDiscardConfirm(false)}
+            />
+
+            <ConfirmModal
                 open={showConfirmModal}
                 title="Confirmar registro"
-                message={<div style={{ padding: '4px 0' }}>{confirmMessageLines}</div>}
+                message={<div className="confirm-message-content">{confirmMessageLines}</div>}
                 confirmText="Registrar"
                 onConfirm={doFinalSubmit}
                 onCancel={handleConfirmCancel}

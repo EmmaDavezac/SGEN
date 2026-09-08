@@ -172,10 +172,10 @@ function PricesPanel({ session, notify, showLoader }) {
                         <p>Consultá los valores de cada servicio.</p>
                     </div>
                 </div>
-                <div className="chart-section" style={{ textAlign: 'center', padding: '40px 20px' }}>
-                    <i className="fa-solid fa-lock" style={{ fontSize: '48px', color: 'var(--barbie-pink)', marginBottom: '12px' }}></i>
-                    <h4 style={{ color: 'var(--barbie-dark)' }}>Sólo administradores</h4>
-                    <p className="text-muted" style={{ fontSize: '13px', marginTop: '8px' }}>
+                <div className="chart-section prices-access-denied">
+                    <i className="fa-solid fa-lock prices-access-icon"></i>
+                    <h4 className="prices-access-title">Sólo administradores</h4>
+                    <p className="text-muted prices-access-description">
                         No tenés permiso para visualizar o editar este panel.
                     </p>
                 </div>
@@ -185,7 +185,7 @@ function PricesPanel({ session, notify, showLoader }) {
 
     return (
         <div id="tab-precios" className="tab-pane active">
-            <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+            <div className="section-title section-title-with-action">
                 <div>
                     <h3>Lista de Precios</h3>
                     <p>Gestioná los valores de cada servicio.</p>
@@ -194,19 +194,17 @@ function PricesPanel({ session, notify, showLoader }) {
                     <button
                         type="button"
                         id="btn-edit-mode"
-                        className="btn btn-secondary btn-sm"
-                        style={{ width: 'auto', padding: '8px 16px', whiteSpace: 'nowrap', fontSize: '13px' }}
+                        className="btn btn-secondary btn-sm prices-edit-action"
                         onClick={handleEdit}
                     >
                         <i className="fa-solid fa-pen-to-square"></i> Editar
                     </button>
                 ) : (
-                    <div id="edit-actions-container" style={{ display: 'flex', gap: '8px' }}>
+                    <div id="edit-actions-container" className="account-form-actions">
                         <button
                             type="button"
                             id="btn-cancel-prices"
-                            className="btn btn-secondary btn-sm"
-                            style={{ width: 'auto', padding: '6px 12px', fontSize: '12px', height: '32px' }}
+                            className="btn btn-secondary btn-sm account-small-action"
                             onClick={handleCancelRequest}
                         >
                             <i className="fa-solid fa-xmark"></i> Cancelar
@@ -214,8 +212,7 @@ function PricesPanel({ session, notify, showLoader }) {
                         <button
                             type="button"
                             id="btn-save-prices"
-                            className="btn btn-primary btn-sm"
-                            style={{ width: 'auto', padding: '6px 12px', fontSize: '12px', height: '32px' }}
+                            className="btn btn-primary btn-sm account-small-action"
                             onClick={handleSaveRequest}
                         >
                             <i className="fa-solid fa-floppy-disk"></i> Guardar
@@ -224,7 +221,7 @@ function PricesPanel({ session, notify, showLoader }) {
                 )}
             </div>
 
-            <div className="prices-editor-container">
+            <div className="prices-editor-container list-scroll">
                 {orderedCategories.map(catKey => (
                     <div key={catKey} className="price-category-group">
                         <div className="price-category-title">

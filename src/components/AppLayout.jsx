@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AppFooter from './AppFooter.jsx';
 
 function AppLayout({ children, session, onLogout, activeTab, setActiveTab, settings = {} }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -11,8 +12,7 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
       <header className="app-header">
         <div className="header-user">
           <div className="mini-logo">
-            <img src="/logo.png" alt="Logo"
-              style={{ height: '32px', width: '32px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--barbie-pink)', display: 'block' }} />
+            <img className="mini-logo-image" src="/icons/favicon.svg?v=2" alt="Logo" />
           </div>
           <div>
             <span className="welcome-text">Hola,</span>
@@ -30,7 +30,7 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
               onClick={() => setMenuOpen(!menuOpen)}
             >
               <span className="header-avatar"><i className="fa-solid fa-user"></i></span>
-              <i className="fa-solid fa-chevron-down" style={{ marginLeft: '4px', fontSize: '10px' }}></i>
+              <i className="fa-solid fa-chevron-down"></i>
             </button>
             <div id="account-menu" className={`account-menu ${menuOpen ? '' : 'hidden'}`}>
               <button 
@@ -57,6 +57,19 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
                   <i className="fa-solid fa-gears"></i> Ajustes
                 </button>
               )}
+              {isAdmin && (
+                <button
+                  id="menu-usuarios"
+                  className="account-menu-item"
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('usuarios');
+                    setMenuOpen(false);
+                  }}
+                >
+                  <i className="fa-solid fa-user-group"></i> Usuarios
+                </button>
+              )}
             </div>
           </div>
           <button id="btn-logout" className="btn-logout" title="Cerrar Sesión" onClick={onLogout}>
@@ -66,8 +79,9 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
       </header>
 
       {/* CONTENIDO PRINCIPAL SCROLLABLE */}
-      <main className="app-content">
+      <main className={`app-content app-content-${activeTab}`}>
         {children}
+        <AppFooter />
       </main>
 
       {/* MENU DE NAVEGACION FLOTANTE INFERIOR */}

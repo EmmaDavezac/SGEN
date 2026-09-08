@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase.js';
 import { ConfirmModal } from './Modal.jsx';
+import { loadExpensesFromDatabase, saveExpenseToDatabase } from '../services.js';
 
 const EXPENSE_PERIOD_OPTIONS = [
     { key: 'todos', label: 'Todos' },
@@ -58,6 +59,7 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
     const [fecha, setFecha] = useState(todayISO());
     const [metodoPago, setMetodoPago] = useState('Efectivo');
     const [submitting, setSubmitting] = useState(false);
+    const [formOpen, setFormOpen] = useState(false);
     const [confirmation, setConfirmation] = useState(null);
     const confirmBypassRef = useRef(false);
 
@@ -74,13 +76,8 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
             setLoading(true);
             if (showLoader) showLoader(true, 'Cargando gastos...');
             try {
-                const { data, error } = await supabase
-                    .from('gastos')
-                    .select('id, fecha, concepto, categoria, monto, metodo_pago')
-                    .order('fecha', { ascending: false });
-
-                if (error) throw error;
-                const normalized = (data || []).map(normalizeExpenseRecord);
+                const data = await loadExpensesFromDatabase();
+                const normalized = data.map(normalizeExpenseRecord);
                 if (!ignore) setExpenses(normalized);
             } catch (err) {
                 console.error(err);
@@ -148,24 +145,19 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
         setSubmitting(true);
         if (showLoader) showLoader(true, 'Guardando gasto...');
         try {
-            const { data, error } = await supabase
-                .from('gastos')
-                .insert({
+            const data = await saveExpenseToDatabase({
                     usuario_id: session.authId,
                     concepto: concepto.trim(),
                     categoria: categoria,
                     monto: Number(monto),
                     metodo_pago: metodoPago,
                     fecha: new Date(fecha).toISOString()
-                })
-                .select('id, fecha, concepto, categoria, monto, metodo_pago')
-                .single();
-
-            if (error) throw error;
+                });
             if (!data) throw new Error('Supabase no devolvió el gasto creado.');
             const newExpense = normalizeExpenseRecord(data);
             setExpenses((prev) => [newExpense, ...prev]);
             resetForm();
+            setFormOpen(false);
             if (notify) notify('Gasto registrado con éxito ✨', 'success');
         } catch (err) {
             console.error(err);
@@ -191,18 +183,58 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
         return 'fa-receipt';
     };
 
+    const closeExpenseForm = () => {
+        const hasChanges = Boolean(
+            concepto.trim() ||
+            monto ||
+            categoria !== 'Otro' ||
+            metodoPago !== 'Efectivo' ||
+            fecha !== todayISO()
+        );
+        if (!hasChanges) {
+            setFormOpen(false);
+            return;
+        }
+        setConfirmation({
+            title: 'Descartar gasto',
+            message: 'Hay datos sin guardar en el gasto. ¿Querés descartarlos?',
+            action: () => {
+                resetForm();
+                setFormOpen(false);
+            }
+        });
+    };
+
+    const toggleExpenseForm = () => {
+        if (formOpen) {
+            closeExpenseForm();
+            return;
+        }
+        setFormOpen(true);
+    };
+
     return (
-        <section style={{ display: 'grid', gap: '18px' }}>
-            <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+        <section id="tab-gastos" className="panel-stack">
+            <div className="section-title section-title-with-action">
                 <div>
                     <h3>Registro de Gastos</h3>
                     <p>Controla tus egresos diarios para optimizar tu negocio.</p>
                 </div>
+                <button
+                    type="button"
+                    className="btn btn-primary btn-sm panel-header-action"
+                    onClick={toggleExpenseForm}
+                    aria-expanded={formOpen}
+                    aria-controls="expense-registration-form"
+                >
+                    <i className={`fa-solid ${formOpen ? 'fa-xmark' : 'fa-plus'}`} aria-hidden="true" />
+                    {formOpen ? 'Cerrar' : 'Nuevo gasto'}
+                </button>
             </div>
 
-            <div className="chart-section">
+            {formOpen && <div className="chart-section">
                 <h4>Registrar Nuevo Gasto</h4>
-                <form className="cute-form" style={{ marginTop: '15px' }} onSubmit={handleSubmit}>
+                <form id="expense-registration-form" className="cute-form panel-form-spaced" onSubmit={handleSubmit}>
                     <div className="form-group">
                         <label htmlFor="expense-concept">Concepto / Descripción</label>
                         <div className="input-wrapper">
@@ -301,19 +333,18 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
 
                     <button
                         type="submit"
-                        className="btn btn-primary btn-block"
-                        style={{ marginTop: '20px' }}
+                        className="btn btn-primary btn-block panel-action-spaced"
                         disabled={submitting}
                     >
-                        <i className="fa-solid fa-check"></i>
-                        {submitting ? 'Guardando…' : 'Registrar'}
+                        <i className="fa-solid fa-floppy-disk"></i>
+                        {submitting ? 'Guardando…' : 'Guardar'}
                     </button>
                 </form>
-            </div>
+            </div>}
 
-            <div className="chart-section" style={{ marginTop: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                    <h4 style={{ marginBottom: 0 }}>Todos los gastos</h4>
+            <div className="chart-section chart-section-spaced">
+                <div className="panel-subsection-header">
+                    <h4 className="panel-subsection-title">Todos los gastos</h4>
                 </div>
 
                 <div className="filters-container expense-filters">
@@ -366,7 +397,7 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                     )}
                 </div>
 
-                <div className="day-appointments-container">
+                <div className="day-appointments-container list-scroll">
                     {loading && filtered.length === 0 && (
                         <div className="list-empty-state"><p>Cargando gastos...</p></div>
                     )}
@@ -379,26 +410,26 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                     {filtered.map((exp) => (
                         <div key={exp.id} className="appointment-card">
                             <div className="appointment-time-col">
-                                <div style={{ fontSize: '22px', color: '#ff4d4d' }}>
+                                <div className="expense-icon">
                                     <i className={`fa-solid ${categoryIcon(exp.categoria)}`}></i>
                                 </div>
-                                <div className="appointment-time-duration" style={{ marginTop: '4px' }}>
+                                <div className="appointment-time-duration expense-date">
                                     {formatDateTime(exp.fecha)}
                                 </div>
                             </div>
                             <div className="appointment-info-col">
                                 <div className="appointment-client-name">{exp.concepto}</div>
                                 <div className="appointment-service-name">
-                                    <span className="pay-badge" style={{ marginRight: '6px' }}>
+                                    <span className="pay-badge expense-payment-badge">
                                         <i className={`fa-solid ${paymentIcon(exp.metodoPago)}`}></i> {exp.metodoPago}
                                     </span>
-                                    <span style={{ color: 'var(--barbie-dark)', fontWeight: 600 }}>
+                                    <span className="expense-category">
                                         {exp.categoria}
                                     </span>
                                 </div>
                             </div>
                             <div className="appointment-actions-col">
-                                <div className="card-price" style={{ color: '#ff4d4d', fontSize: '16px', fontWeight: 700 }}>
+                                <div className="card-price expense-amount">
                                     -${formatPrice(exp.monto)}
                                 </div>
                             </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 
-function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
+function SettingsPanel({ settings = {}, onChangeSettings, notify, onBack }) {
     const { allowFiado, allowRegisterTab, allowCajasTab } = settings;
 
     const handleToggle = (key, checked) => {
@@ -22,19 +22,28 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
 
     return (
         <div id="tab-ajustes" className="tab-pane active">
-            <div className="section-title">
+            <div className="section-title section-title-with-action">
                 <div>
                     <h3>Ajustes</h3>
                     <p>Personalizá las opciones de la aplicación.</p>
                 </div>
+                {onBack && (
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm btn-back"
+                        onClick={onBack}
+                    >
+                        <i className="fa-solid fa-arrow-left" /> Volver
+                    </button>
+                )}
             </div>
 
             <div className="chart-section">
-                <h4><i className="fa-solid fa-sliders" style={{ color: 'var(--barbie-pink)', marginRight: '6px' }}></i>Preferencias Generales</h4>
+                <h4><i className="fa-solid fa-sliders panel-heading-icon"></i>Preferencias Generales</h4>
 
                 <div className="setting-row">
                     <span>
-                        <i className="fa-solid fa-hand-holding-hand" style={{ color: '#FF4D4D', fontSize: '16px' }}></i>
+                        <i className="fa-solid fa-hand-holding-hand setting-icon setting-icon--danger"></i>
                         Habilitar cobros pendientes (fiado)
                     </span>
                     <label className="switch-toggle">
@@ -49,7 +58,7 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
 
                 <div className="setting-row">
                     <span>
-                        <i className="fa-solid fa-circle-plus" style={{ color: 'var(--barbie-pink)', fontSize: '16px' }}></i>
+                        <i className="fa-solid fa-circle-plus setting-icon"></i>
                         Mostrar siempre pestaña Registrar
                     </span>
                     <label className="switch-toggle">
@@ -64,7 +73,7 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
 
                 <div className="setting-row">
                     <span>
-                        <i className="fa-solid fa-vault" style={{ color: 'var(--barbie-pink)', fontSize: '16px' }}></i>
+                        <i className="fa-solid fa-vault setting-icon"></i>
                         Habilitar pestaña Cajas
                     </span>
                     <label className="switch-toggle">
@@ -79,7 +88,7 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
             </div>
 
             <div className="card-info-box">
-                <h5><i className="fa-solid fa-circle-info" style={{ marginRight: '6px', color: 'var(--barbie-pink)' }}></i>Información</h5>
+                <h5><i className="fa-solid fa-circle-info panel-heading-icon"></i>Información</h5>
                 <p>
                     Los ajustes se guardan localmente en este dispositivo. Si usás la app en varios celulares,
                     deberás configurar las preferencias en cada uno.

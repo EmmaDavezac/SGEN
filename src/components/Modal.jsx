@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 
 function Modal({
   open = false,
@@ -11,17 +11,42 @@ function Modal({
   sizeClass = '',
 }) {
   const cardRef = useRef(null);
+  const previousFocusRef = useRef(null);
+  const titleId = useId();
 
   useEffect(() => {
     if (!open) return;
+    previousFocusRef.current = document.activeElement;
+    const focusableSelector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusFirstControl = window.requestAnimationFrame(() => {
+      const firstControl = cardRef.current?.querySelector(focusableSelector);
+      (firstControl || cardRef.current)?.focus?.();
+    });
     const onKey = (e) => {
-      if (e.key === 'Escape' && onClose) onClose();
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !cardRef.current) return;
+      const controls = [...cardRef.current.querySelectorAll(focusableSelector)];
+      if (controls.length === 0) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => {
+      window.cancelAnimationFrame(focusFirstControl);
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
+      previousFocusRef.current?.focus?.();
     };
   }, [open, onClose]);
 
@@ -39,11 +64,11 @@ function Modal({
       className="modal-overlay"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="modal-title"
+      aria-labelledby={title ? titleId : undefined}
       onClick={handleBackdrop}
     >
-      <div ref={cardRef} className={`modal-card ${sizeClass}`.trim()}>
-        {title && <h3 id="modal-title">{title}</h3>}
+      <div ref={cardRef} className={`modal-card ${sizeClass}`.trim()} tabIndex="-1">
+        {title && <h3 id={titleId}>{title}</h3>}
         {subtitle && <p className="modal-sub">{subtitle}</p>}
 
         <div className="modal-body">{children}</div>
@@ -79,6 +104,7 @@ export function ConfirmModal({
             onClick={onCancel}
             disabled={busy}
           >
+            <i className="fa-solid fa-xmark" aria-hidden="true"></i>
             {cancelText}
           </button>
           <button
@@ -87,12 +113,13 @@ export function ConfirmModal({
             onClick={onConfirm}
             disabled={busy}
           >
-            {busy ? 'Procesando…' : confirmText}
+            <i className="fa-solid fa-check" aria-hidden="true"></i>
+            {busy ? 'Procesando...' : confirmText}
           </button>
         </>
       }
     >
-      <div style={{ lineHeight: 1.5, textAlign: 'center', color: 'var(--text-color)' }}>
+      <div className="confirm-message">
         {message}
       </div>
     </Modal>

@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase.js';
 import Modal, { ConfirmModal } from './Modal.jsx';
+import ServiceDetailModal from './ServiceDetailModal.jsx';
+import Button from './Button.jsx';
+import { deleteClientFromDatabase, loadAppointmentsFromDatabase, loadClientsFromDatabase, saveClientToDatabase, updateClientInDatabase } from '../services.js';
 
 function normalizeClientRecord(client) {
   if (!client || typeof client !== 'object') return null;
@@ -63,6 +66,15 @@ function formatCurrencyARS(val) {
   return `$${Number(val || 0).toLocaleString('es-AR')}`;
 }
 
+function whatsappUrl(phone) {
+  const digits = (phone || '').toString().replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('54')) return `https://wa.me/${digits}`;
+  if (digits.length === 10) return `https://wa.me/549${digits}`;
+  if (digits.startsWith('0')) return `https://wa.me/549${digits.slice(1)}`;
+  return `https://wa.me/${digits}`;
+}
+
 function clientInitials(nombre) {
   const words = (nombre || '?').toString().trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return '??';
@@ -90,6 +102,7 @@ function ClientsPanel({ session, notify, showLoader }) {
 
   const [newClient, setNewClient] = useState({ nombre: '', telefono: '', email: '', notas: '' });
   const [creating, setCreating] = useState(false);
+  const [registrationOpen, setRegistrationOpen] = useState(false);
 
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState('activos');
@@ -101,6 +114,7 @@ function ClientsPanel({ session, notify, showLoader }) {
   const [detailHistory, setDetailHistory] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailSaving, setDetailSaving] = useState(false);
+  const [selectedHistoryService, setSelectedHistoryService] = useState(null);
 
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -132,12 +146,8 @@ function ClientsPanel({ session, notify, showLoader }) {
           if (cached) setClients(JSON.parse(cached));
         } catch (e) { /* ignore */ }
       }
-      const { data, error } = await supabase
-        .from('clientes')
-        .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
-        .order('nombre', { ascending: true });
-      if (error) throw error;
-      const records = (data || []).map(normalizeClientRecord).filter(Boolean);
+      const data = await loadClientsFromDatabase();
+      const records = data.map(normalizeClientRecord).filter(Boolean);
       setClients(records);
       try { localStorage.setItem(cacheKeyClients, JSON.stringify(records)); } catch (e) { /* ignore */ }
     } catch (error) {
@@ -156,14 +166,8 @@ function ClientsPanel({ session, notify, showLoader }) {
           setAppointments(Array.isArray(parsed) ? parsed : []);
         }
       } catch (e) { /* ignore */ }
-      const { data, error } = await supabase
-        .from('turnos')
-        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, cliente_id')
-        .order('hora_inicio', { ascending: false });
-      if (error) {
-        return;
-      }
-      const records = (data || []).map(normalizeAppointmentRecord).filter(Boolean).map(r => ({
+      const data = await loadAppointmentsFromDatabase();
+      const records = data.map(normalizeAppointmentRecord).filter(Boolean).map(r => ({
         ...r,
         cliente_id: (data || []).find(x => (x.legacy_id || x.id) === (r.id || r.rawId))?.cliente_id
       }));
@@ -201,12 +205,7 @@ function ClientsPanel({ session, notify, showLoader }) {
         return;
       }
       confirmBypassRef.current = false;
-      const { data, error } = await supabase
-        .from('clientes')
-        .insert(payload)
-        .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
-        .single();
-      if (error) throw error;
+      const data = await saveClientToDatabase(payload);
       const record = normalizeClientRecord(data);
       setClients(prev => {
         const next = [...prev.filter(c => c.id !== record.id), record];
@@ -215,6 +214,7 @@ function ClientsPanel({ session, notify, showLoader }) {
         return next;
       });
       setNewClient({ nombre: '', telefono: '', email: '', notas: '' });
+      setRegistrationOpen(false);
       if (notify) notify('Clienta agregada correctamente.', 'success');
     } catch (error) {
       console.error('Error creando clienta:', error);
@@ -233,11 +233,34 @@ function ClientsPanel({ session, notify, showLoader }) {
       return (
         (c.nombre || '').toLowerCase().includes(search) ||
         (c.telefono || '').includes(search) ||
-        (c.email || '').toLowerCase().includes(search) ||
         (c.notas || '').toLowerCase().includes(search)
       );
     });
   }, [clients, searchText, filterStatus]);
+
+  const closeRegistrationForm = () => {
+    const hasChanges = Object.values(newClient).some((value) => value.trim());
+    if (!hasChanges) {
+      setRegistrationOpen(false);
+      return;
+    }
+    setConfirmation({
+      title: 'Descartar clienta',
+      message: 'Hay datos sin guardar en la nueva clienta. ¿Querés descartarlos?',
+      action: () => {
+        setNewClient({ nombre: '', telefono: '', email: '', notas: '' });
+        setRegistrationOpen(false);
+      }
+    });
+  };
+
+  const toggleRegistrationForm = () => {
+    if (registrationOpen) {
+      closeRegistrationForm();
+      return;
+    }
+    setRegistrationOpen(true);
+  };
 
   const openClientDetail = async (client) => {
     setDetailClient(client);
@@ -250,17 +273,15 @@ function ClientsPanel({ session, notify, showLoader }) {
     });
     setDetailLoading(true);
     setDetailHistory([]);
+    setSelectedHistoryService(null);
     try {
       let historyRaw = appointments.filter(a => a.cliente_id === client.id);
       if (historyRaw.length === 0 && supabase && session?.authId) {
-        const { data, error } = await supabase
-          .from('turnos')
-          .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id')
-          .eq('cliente_id', client.id)
-          .order('hora_inicio', { ascending: false });
-        if (!error && Array.isArray(data)) {
-          historyRaw = data.map(normalizeAppointmentRecord).filter(Boolean);
-        }
+        const data = await loadAppointmentsFromDatabase();
+        historyRaw = data
+          .filter((appointment) => appointment.cliente_id === client.id)
+          .map(normalizeAppointmentRecord)
+          .filter(Boolean);
       }
       setDetailHistory(historyRaw.sort((a, b) => new Date(b.horaInicio || b.fecha) - new Date(a.horaInicio || a.fecha)));
     } catch (error) {
@@ -290,12 +311,8 @@ function ClientsPanel({ session, notify, showLoader }) {
         email: detailForm.email.trim().toLowerCase() || null,
         notas: detailForm.notas.trim() || null
       };
-      const { error } = await supabase
-        .from('clientes')
-        .update(updates)
-        .eq('id', detailClient.id);
-      if (error) throw error;
-      const updated = { ...detailClient, ...updates, actualizado_en: new Date().toISOString() };
+      const saved = await updateClientInDatabase(detailClient.id, updates);
+      const updated = normalizeClientRecord(saved);
       setClients(prev => {
         const next = prev.map(c => c.id === updated.id ? normalizeClientRecord(updated) : c);
         next.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
@@ -327,10 +344,19 @@ function ClientsPanel({ session, notify, showLoader }) {
   const handleDetailClose = () => {
     if (detailSaving) return;
     if (detailEditing) {
-      if (notify) notify('Guardá o descartá los cambios antes de cerrar la ficha.', 'info');
+      requestConfirmation(
+        'Descartar cambios',
+        'Tenés cambios sin guardar. ¿Querés descartarlos y cerrar la ficha?',
+        () => {
+          setDetailEditing(false);
+          setDetailClient(null);
+          setSelectedHistoryService(null);
+        }
+      );
       return;
     }
     setDetailClient(null);
+    setSelectedHistoryService(null);
   };
 
   const askDeleteClient = (client) => {
@@ -345,11 +371,7 @@ function ClientsPanel({ session, notify, showLoader }) {
     if (!deleteConfirm || !supabase || !session?.authId) return;
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from('clientes')
-        .delete()
-        .eq('id', deleteConfirm.id);
-      if (error) throw error;
+      await deleteClientFromDatabase(deleteConfirm.id);
       setClients(prev => {
         const next = prev.filter(c => c.id !== deleteConfirm.id);
         try { localStorage.setItem(cacheKeyClients, JSON.stringify(next)); } catch (e) { /* ignore */ }
@@ -381,11 +403,7 @@ function ClientsPanel({ session, notify, showLoader }) {
     setTogglingStatus(true);
     try {
       const nextActivo = statusToggleConfirm.activo !== true;
-      const { error } = await supabase
-        .from('clientes')
-        .update({ activo: nextActivo })
-        .eq('id', statusToggleConfirm.id);
-      if (error) throw error;
+      await updateClientInDatabase(statusToggleConfirm.id, { activo: nextActivo });
       setClients(prev => {
         const next = prev.map(c => c.id === statusToggleConfirm.id ? { ...c, activo: nextActivo } : c);
         try { localStorage.setItem(cacheKeyClients, JSON.stringify(next)); } catch (e) { /* ignore */ }
@@ -405,14 +423,26 @@ function ClientsPanel({ session, notify, showLoader }) {
   };
 
   return (
-    <div>
-      <div className="section-title">
-        <h3>Clientes</h3>
-        <p>Consultá y agregá las clientas de Evolet Nails.</p>
+    <div id="tab-clientes">
+      <div className="section-title section-title-with-action">
+        <div>
+          <h3>Clientes</h3>
+          <p>Consultá y agregá las clientas de Evolet Nails.</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm panel-header-action"
+          onClick={toggleRegistrationForm}
+          aria-expanded={registrationOpen}
+          aria-controls="client-registration-form"
+        >
+          <i className={`fa-solid ${registrationOpen ? 'fa-xmark' : 'fa-user-plus'}`} aria-hidden="true" />
+          {registrationOpen ? 'Cerrar' : 'Nueva clienta'}
+        </button>
       </div>
 
-      <form className="cute-form client-registration-form" onSubmit={submitNewClient} style={{ marginBottom: '20px' }}>
-        <div className="form-row-2">
+      {registrationOpen && <form id="client-registration-form" className="cute-form client-registration-form client-registration-form--spaced" onSubmit={submitNewClient}>
+        <div className="client-detail-fields-stack">
           <div className="form-group">
             <label htmlFor="client-record-name">
               Nombre
@@ -446,42 +476,10 @@ function ClientsPanel({ session, notify, showLoader }) {
             </div>
           </div>
         </div>
-        <div className="form-row-2">
-          <div className="form-group">
-            <label htmlFor="client-record-email">
-              Email
-            </label>
-            <div className="input-wrapper">
-              <i className="fa-solid fa-envelope input-icon" />
-              <input
-                id="client-record-email"
-                type="email"
-                placeholder="Opcional"
-                value={newClient.email}
-                onChange={(e) => setNewClient(p => ({ ...p, email: e.target.value }))}
-              />
-            </div>
-          </div>
-          <div className="form-group client-registration-notes-field">
-            <label htmlFor="client-record-notes">
-              Notas
-            </label>
-            <div className="input-wrapper">
-              <i className="fa-solid fa-note-sticky input-icon" />
-              <textarea
-                id="client-record-notes"
-                rows="1"
-                placeholder="Opcional"
-                value={newClient.notas}
-                onChange={(e) => setNewClient(p => ({ ...p, notas: e.target.value }))}
-              />
-            </div>
-          </div>
-        </div>
-        <button type="submit" className="btn btn-primary btn-block" disabled={creating}>
-          {creating ? 'Guardando…' : (<><i className="fa-solid fa-user-plus" /> Agregar cliente</>)}
-        </button>
-      </form>
+        <Button type="submit" className="btn-block" busy={creating}>
+          <><i className="fa-solid fa-floppy-disk" />Guardar</>
+        </Button>
+      </form>}
 
       <div className="filters-container">
         <div className="search-box-container">
@@ -489,7 +487,7 @@ function ClientsPanel({ session, notify, showLoader }) {
           <input
             type="search"
             className="search-input"
-            placeholder="Buscar por nombre, teléfono, email o notas..."
+            placeholder="Buscar por nombre o teléfono..."
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
@@ -531,7 +529,7 @@ function ClientsPanel({ session, notify, showLoader }) {
         )}
       </div>
 
-      <div id="clients-list" className="history-list">
+      <div id="clients-list" className="history-list list-scroll">
         {filteredClients.length === 0 && (
           <div className="list-empty-state">
             <p>No se encontraron clientas que coincidan con la búsqueda.</p>
@@ -544,31 +542,35 @@ function ClientsPanel({ session, notify, showLoader }) {
               {clientInitials(client.nombre)}
             </div>
 
-            <div className="appointment-info-col" style={{ paddingLeft: '12px' }}>
+            <div className="appointment-info-col client-info-col">
               <div className="appointment-client-name">
                 {client.nombre}
                 {client.activo !== true && (
-                  <span className="status-tag provisional" style={{ marginLeft: '8px' }}>
+                  <span className="status-tag provisional client-status-tag">
                     Dada de baja
                   </span>
                 )}
               </div>
-              <div className="appointment-service-name" style={{ marginTop: '4px' }}>
+              <div className="appointment-service-name client-contact-row">
                 {client.telefono && (
-                  <span title="Teléfono" style={{ marginRight: '10px' }}>
-                    <i className="fa-solid fa-phone" style={{ marginRight: '4px', color: 'var(--barbie-pink)' }} />
+                  <span className="client-phone-value" title="Teléfono">
+                    <i className="fa-solid fa-phone client-contact-icon" />
                     {client.telefono}
-                  </span>
-                )}
-                {client.email && (
-                  <span title="Email" style={{ marginRight: '10px' }}>
-                    <i className="fa-solid fa-envelope" style={{ marginRight: '4px', color: 'var(--barbie-pink)' }} />
-                    {client.email}
+                    <a
+                      className="whatsapp-link"
+                      href={whatsappUrl(client.telefono)}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Abrir WhatsApp de ${client.nombre}`}
+                      title="Contactar por WhatsApp"
+                    >
+                      <i className="fa-brands fa-whatsapp" aria-hidden="true" />
+                    </a>
                   </span>
                 )}
                 {client.notas && (
                   <span title="Notas">
-                    <i className="fa-solid fa-note-sticky" style={{ marginRight: '4px', color: 'var(--barbie-pink)' }} />
+                    <i className="fa-solid fa-note-sticky client-contact-icon" />
                     {client.notas}
                   </span>
                 )}
@@ -587,10 +589,9 @@ function ClientsPanel({ session, notify, showLoader }) {
               {isAdmin && (
                 <button
                   type="button"
-                  className="client-status-btn btn-view-detail"
                   title={client.activo ? 'Dar de baja' : 'Reactivar clienta'}
                   onClick={() => askToggleStatus(client)}
-                  style={{ color: client.activo ? 'var(--text-light)' : 'var(--barbie-dark)' }}
+                  className={`client-status-btn btn-view-detail ${client.activo ? 'is-active' : 'is-inactive'}`}
                 >
                   <i className={`fa-solid ${client.activo ? 'fa-user-slash' : 'fa-user-check'}`} />
                 </button>
@@ -619,29 +620,30 @@ function ClientsPanel({ session, notify, showLoader }) {
       >
         {detailClient && (
           <div>
-            <div className="modal-header-row" style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="client-avatar">{clientInitials(detailClient.nombre)}</div>
-                <div>
-                  <h3 style={{ textAlign: 'left', marginBottom: 0, fontSize: '18px' }}>
-                    {detailClient.nombre}
-                  </h3>
-                </div>
+            <div className="modal-header-row client-detail-header">
+              <div className="client-detail-header-actions">
+                <button
+                  type="button"
+                  onClick={handleDetailClose}
+                  className="btn btn-secondary btn-sm client-detail-action"
+                  disabled={detailSaving}
+                >
+                  <i className="fa-solid fa-arrow-left" /> Volver
+                </button>
+                {!detailEditing && (
+                  <button
+                    type="button"
+                    onClick={() => setDetailEditing(true)}
+                    className="btn btn-secondary btn-sm client-detail-action client-detail-action--edit"
+                  >
+                    <i className="fa-solid fa-pen-to-square" /> Editar
+                  </button>
+                )}
               </div>
-              <button
-                type="button"
-                className="btn-icon"
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px', borderRadius: '50%' }}
-                onClick={handleDetailClose}
-                title="Cerrar"
-                disabled={detailSaving}
-              >
-                <i className="fa-solid fa-xmark" />
-              </button>
             </div>
 
-            <form className="cute-form account-readonly-form" onSubmit={(e) => { e.preventDefault(); saveDetailClient(); }} style={{ marginBottom: '15px' }}>
-              <fieldset id="client-detail-fields" disabled={!detailEditing} style={{ border: 'none', padding: 0, margin: 0 }}>
+            <form className="cute-form account-readonly-form client-detail-form" onSubmit={(e) => { e.preventDefault(); saveDetailClient(); }}>
+              <fieldset id="client-detail-fields" className="client-detail-fields" disabled={!detailEditing}>
                 <div className="client-detail-fields-stack">
                   <div className="form-group">
                     <label htmlFor="detail-client-name">Nombre</label>
@@ -676,47 +678,9 @@ function ClientsPanel({ session, notify, showLoader }) {
                     </div>
                   </div>
                 </div>
-                <div className="form-group client-detail-single-field">
-                  <label htmlFor="detail-client-email">Email</label>
-                  <div className="input-wrapper">
-                    <i className="fa-solid fa-envelope input-icon" />
-                    <input
-                      id="detail-client-email"
-                      name="email"
-                      type="email"
-                      value={detailForm.email}
-                      onChange={(e) => setDetailForm(p => ({ ...p, email: e.target.value }))}
-                      placeholder="Sin email registrado"
-                      readOnly={!detailEditing}
-                    />
-                  </div>
-                </div>
-                <div className="form-group client-detail-notes-field">
-                  <label htmlFor="detail-client-notes">Notas</label>
-                  <div className="input-wrapper">
-                    <i className="fa-solid fa-note-sticky input-icon" />
-                    <textarea
-                      id="detail-client-notes"
-                      name="notas"
-                      value={detailForm.notas}
-                      onChange={(e) => setDetailForm(p => ({ ...p, notas: e.target.value }))}
-                      readOnly={!detailEditing}
-                      rows="4"
-                      placeholder="Sin notas registradas"
-                    />
-                  </div>
-                </div>
               </fieldset>
               <div className="client-modal-actions">
-                {!detailEditing ? (
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setDetailEditing(true)}
-                  >
-                    <i className="fa-solid fa-pen-to-square" /> Actualizar datos
-                  </button>
-                ) : (
+                {detailEditing && (
                   <>
                     <button
                       type="button"
@@ -724,15 +688,14 @@ function ClientsPanel({ session, notify, showLoader }) {
                       onClick={cancelDetailEdit}
                       disabled={detailSaving}
                     >
-                      Deshacer cambios
+                    <i className="fa-solid fa-xmark" /> Cancelar
                     </button>
-                    <button
+                    <Button
                       type="submit"
-                      className="btn btn-primary"
-                      disabled={detailSaving}
+                      busy={detailSaving}
                     >
-                      {detailSaving ? 'Guardando…' : (<><i className="fa-solid fa-floppy-disk" /> Confirmar cambios</>)}
-                    </button>
+                      <><i className="fa-solid fa-floppy-disk" /> Guardar</>
+                    </Button>
                   </>
                 )}
               </div>
@@ -740,36 +703,52 @@ function ClientsPanel({ session, notify, showLoader }) {
 
             <div className="client-history-heading">
               <strong>Historial de turnos</strong>
-              <span id="client-history-status" className="subtle-text" style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+              <span id="client-history-status" className="subtle-text client-history-status">
                 {detailLoading ? 'Cargando…' : `${detailHistory.length} registros`}
               </span>
             </div>
             <div id="client-detail-history" className="client-history-list">
               {detailLoading && (
-                <div className="list-empty-state" style={{ padding: '12px' }}>
+                <div className="list-empty-state client-history-empty">
                   <p>Cargando historial de la clienta…</p>
                 </div>
               )}
               {!detailLoading && detailHistory.length === 0 && (
-                <div className="list-empty-state" style={{ padding: '12px' }}>
+                <div className="list-empty-state client-history-empty">
                   <p>Esta clienta no tiene turnos registrados.</p>
                 </div>
               )}
               {!detailLoading && detailHistory.map(apt => (
                 <div key={apt.rawId || apt.id} className="client-history-item">
                   <div>
-                    <div style={{ fontWeight: '700', color: 'var(--text-color)' }}>
+                    <div className="client-history-service-name">
                       {apt.servicio || 'Turno'}
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      <i className="fa-regular fa-calendar" style={{ marginRight: '3px' }} />
+                    <div className="client-history-meta">
+                      <i className="fa-regular fa-calendar client-history-calendar" />
                       {formatDateTimeArgentina(apt.horaInicio || apt.fecha)}
                       {' · '}
-                      <span className={`status-tag ${statusBadgeClass(apt.estado)}`} style={{ fontSize: '10px' }}>{apt.estado}</span>
+                      <span className={`status-tag client-history-status-tag ${statusBadgeClass(apt.estado)}`}>{apt.estado}</span>
                     </div>
                   </div>
-                  <div style={{ fontWeight: '700', color: 'var(--barbie-dark)' }}>
-                    {formatCurrencyARS(apt.precio)}
+                  <div className="client-history-item-side">
+                    <div className="client-history-price">
+                      {formatCurrencyARS(apt.precio)}
+                    </div>
+                    <button
+                      type="button"
+                      className="client-history-more"
+                      title="Ver más"
+                      onClick={() => setSelectedHistoryService({
+                        ...apt,
+                        cliente: detailClient.nombre,
+                        categoria: 'Turno',
+                        metodoPago: apt.estado === 'Completado' ? 'Transferencia' : 'Pendiente',
+                        completado: apt.estado
+                      })}
+                    >
+                      <i className="fa-solid fa-eye" aria-hidden="true" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -777,6 +756,14 @@ function ClientsPanel({ session, notify, showLoader }) {
           </div>
         )}
       </Modal>
+
+      <ServiceDetailModal
+        open={!!selectedHistoryService}
+        service={selectedHistoryService}
+        notify={notify}
+        sizeClass="client-service-detail-modal-card"
+        onClose={() => setSelectedHistoryService(null)}
+      />
 
       <ConfirmModal
         open={!!confirmation}

@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    { "source": "/agenda", "destination": "/index.html" },
+    { "source": "/historial", "destination": "/index.html" },
+    { "source": "/clientes", "destination": "/index.html" },
+    { "source": "/gastos", "destination": "/index.html" },
+    { "source": "/estadisticas", "destination": "/index.html" },
+    { "source": "/precios", "destination": "/index.html" },
+    { "source": "/cajas", "destination": "/index.html" },
+    { "source": "/ajustes", "destination": "/index.html" },
+    { "source": "/cuenta", "destination": "/index.html" },
+    { "source": "/registrar", "destination": "/index.html" }
+  ]
+}

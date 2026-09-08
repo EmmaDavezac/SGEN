@@ -359,7 +359,7 @@ const TicketCanvas = forwardRef(function TicketCanvas(_props, ref) {
         <canvas
             ref={canvasRef}
             id="ticket-canvas"
-            style={{ display: 'none' }}
+            className="ticket-canvas-hidden"
             aria-hidden="true"
         />
     );

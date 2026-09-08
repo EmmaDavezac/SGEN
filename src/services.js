@@ -109,7 +109,8 @@ export function normalizeExpenseRecord(item) {
 }
 
 export async function registerServiceDirectly(transaction) {
-    if (supabase && state.currentUser?.authId) {
+    const authId = transaction?.usuario_id || transaction?.usuarioId || state.currentUser?.authId;
+    if (supabase && authId) {
         try {
             let { data: clientRecord, error: clientError } = await supabase
                 .from('clientes')
@@ -135,7 +136,7 @@ export async function registerServiceDirectly(transaction) {
                     legacy_id: transaction.id,
                     cliente_id: clientRecord.id,
                     turno_id: turnoId,
-                    usuario_id: state.currentUser.authId,
+                    usuario_id: authId,
                     fecha: transaction.fecha,
                     servicio: transaction.servicio,
                     categoria: transaction.categoria || 'Otro',
@@ -145,12 +146,14 @@ export async function registerServiceDirectly(transaction) {
                     completado: transaction.completado === true || ['sí', 'si', 'yes', 'true'].includes(String(transaction.completado).toLowerCase()),
                     vuelto: Number(transaction.vuelto) || 0
                 })
-                .select('id, legacy_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
+                .select('id, legacy_id, turno_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
                 .single();
             if (error) throw error;
 
             return { success: true, service: normalizeServiceRecord({
                 id: data.legacy_id || data.id,
+                rawId: data.id,
+                turnoId: data.turno_id,
                 fecha: data.fecha,
                 cliente: data.clientes?.nombre || transaction.cliente,
                 servicio: data.servicio,
@@ -171,6 +174,162 @@ export async function registerServiceDirectly(transaction) {
 
     showToast('Supabase no está disponible para guardar el servicio.', 'error');
     return null;
+}
+
+export async function loadClientsFromDatabase() {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { data, error } = await supabase
+        .from('clientes')
+        .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
+        .order('nombre', { ascending: true });
+    if (error) throw error;
+    return data || [];
+}
+
+export async function loadAppointmentsFromDatabase() {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { data, error } = await supabase
+        .from('turnos')
+        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, cliente_id')
+        .order('hora_inicio', { ascending: false });
+    if (error) throw error;
+    return data || [];
+}
+
+export async function loadExpensesFromDatabase() {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { data, error } = await supabase
+        .from('gastos')
+        .select('id, fecha, concepto, categoria, monto, metodo_pago')
+        .order('fecha', { ascending: false });
+    if (error) throw error;
+    return data || [];
+}
+
+export async function loadServicesFromDatabase() {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { data, error } = await supabase
+        .from('servicios')
+        .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
+        .order('fecha', { ascending: false });
+    if (error) throw error;
+    return data || [];
+}
+
+export async function loadCashboxDataFromDatabase() {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const [servicesResult, movementsResult, expensesResult] = await Promise.all([
+        supabase.from('servicios').select('precio, sena, metodo_pago, completado'),
+        supabase.from('movimientos_caja').select('*').order('fecha', { ascending: false }).limit(50),
+        supabase.from('gastos').select('monto, metodo_pago')
+    ]);
+    if (servicesResult.error) throw servicesResult.error;
+    if (movementsResult.error) throw movementsResult.error;
+    if (expensesResult.error) throw expensesResult.error;
+    return {
+        services: servicesResult.data || [],
+        movements: movementsResult.data || [],
+        expenses: expensesResult.data || []
+    };
+}
+
+export async function saveClientToDatabase(payload, { usuarioId = null } = {}) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { data, error } = await supabase
+        .from('clientes')
+        .insert(payload)
+        .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
+        .single();
+    if (error) throw error;
+    return data;
+}
+
+export async function findClientByNormalizedName(name) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { data, error } = await supabase
+        .from('clientes')
+        .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
+        .eq('nombre_normalizado', String(name || '').trim().toLowerCase())
+        .maybeSingle();
+    if (error) throw error;
+    return data;
+}
+
+export async function updateClientInDatabase(id, updates) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { data, error } = await supabase
+        .from('clientes')
+        .update(updates)
+        .eq('id', id)
+        .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
+        .single();
+    if (error) throw error;
+    return data;
+}
+
+export async function deleteClientFromDatabase(id) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { error } = await supabase.from('clientes').delete().eq('id', id);
+    if (error) throw error;
+    return { success: true };
+}
+
+export async function saveExpenseToDatabase(payload) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { data, error } = await supabase
+        .from('gastos')
+        .insert(payload)
+        .select('id, fecha, concepto, categoria, monto, metodo_pago')
+        .single();
+    if (error) throw error;
+    return data;
+}
+
+export async function saveCashMovementToDatabase(payload) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { data, error } = await supabase
+        .from('movimientos_caja')
+        .insert(payload)
+        .select('*')
+        .single();
+    if (error) throw error;
+    return data;
+}
+
+export async function saveAppointmentToDatabase(payload) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { data, error } = await supabase
+        .from('turnos')
+        .insert(payload)
+        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, cliente_id, usuario_id')
+        .single();
+    if (error) throw error;
+    return data;
+}
+
+export async function updateAppointmentStatusInDatabase(id, updates) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { data, error } = await supabase
+        .from('turnos')
+        .update(updates)
+        .eq('id', id)
+        .select('id, estado, precio')
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('No se encontró el turno para actualizar.');
+    return data;
+}
+
+export async function updateAppointmentInDatabase({ id = null, legacyId = null, updates = {} } = {}) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    let query = supabase.from('turnos').update(updates);
+    query = id ? query.eq('id', id) : query.eq('legacy_id', legacyId);
+    const { data, error } = await query
+        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, cliente_id, usuario_id')
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('No se encontró el turno para actualizar.');
+    return data;
 }
 
 export async function updateServiceRecord(id, updates) {
@@ -197,15 +356,152 @@ export async function updateServiceRecord(id, updates) {
     });
 }
 
-export async function updateLinkedTurnoStatus(serviceId, serviceOverride = null) {
+export async function deleteServiceFromDatabase(id) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const { error } = await supabase.from('servicios').delete().eq('legacy_id', id);
+    if (error) throw error;
+    return { success: true };
+}
+
+export function normalizeTurnoEstado(raw) {
+    const value = (raw || '').toString().trim().toLowerCase();
+    if (['completed', 'completado', 'cobrado', 'pagado'].includes(value)) return 'completado';
+    if (['reservado', 'reserved'].includes(value)) return 'reservado';
+    if (['cancelado', 'cancelled'].includes(value)) return 'cancelado';
+    return 'provisional';
+}
+
+export async function repairMissingTurnoLinks({ clientId = null, serviceDate = null, serviceName = '' } = {}) {
+    if (!supabase || !clientId) return { updated: 0, total: 0 };
+
+    const { data: orphanServices, error } = await supabase
+        .from('servicios')
+        .select('id, cliente_id, fecha, servicio, turno_id')
+        .eq('cliente_id', clientId)
+        .is('turno_id', null)
+        .order('fecha', { ascending: false });
+    if (error) throw error;
+
+    const items = (serviceDate ? (orphanServices || []).filter((item) => {
+        if (!item?.fecha) return true;
+        return new Date(item.fecha).toISOString().slice(0, 10) === serviceDate;
+    }) : orphanServices || []);
+
+    let updated = 0;
+    for (const item of items) {
+        const target = (serviceName || item.servicio || '').toLowerCase();
+        const { data: candidates, error: candidatesError } = await supabase
+            .from('turnos')
+            .select('id, fecha, servicio, cliente_id')
+            .eq('cliente_id', clientId)
+            .order('fecha', { ascending: false });
+        if (candidatesError) throw candidatesError;
+
+        const filtered = (candidates || []).filter((turno) => {
+            const turnoDate = turno?.fecha ? new Date(turno.fecha).toISOString().slice(0, 10) : null;
+            const sameDay = !serviceDate || !turnoDate || turnoDate === serviceDate;
+            const turnoName = (turno?.servicio || '').toLowerCase();
+            return sameDay && (turnoName.includes(target) || target.includes(turnoName) || turnoName === 'turno' || target === 'turno');
+        });
+
+        const match = filtered[0];
+        if (!match) continue;
+
+        const { error: updateError } = await supabase
+            .from('servicios')
+            .update({ turno_id: match.id })
+            .eq('id', item.id);
+        if (updateError) throw updateError;
+        updated += 1;
+    }
+
+    return { updated, total: items.length };
+}
+
+export async function registerPaymentRecord({
+    serviceId = null,
+    turnoId = null,
+    usuarioId = null,
+    amount,
+    paymentMethod = 'transferencia',
+    type = 'cobro'
+}) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+
+    const paymentAmount = Number(amount) || 0;
+    const method = String(paymentMethod || 'transferencia').toLowerCase() === 'efectivo'
+        ? 'efectivo'
+        : 'transferencia';
+
+    if (paymentAmount <= 0) return { skipped: true };
+    if (!serviceId && !turnoId) throw new Error('El pago debe estar relacionado con un servicio o turno.');
+
+    const { data, error } = await supabase
+        .from('pagos')
+        .insert({
+            servicio_id: serviceId,
+            turno_id: turnoId,
+            usuario_id: usuarioId || state.currentUser?.authId || null,
+            fecha: new Date().toISOString(),
+            monto: paymentAmount,
+            metodo_pago: method,
+            tipo: type
+        })
+        .select('id, servicio_id, turno_id, monto, metodo_pago, tipo')
+        .single();
+
+    if (error) throw error;
+    return { success: true, payment: data };
+}
+
+export async function finalizeRegisteredService({
+    turnoId = null,
+    turnoLegacyId = null,
+    precio = 0,
+    serviceId = null,
+    paymentAmount = 0,
+    paymentMethod = 'transferencia',
+    usuarioId = null
+}) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+
+    await registerPaymentRecord({
+        serviceId,
+        turnoId,
+        usuarioId,
+        amount: paymentAmount,
+        paymentMethod,
+        type: 'cobro'
+    });
+
+    if (!turnoId && !turnoLegacyId) return { updated: true, turnoId: null };
+
+    let query = supabase
+        .from('turnos')
+        .update({ estado: 'completado', precio: Number(precio) || 0 });
+    query = turnoId ? query.eq('id', turnoId) : query.eq('legacy_id', turnoLegacyId);
+
+    const { error } = await query;
+    if (error) throw error;
+    return { updated: true, turnoId: turnoId || turnoLegacyId };
+}
+
+export async function completePendingPayment({
+    serviceId,
+    serviceOverride = null,
+    paymentMethod = 'transferencia',
+    vuelto = 0,
+    finalizeTurno = true,
+    usuarioId = null
+}) {
     if (!supabase) return { updated: false, reason: 'missing_supabase' };
 
     let serviceRecord = serviceOverride;
     if (!serviceRecord) {
         const { data, error } = await supabase
             .from('servicios')
-            .select('id, turno_id, cliente_id, fecha, servicio, precio')
-            .eq('id', serviceId)
+            .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, precio, metodo_pago, completado')
+            .or(`id.eq.${serviceId},legacy_id.eq.${serviceId}`)
             .maybeSingle();
         if (error) throw error;
         serviceRecord = data;
@@ -213,17 +509,49 @@ export async function updateLinkedTurnoStatus(serviceId, serviceOverride = null)
 
     if (!serviceRecord) return { updated: false, reason: 'missing_service' };
 
-    if (serviceRecord.turno_id) {
-        const { error } = await supabase
+    const servicePk = serviceRecord.id || serviceRecord.legacy_id || serviceId;
+    const updatePayload = {
+        metodo_pago: String(paymentMethod || 'transferencia').toLowerCase(),
+        completado: true,
+        vuelto: Number(vuelto) || 0
+    };
+
+    const { error: serviceError } = await supabase
+        .from('servicios')
+        .update(updatePayload)
+        .or(`id.eq.${servicePk},legacy_id.eq.${servicePk}`);
+    if (serviceError) throw serviceError;
+
+    const finalizedTurnoId = serviceRecord.turno_id || null;
+    if (serviceRecord.id) {
+        const paymentMonto = Number(serviceRecord.precio) || 0;
+        const paymentMethodValue = String(paymentMethod || 'transferencia').toLowerCase();
+        if (paymentMonto > 0 && ['efectivo', 'transferencia'].includes(paymentMethodValue)) {
+            await registerPaymentRecord({
+                serviceId: serviceRecord.id,
+                turnoId: finalizedTurnoId,
+                usuarioId,
+                amount: paymentMonto,
+                paymentMethod: paymentMethodValue,
+                type: 'cobro'
+            });
+        }
+    }
+
+    if (!finalizeTurno) return { updated: true, turnoId: finalizedTurnoId };
+
+    const matchId = serviceRecord.turno_id || null;
+    if (matchId) {
+        const { error: turnoError } = await supabase
             .from('turnos')
-            .update({ estado: 'completado', precio: Number(serviceRecord.precio) || 0 })
-            .eq('id', serviceRecord.turno_id);
-        if (error) throw error;
-        return { updated: true, turnoId: serviceRecord.turno_id };
+            .update({ estado: normalizeTurnoEstado('completado'), precio: Number(serviceRecord.precio) || 0 })
+            .eq('id', matchId);
+        if (turnoError) throw turnoError;
+        return { updated: true, turnoId: matchId };
     }
 
     const clienteId = serviceRecord.cliente_id;
-    if (!clienteId) return { updated: false, reason: 'missing_cliente' };
+    if (!clienteId) return { updated: true, turnoId: null, reason: 'missing_cliente' };
 
     const serviceDate = serviceRecord.fecha ? new Date(serviceRecord.fecha).toISOString().slice(0, 10) : null;
     let turnoQuery = supabase
@@ -239,27 +567,75 @@ export async function updateLinkedTurnoStatus(serviceId, serviceOverride = null)
     const { data: turnoCandidates, error: turnoError } = await turnoQuery;
     if (turnoError) throw turnoError;
 
+    const targetName = (serviceRecord.servicio || '').toLowerCase();
     const match = (turnoCandidates || []).find((turno) => {
         const current = (turno.servicio || '').toLowerCase();
-        const target = (serviceRecord.servicio || '').toLowerCase();
-        return current.includes(target) || target.includes(current) || current === 'turno' || target === 'turno';
+        return current.includes(targetName) || targetName.includes(current) || current === 'turno' || targetName === 'turno';
     }) || (turnoCandidates || [])[0];
 
-    if (!match) return { updated: false, reason: 'no_matching_turno' };
+    if (!match) {
+        const repaired = await repairMissingTurnoLinks({
+            clientId: clienteId,
+            serviceDate: serviceDate,
+            serviceName: serviceRecord.servicio
+        });
+        if (repaired.updated > 0) {
+            const { data: recoveredCandidates, error: recoveredError } = await supabase
+                .from('turnos')
+                .select('id, fecha, servicio, precio, cliente_id')
+                .eq('cliente_id', clienteId)
+                .order('fecha', { ascending: false });
+            if (recoveredError) throw recoveredError;
 
-    const { error: updateError } = await supabase
+            const recoveredMatch = (recoveredCandidates || []).find((turno) => {
+                const sameDay = !serviceDate || new Date(turno.fecha).toISOString().slice(0, 10) === serviceDate;
+                const current = (turno.servicio || '').toLowerCase();
+                const target = (serviceRecord.servicio || '').toLowerCase();
+                return sameDay && (current.includes(target) || target.includes(current) || current === 'turno' || target === 'turno');
+            }) || (recoveredCandidates || [])[0];
+
+            if (recoveredMatch) {
+                const { error: updateRecoveredTurnoError } = await supabase
+                    .from('turnos')
+                    .update({ estado: normalizeTurnoEstado('completado'), precio: Number(serviceRecord.precio) || Number(recoveredMatch.precio) || 0 })
+                    .eq('id', recoveredMatch.id);
+                if (updateRecoveredTurnoError) throw updateRecoveredTurnoError;
+
+                const { error: linkRecoveredError } = await supabase
+                    .from('servicios')
+                    .update({ turno_id: recoveredMatch.id })
+                    .or(`id.eq.${servicePk},legacy_id.eq.${servicePk}`);
+                if (linkRecoveredError) throw linkRecoveredError;
+
+                return { updated: true, turnoId: recoveredMatch.id };
+            }
+        }
+        return { updated: true, turnoId: null, reason: 'no_matching_turno' };
+    }
+
+    const { error: updateTurnoError } = await supabase
         .from('turnos')
-        .update({ estado: 'completado', precio: Number(serviceRecord.precio) || Number(match.precio) || 0 })
+        .update({ estado: normalizeTurnoEstado('completado'), precio: Number(serviceRecord.precio) || Number(match.precio) || 0 })
         .eq('id', match.id);
-    if (updateError) throw updateError;
+    if (updateTurnoError) throw updateTurnoError;
 
-    const { error: serviceUpdateError } = await supabase
+    const { error: linkError } = await supabase
         .from('servicios')
         .update({ turno_id: match.id })
-        .eq('id', serviceRecord.id);
-    if (serviceUpdateError) throw serviceUpdateError;
+        .or(`id.eq.${servicePk},legacy_id.eq.${servicePk}`);
+    if (linkError) throw linkError;
 
     return { updated: true, turnoId: match.id };
+}
+
+export async function updateLinkedTurnoStatus(serviceId, serviceOverride = null) {
+    return completePendingPayment({
+        serviceId,
+        serviceOverride,
+        paymentMethod: serviceOverride?.metodo_pago || 'transferencia',
+        vuelto: 0,
+        finalizeTurno: true
+    });
 }
 
 export async function loadServicesData() {

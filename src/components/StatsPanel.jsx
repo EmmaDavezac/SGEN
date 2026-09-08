@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase.js';
-import { updateLinkedTurnoStatus } from '../services.js';
+import { completePendingPayment, loadExpensesFromDatabase, loadServicesFromDatabase, saveExpenseToDatabase } from '../services.js';
 import Modal, { ConfirmModal } from '../components/Modal.jsx';
 
 const INCOME_CATEGORIES = ['semi', 'kapping', 'softgel', 'esculpidas', 'personalizado', 'remocion'];
@@ -104,8 +104,27 @@ const StatsPanel = ({ session }) => {
     const [payAmount, setPayAmount] = useState('');
     const [returnMethod, setReturnMethod] = useState('Efectivo');
     const [paying, setPaying] = useState(false);
+    const [payDiscardConfirmOpen, setPayDiscardConfirmOpen] = useState(false);
+    const payInitialRef = React.useRef(null);
 
     const now = new Date();
+
+    const refreshServices = async () => {
+        if (!session?.authId || !supabase) return;
+        setLoading(true);
+        try {
+            const [servicesData, expensesData] = await Promise.all([
+                loadServicesFromDatabase(),
+                loadExpensesFromDatabase()
+            ]);
+            setServices(servicesData.map(normalizeServiceRecord));
+            setExpenses(expensesData.map(normalizeExpenseRecord));
+        } catch (err) {
+            console.error('Error cargando estadísticas:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         let ignore = false;
@@ -114,22 +133,13 @@ const StatsPanel = ({ session }) => {
             if (!session?.authId || !supabase) return;
             setLoading(true);
             try {
-                const [svcRes, expRes] = await Promise.all([
-                    supabase
-                        .from('servicios')
-                        .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, vuelto, metodo_pago, clientes(nombre)')
-                        .order('fecha', { ascending: false }),
-                    supabase
-                        .from('gastos')
-                        .select('id, fecha, concepto, categoria, monto, metodo_pago')
-                        .order('fecha', { ascending: false })
+                const [servicesData, expensesData] = await Promise.all([
+                    loadServicesFromDatabase(),
+                    loadExpensesFromDatabase()
                 ]);
 
-                if (svcRes.error) throw svcRes.error;
-                if (expRes.error) throw expRes.error;
-
-                const normalizedSvcs = (svcRes.data || []).map(normalizeServiceRecord);
-                const normalizedExps = (expRes.data || []).map(normalizeExpenseRecord);
+                const normalizedSvcs = servicesData.map(normalizeServiceRecord);
+                const normalizedExps = expensesData.map(normalizeExpenseRecord);
 
                 if (!ignore) {
                     setServices(normalizedSvcs);
@@ -228,7 +238,7 @@ const StatsPanel = ({ session }) => {
             const ids = debtorToPay.servicios.map((s) => s.rawId || s.id);
             const change = Math.max(0, (Number(payAmount) || 0) - debtorToPay.total);
             if (change > 0) {
-                const { error: changeError } = await supabase.from('gastos').insert({
+                await saveExpenseToDatabase({
                     usuario_id: session.authId,
                     fecha: new Date().toISOString().slice(0, 10),
                     concepto: `Vuelto de ${debtorToPay.cliente}`,
@@ -236,34 +246,28 @@ const StatsPanel = ({ session }) => {
                     metodo_pago: returnMethod.toLowerCase(),
                     categoria: 'Vuelto'
                 });
-                if (changeError) throw changeError;
             }
-            const updates = ids.map((id, index) =>
-                supabase.from('servicios').update({
-                    metodo_pago: payMethod.toLowerCase(),
-                    vuelto: index === 0 ? change : 0,
-                    completado: true
-                }).eq('id', id)
-            );
-            const results = await Promise.all(updates);
-            const failed = results.find((result) => result.error);
-            if (failed) throw failed.error;
-
-            await Promise.all(ids.map(async (serviceId) => {
+            await Promise.all(ids.map((serviceId, index) => {
                 const match = services.find((service) => (service.rawId || service.id) === serviceId);
                 if (!match) return;
-                try {
-                    await updateLinkedTurnoStatus(serviceId, {
-                        id: serviceId,
+                return completePendingPayment({
+                    serviceId,
+                    serviceOverride: {
+                        id: match.rawId || match.id,
+                        legacy_id: match.id,
                         turno_id: match.turnoId || null,
                         cliente_id: match.clienteId || null,
                         fecha: match.fecha,
                         servicio: match.servicio,
-                        precio: match.precio
-                    });
-                } catch (turnoError) {
-                    console.warn('No se pudo completar el turno asociado al cobro pendiente:', turnoError);
-                }
+                        precio: match.precio,
+                        metodo_pago: payMethod.toLowerCase(),
+                        completado: true
+                    },
+                    paymentMethod: payMethod.toLowerCase(),
+                    vuelto: index === 0 ? change : 0,
+                    finalizeTurno: true,
+                    usuarioId: session.authId
+                });
             }));
 
             setServices((prev) =>
@@ -272,6 +276,7 @@ const StatsPanel = ({ session }) => {
                     return index === -1 ? x : { ...x, metodoPago: payMethod, vuelto: index === 0 ? change : 0, completado: true };
                 })
             );
+            await refreshServices();
             if (notify) notify('Cobro registrado y pago pendiente actualizado.', 'success');
             setPayConfirmOpen(false);
             setDebtorToPay(null);
@@ -288,6 +293,7 @@ const StatsPanel = ({ session }) => {
         setPayMethod('Efectivo');
         setReturnMethod('Efectivo');
         setPayAmount(String(debtor.total));
+        payInitialRef.current = JSON.stringify({ amount: String(debtor.total), method: 'Efectivo', returnMethod: 'Efectivo' });
         setPayDetailsOpen(true);
     };
 
@@ -301,8 +307,23 @@ const StatsPanel = ({ session }) => {
         setPayConfirmOpen(true);
     };
 
+    const discardPayDetails = () => {
+        setPayDiscardConfirmOpen(false);
+        setPayDetailsOpen(false);
+        setPayConfirmOpen(false);
+        setDebtorToPay(null);
+        setPayAmount('');
+    };
+
     const cancelPay = () => {
         if (paying) return;
+        if (payDetailsOpen && payInitialRef.current) {
+            const current = JSON.stringify({ amount: payAmount, method: payMethod, returnMethod });
+            if (current !== payInitialRef.current) {
+                setPayDiscardConfirmOpen(true);
+                return;
+            }
+        }
         setPayDetailsOpen(false);
         setPayConfirmOpen(false);
         setDebtorToPay(null);
@@ -369,7 +390,16 @@ const StatsPanel = ({ session }) => {
     ];
 
     return (
-        <section style={{ display: 'grid', gap: '18px' }}>
+        <section className="panel-stack">
+            <ConfirmModal
+                open={payDiscardConfirmOpen}
+                title="Descartar cobro"
+                message="Hay datos sin confirmar en el cobro pendiente. ¿Querés descartarlos?"
+                confirmText="Descartar"
+                confirmVariant="danger"
+                onConfirm={discardPayDetails}
+                onCancel={() => setPayDiscardConfirmOpen(false)}
+            />
             <div className="section-title">
                 <h3>Estadísticas Evolet</h3>
                 <p>Tus finanzas brillando y en orden.</p>
@@ -379,7 +409,7 @@ const StatsPanel = ({ session }) => {
                 {kpiCards.map((kpi) => (
                     <div key={kpi.id} id={kpi.id} className="stat-card pink-glow">
                         <span className="stat-icon">
-                            <i className={`fa-solid ${kpi.icon}`} style={{ color: kpi.iconColor }}></i>
+                            <i className={`fa-solid ${kpi.icon} stats-kpi-icon ${kpi.id}`}></i>
                         </span>
                         <div className="stat-info">
                             <span className="stat-label">{kpi.label}</span>
@@ -391,26 +421,25 @@ const StatsPanel = ({ session }) => {
 
             {debtors.length > 0 && (
                 <div className="chart-section stats-panel">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                        <h4 style={{ marginBottom: 0 }}>Clientes con pagos pendientes</h4>
+                    <div className="panel-subsection-header pending-debtors-header">
+                        <h4 className="panel-subsection-title">Clientes con pagos pendientes</h4>
                     </div>
-                    <div className="day-appointments-container">
+                    <div className="day-appointments-container list-scroll">
                         {debtors.map((d) => (
-                            <div key={d.cliente} className="appointment-card pending-debtor-card" style={{ borderColor: '#FFE4B5', background: 'linear-gradient(135deg, var(--white) 90%, #FFFDF0 100%)' }}>
+                            <div key={d.cliente} className="appointment-card pending-debtor-card">
                                 <div className="appointment-info-col">
                                     <div className="appointment-client-name">{d.cliente}</div>
                                     <div className="appointment-service-name">
                                         {summarizeService(d.servicios)} · {d.servicios.length} servicio{d.servicios.length !== 1 ? 's' : ''}
                                     </div>
                                 </div>
-                                <div className="appointment-actions-col" style={{ flexDirection: 'column', gap: '8px' }}>
-                                    <div className="card-price" style={{ color: '#ff4d4d', fontSize: '16px', fontWeight: 700 }}>
+                                <div className="appointment-actions-col pending-debtor-actions">
+                                    <div className="card-price pending-debtor-amount">
                                         ${formatPrice(d.total)}
                                     </div>
                                     <button
                                         type="button"
-                                        className="btn btn-primary"
-                                        style={{ padding: '6px 12px', fontSize: '12px', minWidth: '88px' }}
+                                        className="btn btn-primary pending-debtor-pay-action"
                                         onClick={() => requestPayDebtor(d)}
                                     >
                                         <i className="fa-solid fa-sack-dollar"></i> Cobrar
@@ -448,11 +477,8 @@ const StatsPanel = ({ session }) => {
                             <span className="payment-stat-label">{row.label}</span>
                             <div className="payment-progress-bar">
                                 <div
-                                    className="progress"
-                                    style={{
-                                        width: `${row.percent}%`,
-                                        background: 'linear-gradient(90deg, #ffcccc 0%, #ff4d4d 100%)'
-                                    }}
+                                    className="progress expense-progress"
+                                    style={{ width: `${row.percent}%` }}
                                 ></div>
                             </div>
                             <span className="payment-stat-val">${formatPrice(row.value)}</span>
