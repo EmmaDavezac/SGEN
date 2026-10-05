@@ -1,7 +1,7 @@
 import { precacheAndRoute } from 'workbox-precaching';
 
 // Service Worker con versionado y precache generado por Vite (Workbox)
-const CACHE_VERSION = 'v17';
+const CACHE_VERSION = 'v18';
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
 // precache manifest será inyectado por `vite-plugin-pwa` durante el build
@@ -28,13 +28,7 @@ self.addEventListener('activate', (e) => {
 
 // Fetch: navegación network-first, otros recursos stale-while-revalidate
 self.addEventListener('fetch', (e) => {
-  // No interceptar ciertos orígenes externos y CDNs
-  if (
-    e.request.url.includes('googleapis.com') ||
-    e.request.url.includes('cdnjs.cloudflare.com')
-  ) {
-    return;
-  }
+  if (new URL(e.request.url).origin !== self.location.origin) return;
 
   // Si es navegación, network-first con fallback al precache (index.html)
   if (e.request.mode === 'navigate') {
@@ -47,7 +41,7 @@ self.addEventListener('fetch', (e) => {
         }
         return networkResponse;
       } catch (err) {
-        return caches.match('/index.html');
+        return (await caches.match('/index.html')) || Response.error();
       }
     })());
     return;
@@ -62,7 +56,7 @@ self.addEventListener('fetch', (e) => {
         await cache.put(e.request, networkResponse.clone());
       }
       return networkResponse;
-    }).catch(() => null);
+    }).catch(() => cachedResponse || Response.error());
     return cachedResponse || networkPromise;
   })());
 });
