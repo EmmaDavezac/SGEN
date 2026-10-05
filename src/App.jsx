@@ -66,6 +66,12 @@ function readStoredSession() {
     }
 }
 
+function isPasswordRecoveryRedirect() {
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const queryParams = new URLSearchParams(window.location.search);
+    return hashParams.get('type') === 'recovery' || queryParams.get('type') === 'recovery';
+}
+
 function readStoredSettings() {
     try {
         const raw = localStorage.getItem(SETTINGS_KEY);
@@ -123,7 +129,7 @@ function App() {
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [passwordResetMode, setPasswordResetMode] = useState(false);
+    const [passwordResetMode, setPasswordResetMode] = useState(isPasswordRecoveryRedirect);
     const [resetPassword, setResetPassword] = useState('');
     const [resetPasswordConfirmation, setResetPasswordConfirmation] = useState('');
 
@@ -144,7 +150,15 @@ function App() {
     useEffect(() => {
         if (!supabase) return undefined;
         const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
-            if (event === 'PASSWORD_RECOVERY') setPasswordResetMode(true);
+            if (event === 'PASSWORD_RECOVERY') {
+                setSession(null);
+                setPasswordResetMode(true);
+                const callbackUrl = new URL(window.location.href);
+                callbackUrl.hash = '';
+                callbackUrl.searchParams.delete('type');
+                callbackUrl.searchParams.delete('code');
+                window.history.replaceState({}, document.title, `${callbackUrl.pathname}${callbackUrl.search}`);
+            }
         });
         return () => authListener.subscription.unsubscribe();
     }, []);
@@ -227,7 +241,7 @@ function App() {
         setLoading(true);
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-                redirectTo: window.location.origin,
+                redirectTo: new URL('/?type=recovery', window.location.origin).toString(),
             });
             if (error) throw error;
             notify('Si el email está registrado, recibirás un enlace para recuperar el acceso.', 'success');
