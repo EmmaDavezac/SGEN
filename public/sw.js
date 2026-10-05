@@ -30,9 +30,6 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   // No interceptar ciertos orígenes externos y CDNs
   if (
-    e.request.url.includes('script.google.com') ||
-    e.request.url.includes('script.googleusercontent.com') ||
-    e.request.url.includes('script.gstatic.com') ||
     e.request.url.includes('googleapis.com') ||
     e.request.url.includes('cdnjs.cloudflare.com')
   ) {

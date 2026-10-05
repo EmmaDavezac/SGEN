@@ -22,7 +22,7 @@ Los tests deben ejecutarse con datos de prueba. No eliminar ni modificar registr
 - [x] Capa comun para crear y editar clientes.
 - [x] Capa comun para crear, reservar, reagendar y cancelar turnos del Calendario.
 - [x] Capa comun para gastos y movimientos de caja.
-- [x] Revisado `Phase3Modules.jsx`: no esta montado en la aplicacion actual y queda aislado.
+- [x] Fuentes legacy archivadas fuera del bundle; `CalendarBoard.jsx` es el unico tablero montado.
 - [ ] Ejecutar los casos de prueba manuales de este documento.
 
 ## Preparacion

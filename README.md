@@ -121,7 +121,7 @@ Antes de este sistema, la operación del salón sufría estos dolores:
 
 ```
 SGEN/
-├── legacy/                       # Código de referencia (no parte del build React)
+├── docs/archive/legacy/          # Fuentes antiguas conservadas fuera de la app React
 ├── public/                       # Assets servidos como /
 │   ├── icons/                    # 8 tamaños de íconos PWA (favicon, maskable, Apple)
 │   ├── logo.png                  # Logo del salón (Login · Header · 404)
@@ -130,7 +130,6 @@ SGEN/
 ├── src/                          # Código React (entry point: react-main.jsx)
 │   ├── components/               # UI modular, 1 archivo ≈ 1 pantalla
 │   │   ├── AppLayout.jsx         #   Layout global (header + nav inferior)
-│   │   ├── AgendaBoard.jsx       #   Agenda vista lista
 │   │   ├── CalendarBoard.jsx     #   Agenda calendario mensual
 │   │   ├── HistoryPanel.jsx      #   Historial + cobro de fiados
 │   │   ├── RegisterServiceForm.jsx # Alta de servicio / cobro
@@ -142,13 +141,10 @@ SGEN/
 │   │   ├── SettingsPanel.jsx     #   Ajustes toggles admin
 │   │   ├── TicketCanvas.jsx      #   Render Canvas ticket PNG
 │   │   ├── Modal.jsx · Toast.jsx · Loader.jsx · Button.jsx
-│   │   └── Phase3Modules.jsx
 │   ├── App.jsx                   # Orquestador: estado global, guards, notify
 │   ├── supabase.js               # Singleton Supabase + signInWithSupabase
 │   ├── config.js                 # Lectura de variables VITE_*
-│   ├── appointments.js           # Helpers turnos
 │   ├── services.js               # Helpers servicios
-│   ├── api.js · state.js
 │   ├── ui/loader.js · ui/toast.js
 │   └── react-main.jsx            # createRoot → <App/>
 ├── supabase/
@@ -195,12 +191,12 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxxxxxxxxxxxxxx
 > ⚠️ Regla de seguridad de Supabase: **nunca** poner `SUPABASE_SERVICE_ROLE_KEY` en variables `VITE_*` (son públicas). Solo la `PUBLISHABLE_KEY`.
 
 ### 3. Aplicar el schema a la base de datos
-Aplicar los 22 SQL de `supabase/migrations/` en orden cronológico (0000 → 0021), desde el SQL Editor de Supabase Dashboard o por CLI:
+Aplicar las migraciones versionadas de `supabase/migrations/` desde el SQL Editor de Supabase Dashboard o por CLI. Antes de ejecutar migraciones de importación, revisar el snapshot incluido y confirmar que corresponde a los datos que se desean cargar:
 ```bash
 supabase link  --project-ref TU-PROYECTO
 supabase db push
 ```
-Esto crea tablas (`perfiles`, `clientes`, `turnos`, `servicios`, `pagos`, `gastos`, `precios`, `movimientos_caja`) y aplica todas las políticas RLS.
+Esto crea tablas (`perfiles`, `clientes`, `turnos`, `servicios`, `pagos`, `gastos`, `precios`, `movimientos_caja`) y aplica las políticas RLS. El proceso no modifica Google Sheets.
 
 ### 4. (Opcional) Sincronización con Google Calendar
 1. Crear OAuth Client ID en Google Cloud Console con scope `https://www.googleapis.com/auth/calendar.events`.
