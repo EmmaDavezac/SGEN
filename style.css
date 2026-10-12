@@ -1243,13 +1243,15 @@ button:disabled {
 
 #tab-historial .search-box-container,
 #tab-clientes .search-box-container,
-#tab-gastos .search-box-container {
+#tab-gastos .search-box-container,
+#tab-usuarios .search-box-container {
     flex: 1 1 220px;
 }
 
 #tab-historial .filter-button-panel,
 #tab-clientes .filter-button-panel,
-#tab-gastos .filter-button-panel {
+#tab-gastos .filter-button-panel,
+#tab-usuarios .filter-button-panel {
     flex-basis: 100%;
     order: 5;
 }
@@ -3877,10 +3879,17 @@ button:active {
     text-align: center;
 }
 
+/* Formulario de invitación: mismo contenedor que el alta de Clientas — tarjeta
+   blanca con borde y sombra (no "pelado" sobre el fondo de la página). */
 .users-invite-form {
     display: grid;
     gap: 12px;
     margin-bottom: 18px;
+    padding: 20px;
+    border: 1px solid var(--barbie-pale);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    box-shadow: var(--shadow-md);
 }
 
 .users-invite-form .form-row-2 {
@@ -4005,6 +4014,10 @@ button:active {
 }
 
 @media (max-width: 520px) {
+    .users-invite-form {
+        padding: 16px;
+    }
+
     .users-invite-form .form-row-2 {
         grid-template-columns: minmax(0, 1fr);
     }
@@ -4537,11 +4550,11 @@ button:active {
     margin-top: 16px;
 }
 
-/* Gastos: misma separación búsqueda → listado que Clientes/Usuarios (16px).
+/* Gastos: misma separación búsqueda → listado que Clientes (16px).
    #tab-gastos es .panel-stack (grid con gap: 18px), así que los márgenes no
    colapsan: .filters-container aporta 4px + gap 18px + este margin-top.
    Se compensa (-6px) para que el total sea 16px, igual que en #tab-clientes
-   y Usuarios (flujo de bloque, márgenes colapsados a 16px). */
+   (flujo de bloque, márgenes colapsados a 16px). */
 #tab-gastos #expenses-list.list-section-gap {
     margin-top: -6px;
 }
@@ -4552,11 +4565,17 @@ button:active {
     margin-top: -6px;
 }
 
+/* Usuarios: mismo caso que Gastos/Historial (section#tab-usuarios.panel-stack,
+   grid). Mismo total de 16px entre barra de búsqueda y listado. */
+#tab-usuarios .users-list.list-section-gap {
+    margin-top: -6px;
+}
+
 /* Separación título → barra de búsqueda uniforme (16px) en todos los paneles.
    En .panel-stack (grid, gap: 18px) el margin-bottom: 16px de .section-title
    no colapsa con el gap → 34px; se anula el gap solo cuando el buscador sigue
-   inmediatamente al título: 16 + 18 - 18 = 16px, igual que en Clientes,
-   Usuarios y Precios (flujo de bloque, márgenes colapsados a 16px). */
+   inmediatamente al título: 16 + 18 - 18 = 16px, igual que en Clientes
+   y Precios (flujo de bloque, márgenes colapsados a 16px). */
 .panel-stack > .section-title + .filters-container {
     margin-top: -18px;
 }
@@ -4648,15 +4667,16 @@ button:active {
 /* ─────────────────────────────────────────────────────────────
    ESTILOS UNIFICADOS — PESO DE LISTADOS (ExpensesPanel + HistoryPanel)
    Un mismo patrón para todas las tarjetas de listado:
-   .unified-card / .client-card / .history-card
+   .unified-card / .client-card / .history-card / .user-card
    ───────────────────────────────────────────────────────────── */
 
-/* Tarjeta de gasto / cliente / historial: misma tarjeta unificada
+/* Tarjeta de gasto / cliente / historial / usuario: misma tarjeta unificada
    del resto de la app (12px de padding, border-radius: var(--radius-sm),
-   grid "avatar | texto | precio/acciones"). */
+   sin sombra, grid "avatar | texto | precio/acciones"). */
 .expense-card,
 .client-card,
-.history-card {
+.history-card,
+.user-card {
     padding: 12px;
     border: 2px solid var(--barbie-pale);
     border-radius: var(--radius-sm);
@@ -4676,7 +4696,8 @@ button:active {
 
 .expense-card:hover,
 .client-card:hover,
-.history-card:hover {
+.history-card:hover,
+.user-card:hover {
     border-color: var(--barbie-light);
     transform: none;
 }

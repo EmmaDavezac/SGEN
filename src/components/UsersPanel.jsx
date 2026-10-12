@@ -276,7 +276,7 @@ function UsersPanel({ session, notify, showLoader }) {
   };
 
   return (
-    <section className="panel-stack view-enter" aria-labelledby="users-title">
+    <section id="tab-usuarios" className="panel-stack view-enter" aria-labelledby="users-title">
       {viewedUser && (
         <DetailWindow
           title="Ficha de usuario"
