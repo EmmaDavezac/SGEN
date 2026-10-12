@@ -2,3 +2,11 @@ node_modules/
 .env
 dist/
 csv/
+
+# Temporales de desarrollo (logs, pids, pruebas de navegador, respaldos)
+*.log
+*.pid
+.dom*.html
+.test-browser*.mjs
+style.css.bak
+supabase/.temp/

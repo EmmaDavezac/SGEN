@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase.js';
 import { ConfirmModal } from './Modal.jsx';
+import { PanelCancelButton, PanelSaveButton } from './Button.jsx';
+import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { loadExpensesFromDatabase, saveExpenseToDatabase } from '../services.js';
 
 const EXPENSE_PERIOD_OPTIONS = [
@@ -67,6 +69,8 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
     const [showFilters, setShowFilters] = useState(false);
     const [period, setPeriod] = useState('todos');
     const [filterCategory, setFilterCategory] = useState('todos');
+    const isSearching = useSearching(search);
+    const expenseListRef = useRef(null);
 
     useEffect(() => {
         let ignore = false;
@@ -74,7 +78,6 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
         const load = async () => {
             if (!session?.authId || !supabase) return;
             setLoading(true);
-            if (showLoader) showLoader(true, 'Cargando gastos...');
             try {
                 const data = await loadExpensesFromDatabase();
                 const normalized = data.map(normalizeExpenseRecord);
@@ -85,7 +88,6 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
             } finally {
                 if (!ignore) {
                     setLoading(false);
-                    if (showLoader) showLoader(false);
                 }
             }
         };
@@ -115,6 +117,12 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
             if (period === 'mes' && d < monthStart) return false;
             return true;
         });
+    }, [expenses, search, filterCategory, period]);
+
+    useEffect(() => {
+        if (expenseListRef.current) {
+            expenseListRef.current.scrollTop = 0;
+        }
     }, [expenses, search, filterCategory, period]);
 
     const resetForm = () => {
@@ -214,7 +222,7 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
     };
 
     return (
-        <section id="tab-gastos" className="panel-stack">
+        <section id="tab-gastos" className="panel-stack view-enter">
             <div className="section-title section-title-with-action">
                 <div>
                     <h3>Registro de Gastos</h3>
@@ -222,13 +230,14 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                 </div>
                 <button
                     type="button"
-                    className="btn btn-primary btn-sm panel-header-action"
+                    className="btn btn-primary btn-sm panel-header-action mobile-icon-only"
                     onClick={toggleExpenseForm}
                     aria-expanded={formOpen}
                     aria-controls="expense-registration-form"
+                    aria-label={formOpen ? 'Cerrar registro de gasto' : 'Registrar nuevo gasto'}
                 >
                     <i className={`fa-solid ${formOpen ? 'fa-xmark' : 'fa-plus'}`} aria-hidden="true" />
-                    {formOpen ? 'Cerrar' : 'Nuevo gasto'}
+                    <span className="mobile-action-label">{formOpen ? 'Cerrar' : 'Nuevo'}</span>
                 </button>
             </div>
 
@@ -236,7 +245,7 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                 <h4>Registrar Nuevo Gasto</h4>
                 <form id="expense-registration-form" className="cute-form panel-form-spaced" onSubmit={handleSubmit}>
                     <div className="form-group">
-                        <label htmlFor="expense-concept">Concepto / Descripción</label>
+                        <label htmlFor="expense-concept">Concepto / Descripción <span className="field-required">(obligatorio)</span></label>
                         <div className="input-wrapper">
                             <i className="fa-solid fa-pen input-icon"></i>
                             <input
@@ -249,7 +258,6 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                             />
                         </div>
                     </div>
-
                     <div className="form-group">
                         <label htmlFor="expense-category">Categoría</label>
                         <div className="input-wrapper">
@@ -269,7 +277,7 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
 
                     <div className="form-row-2">
                         <div className="form-group">
-                            <label htmlFor="expense-amount">Monto ($)</label>
+                            <label htmlFor="expense-amount">Monto ($) <span className="field-required">(obligatorio)</span></label>
                             <div className="input-wrapper">
                                 <i className="fa-solid fa-dollar-sign input-icon"></i>
                                 <input
@@ -285,7 +293,7 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                             </div>
                         </div>
                         <div className="form-group">
-                            <label htmlFor="expense-date">Fecha</label>
+                            <label htmlFor="expense-date">Fecha <span className="field-required">(obligatorio)</span></label>
                             <div className="input-wrapper">
                                 <i className="fa-solid fa-calendar-day input-icon"></i>
                                 <input
@@ -331,23 +339,15 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                         </div>
                     </div>
 
-                    <button
-                        type="submit"
-                        className="btn btn-primary btn-block panel-action-spaced"
-                        disabled={submitting}
-                    >
-                        <i className="fa-solid fa-floppy-disk"></i>
-                        {submitting ? 'Guardando…' : 'Guardar'}
-                    </button>
+                    <div className="form-actions">
+                        <PanelCancelButton onClick={closeExpenseForm} disabled={submitting} />
+                        <PanelSaveButton type="submit" busy={submitting} busyLabel="Guardando…" disabled={submitting} />
+                    </div>
                 </form>
             </div>}
 
-            <div className="chart-section chart-section-spaced">
-                <div className="panel-subsection-header">
-                    <h4 className="panel-subsection-title">Todos los gastos</h4>
-                </div>
-
-                <div className="filters-container expense-filters">
+            {!formOpen && <>
+                <div className="filters-container">
                     <div className="search-box-container">
                         <i className="fa-solid fa-magnifying-glass search-icon"></i>
                         <input
@@ -397,46 +397,43 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                     )}
                 </div>
 
-                <div className="day-appointments-container list-scroll">
-                    {loading && filtered.length === 0 && (
-                        <div className="list-empty-state"><p>Cargando gastos...</p></div>
-                    )}
-                    {!loading && filtered.length === 0 && (
-                        <div className="no-appointments-placeholder">
-                            No hay gastos para mostrar 💸
+                <div ref={expenseListRef} id="expenses-list" className="expense-list unified-list list-scroll list-section-gap">
+                    {(loading || isSearching) && <SkeletonList count={6} />}
+                    {!loading && !isSearching && filtered.length === 0 && (
+                        <div className="list-empty-state">
+                            <p>No se encontraron gastos que coincidan con la búsqueda.</p>
                         </div>
                     )}
 
-                    {filtered.map((exp) => (
-                        <div key={exp.id} className="appointment-card">
-                            <div className="appointment-time-col">
-                                <div className="expense-icon">
-                                    <i className={`fa-solid ${categoryIcon(exp.categoria)}`}></i>
-                                </div>
-                                <div className="appointment-time-duration expense-date">
+                    {!loading && !isSearching && filtered.map((exp) => (
+                    <div key={exp.id} className="expense-card unified-card">
+                        <div className="client-avatar expense-avatar" aria-hidden="true">
+                            <i className={`fa-solid ${categoryIcon(exp.categoria)}`}></i>
+                        </div>
+                        <div className="card-details">
+                            <div className="card-client expense-name">{exp.concepto}</div>
+                            <div className="card-service expense-category">{exp.categoria}</div>
+                            <div className="card-meta">
+                                <span>
+                                    <i className="fa-regular fa-calendar card-meta-icon"></i>
                                     {formatDateTime(exp.fecha)}
-                                </div>
-                            </div>
-                            <div className="appointment-info-col">
-                                <div className="appointment-client-name">{exp.concepto}</div>
-                                <div className="appointment-service-name">
-                                    <span className="pay-badge expense-payment-badge">
-                                        <i className={`fa-solid ${paymentIcon(exp.metodoPago)}`}></i> {exp.metodoPago}
-                                    </span>
-                                    <span className="expense-category">
-                                        {exp.categoria}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="appointment-actions-col">
-                                <div className="card-price expense-amount">
-                                    -${formatPrice(exp.monto)}
-                                </div>
+                                </span>
+                                <span className="pay-badge" title="Método de pago">
+                                    <i className={`fa-solid ${paymentIcon(exp.metodoPago)}`}></i>
+                                    {' '}
+                                    {exp.metodoPago}
+                                </span>
                             </div>
                         </div>
-                    ))}
+                        <div className="card-amount-box">
+                            <div className="card-price expense-amount">
+                                -${formatPrice(exp.monto)}
+                            </div>
+                        </div>
+                    </div>
+                ))}
                 </div>
-            </div>
+            </>}
 
             <ConfirmModal
                 open={!!confirmation}

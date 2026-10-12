@@ -160,6 +160,25 @@ Resultado esperado:
 - [ ] Confirmar que no se crean duplicados al reintentar.
 - [ ] Revisar la consola por errores no controlados.
 
+## 11. Administrar categorías y servicios
+
+**Objetivo:** administrar las opciones del formulario de registro sin alterar el historial.
+
+1. En Precios, agregar una categoría y un servicio con precio.
+2. Guardar y abrir Registrar Servicio.
+3. Confirmar que aparecen la categoría y el servicio nuevos.
+4. Dar de baja el servicio y luego la categoría.
+5. Confirmar que dejan de aparecer para nuevos registros.
+6. Revisar Historial y confirmar que los servicios anteriores siguen visibles.
+7. Reactivar la categoría y el servicio y confirmar que vuelven a aparecer.
+
+Resultado esperado:
+
+- [ ] Solo administradores pueden cambiar el catálogo.
+- [ ] Categorías y servicios nuevos persisten tras recargar.
+- [ ] Bajas y reactivaciones persisten tras recargar.
+- [ ] El historial anterior no se modifica ni elimina.
+
 ## Registro de resultados
 
 | Fecha | Test | Resultado | Incidencia | Corregido |

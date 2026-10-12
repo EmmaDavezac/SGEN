@@ -1,6 +1,6 @@
 import React from 'react';
 
-function SettingsPanel({ settings = {}, onChangeSettings, notify, onBack }) {
+function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
     const { allowFiado, allowRegisterTab, allowCajasTab } = settings;
 
     const handleToggle = (key, checked) => {
@@ -27,15 +27,6 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify, onBack }) {
                     <h3>Ajustes</h3>
                     <p>Personalizá las opciones de la aplicación.</p>
                 </div>
-                {onBack && (
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-sm btn-back"
-                        onClick={onBack}
-                    >
-                        <i className="fa-solid fa-arrow-left" /> Volver
-                    </button>
-                )}
             </div>
 
             <div className="chart-section">

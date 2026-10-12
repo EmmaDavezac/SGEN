@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 function requireEnv(name: string, value: string | undefined) {
@@ -11,14 +12,22 @@ function requireEnv(name: string, value: string | undefined) {
   return value;
 }
 
-function corsJson(data: unknown, status = 200) {
+function corsHeaders(req?: Request) {
+  const origin = req?.headers.get('origin');
+  return {
+    'Access-Control-Allow-Origin': origin || '*',
+    'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin'
+  };
+}
+
+function corsJson(data: unknown, status = 200, req?: Request) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      ...corsHeaders(req)
     }
   });
 }
@@ -26,28 +35,46 @@ function corsJson(data: unknown, status = 200) {
 type InvitePayload = {
   email?: string;
   nombre?: string;
-  rol?: 'admin' | 'manicurista';
+  rol?: 'superadmin' | 'admin' | 'manicurista';
   telefono?: string;
   dni?: string;
   comision_pct?: number;
 };
 
+async function getAvailableProfileColumns(serviceClient: any) {
+  const { data, error } = await serviceClient
+    .from('information_schema.columns')
+    .select('column_name')
+    .eq('table_schema', 'public')
+    .eq('table_name', 'perfiles');
+
+  if (error || !data) return new Set<string>();
+  return new Set((data as Array<{ column_name: string }>).map((row) => row.column_name));
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return corsJson(null, 204);
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders(req)
+    });
   }
 
   try {
     requireEnv('SUPABASE_URL', SUPABASE_URL);
+    requireEnv('SUPABASE_ANON_KEY', SUPABASE_ANON_KEY);
     requireEnv('SUPABASE_SERVICE_ROLE_KEY', SUPABASE_SERVICE_ROLE_KEY);
 
     const authz = req.headers.get('authorization');
     if (!authz || !authz.toLowerCase().startsWith('bearer ')) {
-      return corsJson({ code: 'NO_AUTH', message: 'Falta token de autorización.' }, 401);
+      return corsJson({ code: 'NO_AUTH', message: 'Falta token de autorización.' }, 401, req);
     }
     const bearer = authz.slice('bearer '.length);
 
-    const adminClientAnon = createClient(SUPABASE_URL!, bearer, { auth: { persistSession: false } });
+    const adminClientAnon = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${bearer}` } }
+    });
     const { data: adminUser, error: adminErr } = await adminClientAnon.auth.getUser(bearer);
     if (adminErr || !adminUser?.user) {
       return corsJson({ code: 'BAD_AUTH', message: 'Token inválido.' }, 401);
@@ -59,8 +86,8 @@ serve(async (req) => {
       .eq('id', adminUser.user.id)
       .maybeSingle();
 
-    if (!adminProfile || adminProfile.rol !== 'admin') {
-      return corsJson({ code: 'FORBIDDEN', message: 'Solo administradores pueden invitar usuarios.' }, 403);
+    if (!adminProfile || adminProfile.rol !== 'superadmin') {
+      return corsJson({ code: 'FORBIDDEN', message: 'Solo el superadmin puede invitar usuarios.' }, 403);
     }
     if (!adminProfile.activo) {
       return corsJson({ code: 'ADMIN_INACTIVO', message: 'Tu perfil se encuentra desactivado.' }, 403);
@@ -69,7 +96,7 @@ serve(async (req) => {
     const payload: InvitePayload = await req.json().catch(() => ({} as InvitePayload));
     const email = (payload.email || '').trim().toLowerCase();
     const nombre = (payload.nombre || '').trim();
-    const rol = payload.rol === 'admin' ? 'admin' : 'manicurista';
+    const rol = payload.rol === 'superadmin' || payload.rol === 'admin' ? payload.rol : 'manicurista';
     const telefono = payload.telefono ? payload.telefono.trim() : undefined;
     const dni = payload.dni ? payload.dni.trim() : undefined;
     const comision_pct_raw = payload.comision_pct === 0 ? 0 : Number(payload.comision_pct || 0);
@@ -99,6 +126,8 @@ serve(async (req) => {
       .select('id, email, nombre, activo')
       .ilike('email', email)
       .maybeSingle();
+
+    const availableColumns = await getAvailableProfileColumns(serviceClient);
 
     if (usuariosExistentes) {
       return corsJson(
@@ -135,22 +164,22 @@ serve(async (req) => {
       return corsJson({ code: 'NO_UID', message: 'No se pudo crear el usuario. Reintentá.' }, 500);
     }
 
+    const profileInsert: Record<string, unknown> = {
+      id: uid,
+      email,
+      nombre,
+      rol,
+      activo: true
+    };
+
+    if (availableColumns.has('telefono')) profileInsert.telefono = telefono;
+    if (availableColumns.has('dni')) profileInsert.dni = dni;
+    if (availableColumns.has('comision_pct')) profileInsert.comision_pct = comision_pct;
+
     const { data: nuevoPerfil, error: perfilesErr } = await serviceClient
       .from('perfiles')
-      .upsert(
-        {
-          id: uid,
-          email,
-          nombre,
-          rol,
-          telefono,
-          dni,
-          comision_pct,
-          activo: true
-        },
-        { onConflict: 'id' }
-      )
-      .select('id, email, nombre, rol, telefono, dni, comision_pct, activo, creado_en')
+      .upsert(profileInsert, { onConflict: 'id' })
+      .select('id, email, nombre, rol, activo, creado_en')
       .single();
 
     if (perfilesErr || !nuevoPerfil) {

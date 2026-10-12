@@ -1,51 +1,35 @@
-# Google Calendar Edge Function
+# Google Calendar bridge
 
-Esta función corre en Supabase Edge Functions y se encarga de sincronizar eventos de turnos con Google Calendar sin exponer secretos en el frontend.
+Google Calendar se opera desde el Apps Script existente, ejecutado como la cuenta dueña del calendario. Supabase guarda los turnos; el Apps Script solo crea/actualiza el evento y no escribe filas en Sheets.
 
-## Variables de entorno requeridas
+## Configuración de Apps Script
 
-Configurar en Supabase > Project Settings > Edge Function environment variables:
+1. Crea un proyecto nuevo en [Google Apps Script](https://script.google.com/).
+2. Pega el contenido de [`docs/google_calendar_bridge.gs`](../../../docs/google_calendar_bridge.gs) y guarda el proyecto.
+3. En **Configuración del proyecto > Propiedades del script**, configura `CALENDAR_BRIDGE_SECRET` con una clave aleatoria larga. Opcionalmente configura `CALENDAR_ID`; si se omite, usa el calendario principal.
+4. En **Implementar > Nueva implementación > Aplicación web**, elige ejecutar como tu cuenta y configura el acceso para que la Edge Function pueda llamar al endpoint.
+5. Autoriza los permisos de Calendar con la cuenta cuyo calendario recibirá los turnos; copia la URL `/exec` de la implementación.
 
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `GOOGLE_REFRESH_TOKEN`
-- `GOOGLE_CALENDAR_ID` (opcional; usa `primary` si no se define)
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+La acción `sync_calendar_event` y `update_calendar_event` validan el secreto, usan el ID UUID de Supabase como clave idempotente, crean o actualizan un único evento y devuelven su `eventId`. La acción `delete_calendar_event` borra por `eventId` guardado o por marcador `ID Evolet: <uuid>` y siempre limpia la propiedad. No necesita SpreadsheetApp y no agrega filas a Sheets.
 
-## Flujo
+El calendario destino se resuelve con prioridad: `calendarId` enviado por la Edge Function > propiedad `CALENDAR_ID` en Apps Script > calendario principal.
 
-El frontend solo llama a la función Edge con acciones como:
+## Secretos de Supabase
 
-- `create`
-- `update`
-- `delete`
+En **Project Settings > Edge Functions > Secrets** configura:
 
-La función:
+- `GOOGLE_APPS_SCRIPT_URL`: URL `/exec` de la implementación web.
+- `GOOGLE_APPS_SCRIPT_SECRET`: el mismo valor que `CALENDAR_BRIDGE_SECRET` en Apps Script.
+- `GOOGLE_CALENDAR_ID`: ID del calendario destino, por ejemplo `66c3ae6263491d71ff4e1ce61677018ec9d85a12a3bd677a301d927d62ae1b74@group.calendar.google.com`. La Edge lo envía a Apps Script en cada `create/update/delete`.
 
-1. Obtiene un token OAuth de Google.
-2. Crea, actualiza o elimina el evento.
-3. Persiste `turnos.event_id` en Supabase.
-4. Maneja reintentos y devuelve un `warning` si Google Calendar falla sin bloquear la operación principal.
+La función Edge también necesita `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`, ya configurados para el proyecto. `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` y `GOOGLE_CALENDAR_ID` ya no se usan en esta arquitectura.
 
-## Ejemplo de invocación
+Después de guardar los secretos, vuelve a desplegar:
 
-```ts
-await supabase.functions.invoke('google-calendar', {
-  body: {
-    action: 'create',
-    appointment: {
-      legacy_id: 'app_123',
-      cliente: 'Ana',
-      fecha: '2026-08-23',
-      hora_inicio: '2026-08-23T10:00:00.000Z',
-      hora_fin: '2026-08-23T11:30:00.000Z',
-      servicio: 'Turno',
-      estado: 'reservado',
-      precio: 2500
-    }
-  }
-});
+```sh
+npx supabase functions deploy google-calendar --no-verify-jwt
 ```
 
-> Nunca agregues client_id, client_secret, refresh token ni service role key al frontend.
+Los turnos guardados sin `event_id` se pueden reintentar desde la acción de sincronización de la agenda. Los reintentos reutilizan el evento asociado al ID de Supabase para evitar duplicados.
+
+> No pongas el secreto compartido, credenciales de Google ni `SUPABASE_SERVICE_ROLE_KEY` en el frontend o en el repositorio.

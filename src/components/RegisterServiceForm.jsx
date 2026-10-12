@@ -1,50 +1,9 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../supabase.js';
 import { finalizeRegisteredService, registerServiceDirectly, saveExpenseToDatabase } from '../services.js';
-import Button from './Button.jsx';
-import Modal, { ConfirmModal } from './Modal.jsx';
-
-const DEFAULT_CATALOG = {
-    semi: [
-        { name: "Semipermanente Basic", price: 12000 },
-        { name: "Semipermanente Full", price: 14000 }
-    ],
-    kapping: [
-        { name: "Kapping", price: 12500 },
-        { name: "Kapping Basic", price: 14000 },
-        { name: "Kapping Full", price: 15500 },
-        { name: "Kapping con Polygel Basic", price: 15500 },
-        { name: "Kapping con Polygel Full", price: 17000 }
-    ],
-    softgel: [
-        { name: "Soft Gel Basic", price: 16500 },
-        { name: "Soft Gel Full", price: 18000 }
-    ],
-    esculpidas: [
-        { name: "Esculpidas en Polygel Basic", price: 17500 },
-        { name: "Esculpidas en Polygel Full", price: 19000 }
-    ],
-    remocion: [
-        { name: "Retiro Servicio Propio", price: 0 },
-        { name: "Remoción Semipermanente", price: 4500 },
-        { name: "Remoción Kapping", price: 5000 },
-        { name: "Remoción Softgel", price: 5500 },
-        { name: "Remoción Polygel", price: 6000 },
-        { name: "Remoción Acrilico", price: 6500 }
-    ],
-    personalizado: [
-        { name: "Servicio Personalizado", price: 0 }
-    ]
-};
-
-const CATEGORY_LABELS = {
-    semi: "Semi",
-    kapping: "Kapping",
-    softgel: "Soft Gel",
-    esculpidas: "Esculpidas",
-    remocion: "Remoción",
-    personalizado: "Otro"
-};
+import { cloneServiceCatalog, DEFAULT_SERVICE_CATEGORIES, DEFAULT_SERVICE_CATALOG } from '../serviceCatalog.js';
+import Button, { DetailActionButton } from './Button.jsx';
+import Modal, { ConfirmModal, ModalCancelButton, ModalConfirmButton } from './Modal.jsx';
 
 function hasSuspiciousPrice(rawValue) {
     const num = Number(rawValue);
@@ -55,10 +14,12 @@ function hasSuspiciousPrice(rawValue) {
 function RegisterServiceForm({ session, onBack, initialAppointment = null, onRegisterSuccess, allowFiado = true, notify, showLoader }) {
     const [clients, setClients] = useState([]);
     const [clientName, setClientName] = useState('');
-    const [catalog, setCatalog] = useState(DEFAULT_CATALOG);
+    const [categories, setCategories] = useState(DEFAULT_SERVICE_CATEGORIES);
+    const [catalog, setCatalog] = useState(() => cloneServiceCatalog(DEFAULT_SERVICE_CATALOG));
 
     const [selectedCategory, setSelectedCategory] = useState('semi');
     const [selectedSubService, setSelectedSubService] = useState(null);
+    const [useCombinedService, setUseCombinedService] = useState(false);
 
     const [combinedService1, setCombinedService1] = useState('');
     const [combinedCount1, setCombinedCount1] = useState(7);
@@ -108,23 +69,26 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     useEffect(() => {
         async function fetchPrices() {
             try {
-                const { data, error } = await supabase
-                    .from('precios')
-                    .select('categoria, nombre, precio')
-                    .order('categoria');
-                if (!error && data && data.length > 0) {
-                    const newCatalog = {};
-                    data.forEach(p => {
-                        if (!newCatalog[p.categoria]) {
-                            newCatalog[p.categoria] = [];
-                        }
-                        newCatalog[p.categoria].push({ name: p.nombre, price: Number(p.precio) || 0 });
-                    });
-                    if (!newCatalog.personalizado) {
-                        newCatalog.personalizado = DEFAULT_CATALOG.personalizado;
-                    }
-                    setCatalog(newCatalog);
-                }
+                const [categoryResult, priceResult] = await Promise.all([
+                    supabase.from('categorias_servicio').select('clave, nombre, activo').eq('activo', true).order('nombre'),
+                    supabase.from('precios').select('categoria, nombre, precio, activo').eq('activo', true).order('categoria').order('nombre')
+                ]);
+                if (categoryResult.error) throw categoryResult.error;
+                if (priceResult.error) throw priceResult.error;
+
+                const loadedCategories = categoryResult.data?.length ? categoryResult.data : DEFAULT_SERVICE_CATEGORIES;
+                const newCatalog = Object.fromEntries(loadedCategories.map(category => [category.clave || category.key, []]));
+                (priceResult.data || []).forEach(price => {
+                    if (!newCatalog[price.categoria]) return;
+                    newCatalog[price.categoria].push({ name: price.nombre, price: Number(price.precio) || 0, active: true });
+                });
+                if (!(priceResult.data || []).length) Object.assign(newCatalog, cloneServiceCatalog(DEFAULT_SERVICE_CATALOG));
+                setCategories(loadedCategories.map(category => ({
+                    key: category.clave || category.key,
+                    name: category.nombre || category.name,
+                    active: category.activo !== false
+                })));
+                setCatalog(newCatalog);
             } catch (err) {
                 console.warn("Error fetching prices catalog:", err);
             }
@@ -136,7 +100,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         const list = [];
         Object.keys(catalog).forEach(cat => {
             if (cat !== 'remocion' && cat !== 'personalizado') {
-                catalog[cat].forEach(item => {
+                catalog[cat].filter(item => item.active !== false).forEach(item => {
                     list.push({ ...item, category: cat });
                 });
             }
@@ -156,7 +120,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     }, [allBasicOptions]);
 
     useEffect(() => {
-        if (!initialAppointment && selectedCategory === 'personalizado' && combinedService1 && combinedService2) {
+        if (!initialAppointment && selectedCategory === 'personalizado' && useCombinedService && combinedService1 && combinedService2) {
             const count1 = Number(combinedCount1) || 7;
             const count2 = 10 - count1;
 
@@ -171,22 +135,27 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                 setServicePrice(combinedPrice);
             }
         }
-    }, [selectedCategory, combinedService1, combinedService2, combinedCount1, allBasicOptions]);
+    }, [selectedCategory, useCombinedService, combinedService1, combinedService2, combinedCount1, allBasicOptions]);
 
     useEffect(() => {
-        if (!initialAppointment && selectedCategory !== 'personalizado') {
-            const subservices = catalog[selectedCategory] || [];
+        if (!initialAppointment && (selectedCategory !== 'personalizado' || !useCombinedService)) {
+            const subservices = (catalog[selectedCategory] || []).filter(service => service.active !== false);
             if (subservices.length > 0) {
                 setSelectedSubService(subservices[0]);
                 setServiceName(subservices[0].name);
                 setServicePrice(subservices[0].price);
+            } else {
+                setSelectedSubService(null);
+                setServiceName('');
+                setServicePrice(0);
             }
         }
+        if (selectedCategory !== 'personalizado') setUseCombinedService(false);
         if (selectedCategory === 'remocion') {
             setHasExternalRemoval(false);
             setSelectedRemoval(null);
         }
-    }, [selectedCategory, catalog]);
+    }, [selectedCategory, catalog, useCombinedService]);
 
     useEffect(() => {
         if (initialAppointment?.cliente) {
@@ -213,7 +182,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
 
     const removalOptions = useMemo(() => {
         const rems = catalog.remocion || [];
-        return rems.filter(rem => rem.name !== "Retiro Servicio Propio");
+        return rems.filter(rem => rem.name !== "Retiro Servicio Propio" && rem.active !== false);
     }, [catalog]);
 
     useEffect(() => {
@@ -383,7 +352,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
 
             setClientName('');
             setSena('');
-            setSelectedCategory('semi');
+            setSelectedCategory(categories.find(category => category.active)?.key || 'semi');
+            setUseCombinedService(false);
             setHasExternalRemoval(false);
             setSelectedRemoval(null);
             setPaymentMethod('Transferencia');
@@ -468,21 +438,23 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
 
     return (
         <div id="tab-registrar" className="tab-pane active">
-            <div className="section-title section-title-with-action">
-                <div>
-                    <h3>Registrar Servicio</h3>
-                    <p>Agrega un nuevo trabajo realizado en segundos.</p>
-                </div>
+            <div className="section-title section-title-with-back">
                 {onBack && (
                     <button
                         type="button"
                         id="btn-cancel-checkout"
-                        className="btn btn-secondary btn-sm btn-back"
+                        className="btn btn-primary btn-sm panel-header-action btn-back mobile-icon-only"
                         onClick={handleRegisterBack}
+                        aria-label="Volver"
                     >
-                        <i className="fa-solid fa-arrow-left"></i> Volver
+                        <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+                        <span className="mobile-action-label">Volver</span>
                     </button>
                 )}
+                <div className="section-title-text">
+                    <h3>Registrar Servicio</h3>
+                    <p>Agrega un nuevo trabajo realizado en segundos.</p>
+                </div>
             </div>
 
             <form id="service-form" className="cute-form" onSubmit={initiateSubmit}>
@@ -493,7 +465,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                     </div>
                 )}
                 <div className="form-group">
-                    <label htmlFor="client-name">Nombre de la Clienta</label>
+                    <label htmlFor="client-name">Nombre de la Clienta <span className="field-required">(obligatorio)</span></label>
                     <div className="input-wrapper">
                         <i className="fa-solid fa-user input-icon" />
                         <input
@@ -514,37 +486,50 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                 </div>
 
                 <div className="form-group">
-                    <label><i className="fa-solid fa-tags"></i> Selecciona una Categoría</label>
+                    <label><i className="fa-solid fa-tags"></i> Selecciona una Categoría <span className="field-required">(obligatorio)</span></label>
                     <div className="category-grid">
-                        {Object.keys(CATEGORY_LABELS).map((catKey) => (
+                        {categories.map((category) => (
                             <button
-                                key={catKey}
+                                key={category.key}
                                 type="button"
-                                className={`btn-cat ${selectedCategory === catKey ? 'active' : ''}`}
-                                onClick={() => setSelectedCategory(catKey)}
+                                className={`btn-cat ${selectedCategory === category.key ? 'active' : ''}`}
+                                onClick={() => setSelectedCategory(category.key)}
                             >
-                                {CATEGORY_LABELS[catKey]}
+                                {category.name}
                             </button>
                         ))}
                     </div>
                 </div>
 
-                {selectedCategory !== 'personalizado' ? (
+                {selectedCategory === 'personalizado' && !useCombinedService && (
+                    <div className="form-group service-choice-row">
+                        <DetailActionButton
+                            icon="fa-puzzle-piece"
+                            label="Armar combinación"
+                            onClick={() => setUseCombinedService(true)}
+                        />
+                    </div>
+                )}
+
+                {(selectedCategory !== 'personalizado' || !useCombinedService) ? (
                     <div className="form-group" id="services-grid-wrapper">
-                        <label id="services-grid-label">Servicio Específico</label>
+                        <label id="services-grid-label">Servicio Específico <span className="field-required">(obligatorio)</span></label>
                         <div id="services-grid" className="services-grid">
-                            {(catalog[selectedCategory] || []).map((service) => (
+                            {(catalog[selectedCategory] || []).filter(service => service.active !== false).map((service) => (
                                 <button
                                     key={service.name}
                                     type="button"
                                     className={`btn-service ${selectedSubService?.name === service.name ? 'active' : ''}`}
                                     onClick={() => selectSubService(service)}
                                 >
-                                    <span>{service.name}</span>
+                                    <span className="service-name-label">{service.name}</span>
                                     <span className="price-tag">${service.price.toLocaleString("es-AR")}</span>
                                 </button>
                             ))}
                         </div>
+                        {(catalog[selectedCategory] || []).filter(service => service.active !== false).length === 0 && (
+                            <p className="catalog-empty-note">No hay servicios activos en esta categoría.</p>
+                        )}
                     </div>
                 ) : (
                     <div id="combined-service-builder" className="combined-service-builder">
@@ -608,11 +593,16 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                                 </select>
                             </div>
                         </div>
+                        <DetailActionButton
+                            icon="fa-arrow-left"
+                            label="Elegir servicio"
+                            onClick={() => setUseCombinedService(false)}
+                        />
                     </div>
                 )}
 
                 <div className="form-group">
-                    <label>Precio Total ($)</label>
+                    <label>Precio Total ($) <span className="field-required">(obligatorio)</span></label>
                         <div className="input-wrapper">
                             <i className="fa-solid fa-dollar-sign input-icon" />
                             <input
@@ -712,12 +702,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                 closeOnBackdrop={false}
                 actions={
                     <>
-                        <button type="button" className="btn btn-secondary" onClick={handleCashCancel}>
-                            Cancelar
-                        </button>
-                        <button type="button" className="btn btn-primary" onClick={handleCashConfirm}>
-                            Confirmar
-                        </button>
+                        <ModalCancelButton onClick={handleCashCancel} />
+                        <ModalConfirmButton onClick={handleCashConfirm} />
                     </>
                 }
             >

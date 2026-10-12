@@ -1,9 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { signInWithSupabase, supabase } from './supabase.js';
 import AppLayout from './components/AppLayout.jsx';
 import Button from './components/Button.jsx';
 import Loader from './components/Loader.jsx';
 import Toast from './components/Toast.jsx';
+import { ToastProvider, useToast } from './components/ToastContext.jsx';
+import { pedirAbrirCliente } from './clienteNav.js';
 import CalendarBoard from './components/CalendarBoard.jsx';
 import RegisterServiceForm from './components/RegisterServiceForm.jsx';
 import HistoryPanel from './components/HistoryPanel.jsx';
@@ -17,6 +19,13 @@ import UsersPanel from './components/UsersPanel.jsx';
 import AppFooter from './components/AppFooter.jsx';
 import { ConfirmModal } from './components/Modal.jsx';
 import { getPathForTab, getTabFromPath, isKnownPath } from './router.js';
+import {
+    readLoginRateState,
+    registerFailedLoginAttempt,
+    clearLoginAttempts,
+    formatRemainingTime,
+    describeLoginFailure,
+} from './loginRateLimit.js';
 
 const SESSION_KEY = 'evolet_session_v4';
 const SETTINGS_KEY = 'evolet_settings_v4';
@@ -90,18 +99,29 @@ function readStoredSettings() {
     }
 }
 
+/**
+ * Conecta el `notify` de App con el ToastContext. Sin este puente, los mensajes
+ * que App envía al estado `toast` nunca llegaban al `<Toast />` renderizado
+ * dentro del ToastProvider y se perdían en silencio.
+ */
+function ToastBridge({ notifyRef }) {
+    const { notify } = useToast();
+    notifyRef.current = notify;
+    return null;
+}
+
 function App() {
     const [session, setSession] = useState(() => readStoredSession());
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [loaderText, setLoaderText] = useState('Verificando credenciales...');
-    const [toast, setToast] = useState(null);
     const [confirmation, setConfirmation] = useState(null);
+    const toastNotifyRef = useRef(null);
 
     const initialSession = readStoredSession();
     const initialSettings = readStoredSettings();
-    const initialIsAdmin = initialSession && initialSession.rol === 'admin';
+    const initialIsAdmin = initialSession && (initialSession.rol === 'admin' || initialSession.rol === 'superadmin');
     const initialRouteTab = getTabFromPath(window.location.pathname);
     const initialTab = isValidTab(initialRouteTab || DEFAULT_TAB, initialIsAdmin, initialSettings)
         ? (initialRouteTab || DEFAULT_TAB)
@@ -118,6 +138,15 @@ function App() {
         setRouteNotFound(false);
         setActiveTabState(tab);
     }, []);
+
+    // "Consultar ficha de la clienta" desde una venta: lleva a Clientes y le pide abrir
+    // la ficha. ClientsPanel escucha el evento, así que tiene que estar montado
+    // cuando llega (por eso se dispara después de cambiar de pestaña).
+    const verCliente = useCallback((clienteId) => {
+        if (!clienteId) return;
+        setActiveTab('clientes');
+        pedirAbrirCliente(clienteId);
+    }, [setActiveTab]);
 
     const [settings, setSettings] = useState(() => initialSettings);
 
@@ -137,6 +166,16 @@ function App() {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+    // Rate limit del ingreso: se renueva en pantalla cada segundo mientras dure el bloqueo.
+    const [loginRate, setLoginRate] = useState(() => readLoginRateState());
+    const loginLocked = loginRate.lockedMs > 0;
+
+    useEffect(() => {
+        if (!loginLocked) return undefined;
+        const timer = window.setInterval(() => setLoginRate(readLoginRateState()), 1000);
+        return () => window.clearInterval(timer);
+    }, [loginLocked]);
+
     useEffect(() => {
         if (session) {
             localStorage.setItem(SESSION_KEY, JSON.stringify(session));
@@ -149,6 +188,22 @@ function App() {
 
     useEffect(() => {
         if (!supabase) return undefined;
+
+        let isActive = true;
+        supabase.auth.getSession().then(({ data, error }) => {
+            if (!isActive || error || !data.session?.user) return;
+
+            supabase
+                .from('perfiles')
+                .select('id, email, nombre, rol')
+                .eq('id', data.session.user.id)
+                .maybeSingle()
+                .then(({ data: profile, error: profileError }) => {
+                    if (!isActive || profileError || !profile) return;
+                    setSession({ ...profile, authId: data.session.user.id });
+                });
+        });
+
         const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
             if (event === 'PASSWORD_RECOVERY') {
                 setSession(null);
@@ -160,14 +215,17 @@ function App() {
                 window.history.replaceState({}, document.title, `${callbackUrl.pathname}${callbackUrl.search}`);
             }
         });
-        return () => authListener.subscription.unsubscribe();
+        return () => {
+            isActive = false;
+            authListener.subscription.unsubscribe();
+        };
     }, []);
 
     useEffect(() => {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     }, [settings]);
 
-    const isAdmin = session && session.rol === 'admin';
+    const isAdmin = session && (session.rol === 'admin' || session.rol === 'superadmin');
     useEffect(() => {
         const handlePopState = () => {
             const tab = getTabFromPath(window.location.pathname);
@@ -188,9 +246,11 @@ function App() {
     }, [activeTab, isAdmin, settings, checkoutAppointment]);
 
     const notify = useCallback((message, type = 'info') => {
-        const nextToast = { id: `${Date.now()}-${Math.random()}`, message, type };
-        setToast(nextToast);
-        window.setTimeout(() => setToast(null), 3500);
+        if (toastNotifyRef.current) {
+            toastNotifyRef.current(message, type);
+            return;
+        }
+        console.warn('notify llamado sin ToastProvider montado:', message);
     }, []);
 
     const showLoader = useCallback((show, text = 'Cargando...') => {
@@ -200,6 +260,14 @@ function App() {
 
     const handleLogin = async (event) => {
         event.preventDefault();
+
+        const currentRate = readLoginRateState();
+        if (currentRate.lockedMs > 0) {
+            setLoginRate(currentRate);
+            notify(`Demasiados intentos fallidos. Reintentá en ${formatRemainingTime(currentRate.lockedMs)}.`, 'error');
+            return;
+        }
+
         const cleanEmail = email.trim();
         const cleanPassword = password.trim();
 
@@ -214,14 +282,19 @@ function App() {
         try {
             const user = await signInWithSupabase(cleanEmail, cleanPassword);
             if (user) {
+                clearLoginAttempts();
+                setLoginRate(readLoginRateState());
                 setSession(user);
                 notify(`¡Bienvenida de vuelta, ${user.nombre}!`, 'success');
                 setEmail('');
                 setPassword('');
                 return;
             }
-            notify('Email o contraseña incorrectos.', 'error');
+            // Credenciales rechazadas: cuenta para el rate limit.
+            setLoginRate(registerFailedLoginAttempt());
+            notify(describeLoginFailure(readLoginRateState()), 'error');
         } catch (error) {
+            // Un fallo de red no es un intento de credenciales: no suma al bloqueo.
             console.error('Error en login React:', error);
             notify('No se pudo iniciar sesión. Verificá tus credenciales o la conexión.', 'error');
         } finally {
@@ -452,7 +525,10 @@ function App() {
                 onConfirm={confirmPendingAction}
                 onCancel={cancelConfirmation}
             />
-            <Toast toasts={toast ? [toast] : []} />
+            <ToastProvider>
+                <ToastBridge notifyRef={toastNotifyRef} />
+                <Toast />
+            </ToastProvider>
             <Loader show={loading} text={loaderText} />
 
             {routeNotFound ? (
@@ -488,7 +564,7 @@ function App() {
                             <form className="retro-form" onSubmit={handlePasswordRecoverySave}>
                                 <p className="login-form-heading">Elegí una nueva contraseña para continuar.</p>
                                 <div className="form-group">
-                                    <label htmlFor="react-reset-password">Nueva contraseña</label>
+                                    <label htmlFor="react-reset-password">Nueva contraseña <span className="field-required">(obligatorio)</span></label>
                                     <div className="input-wrapper">
                                         <i className="fa-solid fa-lock input-icon" aria-hidden="true"></i>
                                         <input
@@ -503,7 +579,7 @@ function App() {
                                     </div>
                                 </div>
                                 <div className="form-group">
-                                    <label htmlFor="react-reset-password-confirmation">Confirmar contraseña</label>
+                                    <label htmlFor="react-reset-password-confirmation">Confirmar contraseña <span className="field-required">(obligatorio)</span></label>
                                     <div className="input-wrapper">
                                         <i className="fa-solid fa-lock input-icon" aria-hidden="true"></i>
                                         <input
@@ -525,7 +601,7 @@ function App() {
                             <form className="retro-form password-recovery-form" onSubmit={handlePasswordRecoveryRequest}>
                                 <p className="login-form-heading">Te enviaremos un enlace temporal a tu email.</p>
                                 <div className="form-group">
-                                    <label htmlFor="react-recovery-email">Email autorizado</label>
+                                    <label htmlFor="react-recovery-email">Email autorizado <span className="field-required">(obligatorio)</span></label>
                                     <div className="input-wrapper">
                                         <i className="fa-solid fa-envelope input-icon" aria-hidden="true"></i>
                                         <input
@@ -549,7 +625,7 @@ function App() {
                         <form className="retro-form" onSubmit={handleLogin}>
                             <div className="form-group">
                                 <label htmlFor="react-login-email">
-                                    Email Autorizado
+                                    Email Autorizado <span className="field-required">(obligatorio)</span>
                                 </label>
                                 <div className="input-wrapper">
                                     <i className="fa-solid fa-envelope input-icon" aria-hidden="true"></i>
@@ -566,7 +642,7 @@ function App() {
 
                             <div className="form-group">
                                 <label htmlFor="react-login-password">
-                                    Contraseña
+                                    Contraseña <span className="field-required">(obligatorio)</span>
                                 </label>
                                 <div className="input-wrapper">
                                     <i className="fa-solid fa-lock input-icon" aria-hidden="true"></i>
@@ -581,7 +657,14 @@ function App() {
                                 </div>
                             </div>
 
-                            <Button type="submit" className="btn-block">
+                            {loginLocked && (
+                                <p className="login-rate-limit-note" role="alert">
+                                    <i className="fa-solid fa-clock" aria-hidden="true"></i>
+                                    Demasiados intentos fallidos. El ingreso está bloqueado; reintentá en {formatRemainingTime(loginRate.lockedMs)}.
+                                </p>
+                            )}
+
+                            <Button type="submit" className="btn-block" disabled={loginLocked}>
                                 <i className="fa-solid fa-heart-pulse" aria-hidden="true"></i> Ingresar
                             </Button>
                             <button type="button" className="login-secondary-action" onClick={() => setPasswordResetMode('request')}>
@@ -624,6 +707,7 @@ function App() {
                             notify={notify}
                             showLoader={showLoader}
                             onBack={() => setActiveTab('calendario')}
+                            onVerCliente={verCliente}
                         />
                     )}
 
@@ -633,6 +717,7 @@ function App() {
                             notify={notify}
                             showLoader={showLoader}
                             onGoHistory={() => setActiveTab('historial')}
+                            onVerCliente={verCliente}
                             onCheckoutFromAppointment={(apt) => {
                                 setCheckoutAppointment(apt);
                                 setActiveTab('registrar');
@@ -665,12 +750,14 @@ function App() {
                         />
                     )}
 
-                    {isAdmin && activeTab === 'precios' && (
-                        <PricesPanel
-                            session={session}
-                            notify={notify}
-                            showLoader={showLoader}
-                        />
+                    {isAdmin && (
+                        <div style={{ display: activeTab === 'precios' ? undefined : 'none' }}>
+                            <PricesPanel
+                                session={session}
+                                notify={notify}
+                                showLoader={showLoader}
+                            />
+                        </div>
                     )}
 
                     {isAdmin && settings.allowCajasTab && activeTab === 'cajas' && (
@@ -686,7 +773,6 @@ function App() {
                             settings={settings}
                             onChangeSettings={handleChangeSettings}
                             notify={notify}
-                            onBack={() => setActiveTab('calendario')}
                         />
                     )}
 
@@ -700,19 +786,21 @@ function App() {
 
                     {activeTab === 'cuenta' && (
                         <div id="tab-cuenta" className="tab-pane active">
-                            <div className="section-title section-title-with-action">
-                                <div>
+                            <div className="section-title section-title-with-back">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('calendario')}
+                                    className="btn btn-primary btn-sm panel-header-action btn-back mobile-icon-only"
+                                    aria-label="Volver al calendario"
+                                >
+                                    <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+                                    <span className="mobile-action-label">Volver</span>
+                                </button>
+                                <div className="section-title-text">
                                     <h3>Mi cuenta</h3>
                                     <p>Actualizá tus datos de perfil.</p>
                                 </div>
                                 <div className="account-header-actions">
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveTab('calendario')}
-                                        className="btn btn-secondary btn-sm btn-back"
-                                    >
-                                        <i className="fa-solid fa-arrow-left"></i> Volver
-                                    </button>
                                     {!profileEditing ? (
                                         <button 
                                             type="button" 
@@ -752,12 +840,13 @@ function App() {
 
                             <form id="account-form" className="cute-form account-readonly-form account-profile-form" onSubmit={handleProfileSave}>
                                 <div className="form-group">
-                                    <label htmlFor="account-name">Nombre</label>
+                                    <label htmlFor="account-name">Nombre <span className="field-required">(obligatorio)</span></label>
                                     <div className="input-wrapper">
                                         <i className="fa-solid fa-user input-icon"></i>
                                         <input 
                                             type="text" 
                                             id="account-name" 
+                                            placeholder="Ej. Camila Silva"
                                             value={profileName} 
                                             onChange={(e) => setProfileName(e.target.value)}
                                             required 
@@ -767,12 +856,13 @@ function App() {
                                 </div>
 
                                 <div className="form-group">
-                                    <label htmlFor="account-email">Email</label>
+                                    <label htmlFor="account-email">Email <span className="field-required">(obligatorio)</span></label>
                                     <div className="input-wrapper">
                                         <i className="fa-solid fa-envelope input-icon"></i>
                                         <input 
                                             type="email" 
                                             id="account-email" 
+                                            placeholder="ejemplo@correo.com"
                                             value={profileEmail} 
                                             onChange={(e) => setProfileEmail(e.target.value)}
                                             required 
@@ -821,7 +911,7 @@ function App() {
                                     </div>
 
                                     <div className="form-group password-field-group">
-                                        <label htmlFor="account-current-password">Contraseña actual</label>
+                                        <label htmlFor="account-current-password">Contraseña actual <span className="field-required">(obligatorio)</span></label>
                                         <div className="password-input-wrapper">
                                             <i className="fa-solid fa-shield-halved input-icon" />
                                             <input 
@@ -845,7 +935,7 @@ function App() {
                                     </div>
 
                                     <div className="form-group password-field-group">
-                                        <label htmlFor="account-password">Nueva contraseña</label>
+                                        <label htmlFor="account-password">Nueva contraseña <span className="field-required">(obligatorio)</span></label>
                                         <div className="password-input-wrapper">
                                             <i className="fa-solid fa-lock input-icon" />
                                             <input 
@@ -869,7 +959,7 @@ function App() {
                                     </div>
 
                                     <div className="form-group password-field-group">
-                                        <label htmlFor="account-confirm-password">Confirmar nueva contraseña</label>
+                                        <label htmlFor="account-confirm-password">Confirmar nueva contraseña <span className="field-required">(obligatorio)</span></label>
                                         <div className="password-input-wrapper">
                                             <i className="fa-solid fa-lock-open input-icon" />
                                             <input 

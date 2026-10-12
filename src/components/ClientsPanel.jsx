@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase.js';
 import Modal, { ConfirmModal } from './Modal.jsx';
-import ServiceDetailModal from './ServiceDetailModal.jsx';
-import Button from './Button.jsx';
+import VentaDetalleModal from './VentaDetalleModal.jsx';
+import { CLIENTE_ABRIR_EVENTO, consumirClientePendiente } from '../clienteNav.js';
+import DetailWindow from './DetailWindow.jsx';
+import { DetailActionButton, ListIconButton, PanelCancelButton, PanelSaveButton } from './Button.jsx';
 import { deleteClientFromDatabase, loadAppointmentsFromDatabase, loadClientsFromDatabase, saveClientToDatabase, updateClientInDatabase } from '../services.js';
+import { estadoBadgeClass, estadoLabel } from '../appointmentActions.js';
+import SkeletonList, { useSearching } from './SkeletonList.jsx';
 
 function normalizeClientRecord(client) {
   if (!client || typeof client !== 'object') return null;
@@ -21,10 +25,9 @@ function normalizeClientRecord(client) {
 
 function normalizeAppointmentRecord(apt) {
   if (!apt || typeof apt !== 'object') return null;
-  const rawEstado = (apt.estado || 'provisional').toString().trim().toLowerCase();
-  let estado = 'Provisional';
-  if (rawEstado === 'completado' || rawEstado === 'completed' || rawEstado === 'cobrado' || rawEstado === 'pagado') estado = 'Completado';
-  else if (rawEstado === 'reservado' || rawEstado === 'reserved') estado = 'Reservado';
+  // Misma normalización que la agenda (appointmentActions.js): un estado
+  // desconocido queda como cancelado, no como provisional.
+  const estado = estadoLabel(apt.estado || 'provisional');
 
   return {
     id: apt.legacy_id || apt.id,
@@ -35,6 +38,7 @@ function normalizeAppointmentRecord(apt) {
     servicio: apt.servicio || 'Turno',
     precio: Number(apt.precio) || 0,
     estado,
+    motivoCancelacion: apt.motivo_cancelacion || null,
     eventId: apt.event_id
   };
 }
@@ -83,22 +87,16 @@ function clientInitials(nombre) {
   return first + second;
 }
 
-function statusBadgeClass(estado) {
-  const low = (estado || '').toString().toLowerCase();
-  if (low === 'completado') return 'completado';
-  if (low === 'reservado') return 'reservado';
-  if (low === 'provisional') return 'provisional';
-  return 'reservado';
-}
-
 function ClientsPanel({ session, notify, showLoader }) {
   const email = session?.email || '';
   const cacheKeyClients = `evolet_clients_v4_${email}`;
   const cacheKeyAppointments = `evolet_appointments_v4_${email}`;
-  const isAdmin = session?.rol === 'admin';
+  const isAdmin = session?.rol === 'admin' || session?.rol === 'superadmin';
+  const isSuperadmin = session?.rol === 'superadmin';
 
   const [clients, setClients] = useState([]);
   const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [newClient, setNewClient] = useState({ nombre: '', telefono: '', email: '', notas: '' });
   const [creating, setCreating] = useState(false);
@@ -107,6 +105,7 @@ function ClientsPanel({ session, notify, showLoader }) {
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState('activos');
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const isSearching = useSearching(searchText);
 
   const [detailClient, setDetailClient] = useState(null);
   const [detailEditing, setDetailEditing] = useState(false);
@@ -139,13 +138,19 @@ function ClientsPanel({ session, notify, showLoader }) {
 
   const loadClients = async (forceRefresh = false) => {
     if (!session?.authId || !supabase) return;
+    let hasCachedData = false;
     try {
       if (!forceRefresh) {
         try {
           const cached = localStorage.getItem(cacheKeyClients);
-          if (cached) setClients(JSON.parse(cached));
+          if (cached) {
+            setClients(JSON.parse(cached));
+            hasCachedData = true;
+          }
         } catch (e) { /* ignore */ }
       }
+      // Solo mostramos skeleton si no hay caché que mostrar de inmediato.
+      if (!hasCachedData) setLoading(true);
       const data = await loadClientsFromDatabase();
       const records = data.map(normalizeClientRecord).filter(Boolean);
       setClients(records);
@@ -153,6 +158,8 @@ function ClientsPanel({ session, notify, showLoader }) {
     } catch (error) {
       console.error('Error cargando clientes React:', error);
       if (notify) notify(error.message || 'No se pudo cargar la lista de clientes.', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -183,6 +190,50 @@ function ClientsPanel({ session, notify, showLoader }) {
     loadAppointmentsLight();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  // "Consultar ficha de la clienta" desde una venta: el Historial y la Agenda navegan a
+  // esta pestaña y avisan qué clienta abrir. Se escucha por evento porque los
+  // paneles no se conocen entre sí (App.jsx solo cambia de pestaña).
+  // Se usa un ref para no re-suscribir el listener en cada render.
+  const clientsRef = useRef([]);
+  clientsRef.current = clients;
+
+  const abrirFichaPorId = (clienteId) => {
+    const encontrada = clientsRef.current.find(
+      (c) => (c.rawId || c.id) === clienteId || c.id === clienteId
+    );
+    if (!encontrada) return false;
+    openClientDetail(encontrada);
+    return true;
+  };
+
+  useEffect(() => {
+    const abrirFicha = (event) => {
+      // El pendiente se consume siempre: si el evento lo atiende acá, no debe
+      // volver a dispararse después cuando cargue la lista.
+      const clienteId = event?.detail?.clienteId || consumirClientePendiente();
+      if (!clienteId) return;
+      if (!abrirFichaPorId(clienteId) && clientsRef.current.length && notify) {
+        notify('No se encontró la ficha de esa clienta.', 'error');
+      }
+    };
+    window.addEventListener(CLIENTE_ABRIR_EVENTO, abrirFicha);
+    return () => window.removeEventListener(CLIENTE_ABRIR_EVENTO, abrirFicha);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notify]);
+
+  // Si el pedido llegó antes de que este panel estuviera montado (el evento se
+  // dispara en el mismo tick del cambio de pestaña) o antes de cargar las
+  // clientas, queda pendiente y se atiende acá. Con la lista vacía no se avisa
+  // nada todavía: puede que siga cargando.
+  useEffect(() => {
+    if (!clients.length) return;
+    const pendiente = consumirClientePendiente();
+    if (pendiente && !abrirFichaPorId(pendiente) && notify) {
+      notify('No se encontró la ficha de esa clienta.', 'error');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, notify]);
 
   const submitNewClient = async (e) => {
     if (e) e.preventDefault();
@@ -360,8 +411,8 @@ function ClientsPanel({ session, notify, showLoader }) {
   };
 
   const askDeleteClient = (client) => {
-    if (!isAdmin) {
-      if (notify) notify('Solo los administradores pueden eliminar clientas.', 'error');
+    if (!isSuperadmin) {
+      if (notify) notify('Solo el superadmin puede eliminar clientas.', 'error');
       return;
     }
     setDeleteConfirm(client);
@@ -423,7 +474,9 @@ function ClientsPanel({ session, notify, showLoader }) {
   };
 
   return (
-    <div id="tab-clientes">
+    <div id="tab-clientes" className="view-enter">
+      {!detailClient && (
+        <>
       <div className="section-title section-title-with-action">
         <div>
           <h3>Clientes</h3>
@@ -431,21 +484,28 @@ function ClientsPanel({ session, notify, showLoader }) {
         </div>
         <button
           type="button"
-          className="btn btn-primary btn-sm panel-header-action"
+          className="btn btn-primary btn-sm panel-header-action mobile-icon-only"
           onClick={toggleRegistrationForm}
           aria-expanded={registrationOpen}
           aria-controls="client-registration-form"
+          aria-label={registrationOpen ? 'Cerrar registro de clienta' : 'Registrar nueva clienta'}
         >
-          <i className={`fa-solid ${registrationOpen ? 'fa-xmark' : 'fa-user-plus'}`} aria-hidden="true" />
-          {registrationOpen ? 'Cerrar' : 'Nueva clienta'}
+          <i className={`fa-solid ${registrationOpen ? 'fa-xmark' : 'fa-plus'}`} aria-hidden="true" />
+          <span className="mobile-action-label">{registrationOpen ? 'Cerrar' : 'Nuevo'}</span>
         </button>
       </div>
 
-      {registrationOpen && <form id="client-registration-form" className="cute-form client-registration-form client-registration-form--spaced" onSubmit={submitNewClient}>
-        <div className="client-detail-fields-stack">
+      {registrationOpen ? <form id="client-registration-form" className="cute-form client-registration-form client-registration-form--spaced" onSubmit={submitNewClient}>
+        <div className="client-registration-heading">
+          <div>
+            <h4>Datos de la clienta</h4>
+            <p>Completá el nombre y agregá un teléfono si lo necesitás.</p>
+          </div>
+        </div>
+        <div className="client-registration-fields">
           <div className="form-group">
             <label htmlFor="client-record-name">
-              Nombre
+              Nombre <span className="field-required">(obligatorio)</span>
             </label>
             <div className="input-wrapper">
               <i className="fa-solid fa-user input-icon" />
@@ -456,12 +516,13 @@ function ClientsPanel({ session, notify, showLoader }) {
                 value={newClient.nombre}
                 onChange={(e) => setNewClient(p => ({ ...p, nombre: e.target.value }))}
                 required
+                aria-required="true"
               />
             </div>
           </div>
           <div className="form-group client-phone-field">
             <label htmlFor="client-record-phone">
-              Teléfono
+              Teléfono <span className="field-optional">(opcional)</span>
             </label>
             <div className="input-wrapper">
               <i className="fa-solid fa-phone input-icon" />
@@ -469,17 +530,18 @@ function ClientsPanel({ session, notify, showLoader }) {
                 id="client-record-phone"
                 type="tel"
                 inputMode="tel"
-                placeholder="Opcional"
+                placeholder="Ej. 11 2233 4455"
                 value={newClient.telefono}
                 onChange={(e) => setNewClient(p => ({ ...p, telefono: e.target.value }))}
               />
             </div>
           </div>
         </div>
-        <Button type="submit" className="btn-block" busy={creating}>
-          <><i className="fa-solid fa-floppy-disk" />Guardar</>
-        </Button>
-      </form>}
+        <div className="form-actions">
+          <PanelCancelButton onClick={closeRegistrationForm} disabled={creating} />
+          <PanelSaveButton type="submit" busy={creating} busyLabel="Guardando…" />
+        </div>
+      </form> : <>
 
       <div className="filters-container">
         <div className="search-box-container">
@@ -505,6 +567,13 @@ function ClientsPanel({ session, notify, showLoader }) {
             <div className="filter-button-group">
               <button
                 type="button"
+                className={`filter-choice ${filterStatus === 'todos' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('todos')}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
                 className={`filter-choice ${filterStatus === 'activos' ? 'active' : ''}`}
                 onClick={() => setFilterStatus('activos')}
               >
@@ -517,27 +586,21 @@ function ClientsPanel({ session, notify, showLoader }) {
               >
                 Dados de baja
               </button>
-              <button
-                type="button"
-                className={`filter-choice ${filterStatus === 'todos' ? 'active' : ''}`}
-                onClick={() => setFilterStatus('todos')}
-              >
-                Todos
-              </button>
             </div>
           </div>
         )}
       </div>
 
-      <div id="clients-list" className="history-list list-scroll">
-        {filteredClients.length === 0 && (
+      <div id="clients-list" className="history-list unified-list list-scroll list-section-gap">
+        {(loading || isSearching) && <SkeletonList count={6} />}
+        {!loading && !isSearching && filteredClients.length === 0 && (
           <div className="list-empty-state">
             <p>No se encontraron clientas que coincidan con la búsqueda.</p>
           </div>
         )}
 
-        {filteredClients.map(client => (
-          <div key={client.id} className={`appointment-card client-card ${client.activo !== true ? 'provisional' : ''}`}>
+        {!loading && !isSearching && filteredClients.map(client => (
+          <div key={client.id} className={`appointment-card client-card unified-card ${client.activo !== true ? 'is-inactive' : ''}`}>
             <div className="client-avatar" title={client.nombre}>
               {clientInitials(client.nombre)}
             </div>
@@ -551,102 +614,63 @@ function ClientsPanel({ session, notify, showLoader }) {
                   </span>
                 )}
               </div>
-              <div className="appointment-service-name client-contact-row">
-                {client.telefono && (
-                  <span className="client-phone-value" title="Teléfono">
-                    <i className="fa-solid fa-phone client-contact-icon" />
-                    {client.telefono}
-                    <a
-                      className="whatsapp-link"
-                      href={whatsappUrl(client.telefono)}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Abrir WhatsApp de ${client.nombre}`}
-                      title="Contactar por WhatsApp"
-                    >
-                      <i className="fa-brands fa-whatsapp" aria-hidden="true" />
-                    </a>
-                  </span>
-                )}
-                {client.notas && (
+              {client.notas && (
+                <div className="appointment-service-name client-contact-row">
                   <span title="Notas">
                     <i className="fa-solid fa-note-sticky client-contact-icon" />
                     {client.notas}
                   </span>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             <div className="client-actions-col">
-              <button
-                type="button"
-                className="btn-view-detail"
-                title="Ver detalle"
-                onClick={() => openClientDetail(client)}
-              >
-                <i className="fa-solid fa-eye" />
-              </button>
-              {isAdmin && (
-                <button
-                  type="button"
-                  title={client.activo ? 'Dar de baja' : 'Reactivar clienta'}
-                  onClick={() => askToggleStatus(client)}
-                  className={`client-status-btn btn-view-detail ${client.activo ? 'is-active' : 'is-inactive'}`}
-                >
-                  <i className={`fa-solid ${client.activo ? 'fa-user-slash' : 'fa-user-check'}`} />
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  type="button"
-                  className="btn-delete-card"
-                  title="Eliminar clienta"
-                  onClick={() => askDeleteClient(client)}
-                >
-                  <i className="fa-solid fa-trash-can" />
-                </button>
-              )}
+              <div className="client-card-actions-row">
+                {client.telefono && whatsappUrl(client.telefono) && (
+                  <ListIconButton
+                    icon="fa-whatsapp"
+                    iconStyle="brands"
+                    label="WhatsApp"
+                    title="Escribir por WhatsApp"
+                    variant="whatsapp"
+                    onClick={() => requestConfirmation(
+                      'Abrir WhatsApp',
+                      `¿Confirmás abrir el WhatsApp de ${client.nombre} en una pestaña nueva?`,
+                      () => window.open(whatsappUrl(client.telefono), '_blank', 'noopener,noreferrer')
+                    )}
+                    aria-label={`Abrir WhatsApp de ${client.nombre}`}
+                  />
+                )}
+                <ListIconButton
+                  icon="fa-eye"
+                  label="Consultar"
+                  title="Consultar ficha"
+                  variant="primary"
+                  onClick={() => openClientDetail(client)}
+                  aria-label={`Consultar ficha de ${client.nombre}`}
+                />
+              </div>
             </div>
           </div>
         ))}
       </div>
+      </>}
 
-      <Modal
-        open={!!detailClient}
-        onClose={handleDetailClose}
-        closeOnBackdrop={!detailEditing && !detailSaving}
-        sizeClass="client-detail-modal-card"
-        title="Ficha de cliente"
-      >
-        {detailClient && (
-          <div>
-            <div className="modal-header-row client-detail-header">
-              <div className="client-detail-header-actions">
-                <button
-                  type="button"
-                  onClick={handleDetailClose}
-                  className="btn btn-secondary btn-sm client-detail-action"
-                  disabled={detailSaving}
-                >
-                  <i className="fa-solid fa-arrow-left" /> Volver
-                </button>
-                {!detailEditing && (
-                  <button
-                    type="button"
-                    onClick={() => setDetailEditing(true)}
-                    className="btn btn-secondary btn-sm client-detail-action client-detail-action--edit"
-                  >
-                    <i className="fa-solid fa-pen-to-square" /> Editar
-                  </button>
-                )}
-              </div>
-            </div>
+      </>
+      )}
 
-            <form className="cute-form account-readonly-form client-detail-form" onSubmit={(e) => { e.preventDefault(); saveDetailClient(); }}>
-              <fieldset id="client-detail-fields" className="client-detail-fields" disabled={!detailEditing}>
-                <div className="client-detail-fields-stack">
+      {detailClient && (
+        <DetailWindow
+          title="Ficha de cliente"
+          subtitle="Datos, contacto e historial de turnos"
+          onClose={handleDetailClose}
+          closeDisabled={detailSaving}
+        >
+            <form className="cute-form account-readonly-form detail-form" onSubmit={(e) => { e.preventDefault(); saveDetailClient(); }}>
+              <fieldset className="detail-fields" disabled={!detailEditing}>
+                <div className="detail-fields-stack">
                   <div className="form-group">
-                    <label htmlFor="detail-client-name">Nombre</label>
+                    <label htmlFor="detail-client-name">Nombre <span className="field-required">(obligatorio)</span></label>
                     <div className="input-wrapper">
                       <i className="fa-solid fa-user input-icon" />
                       <input
@@ -662,44 +686,165 @@ function ClientsPanel({ session, notify, showLoader }) {
                     </div>
                   </div>
                   <div className="form-group client-phone-field">
-                    <label htmlFor="detail-client-phone">Teléfono</label>
-                    <div className="input-wrapper">
-                      <i className="fa-solid fa-phone input-icon" />
-                      <input
-                        id="detail-client-phone"
-                        name="telefono"
-                        type="tel"
-                        inputMode="tel"
-                        value={detailForm.telefono}
-                        onChange={(e) => setDetailForm(p => ({ ...p, telefono: e.target.value }))}
-                        placeholder="Sin teléfono registrado"
-                        readOnly={!detailEditing}
-                      />
+                    <label htmlFor="detail-client-phone">Teléfono <span className="field-optional">(opcional)</span></label>
+                    <div className="client-phone-input-row">
+                      <div className="input-wrapper">
+                        <i className="fa-solid fa-phone input-icon" />
+                        <input
+                          id="detail-client-phone"
+                          name="telefono"
+                          type="tel"
+                          inputMode="tel"
+                          placeholder="Ej. 11 2233 4455"
+                          value={detailForm.telefono}
+                          onChange={(e) => setDetailForm(p => ({ ...p, telefono: e.target.value }))}
+                          readOnly={!detailEditing}
+                        />
+                      </div>
+                      {(detailClient.telefono || detailForm.telefono) && whatsappUrl(detailClient.telefono || detailForm.telefono) && (
+                        <DetailActionButton
+                          icon="fa-whatsapp"
+                          iconStyle="brands"
+                          label="WhatsApp"
+                          aria-label={`Abrir WhatsApp de ${detailClient.nombre}`}
+                          title={detailEditing ? 'Terminá la edición para escribir por WhatsApp' : 'Escribir por WhatsApp'}
+                          disabled={detailEditing}
+                          onClick={() => {
+                            if (detailEditing) return;
+                            requestConfirmation(
+                              'Abrir WhatsApp',
+                              `¿Confirmás abrir el WhatsApp de ${detailClient.nombre} en una pestaña nueva?`,
+                              () => window.open(
+                                whatsappUrl(detailClient.telefono || detailForm.telefono),
+                                '_blank',
+                                'noopener,noreferrer'
+                              )
+                            );
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
               </fieldset>
-              <div className="client-modal-actions">
+              <div className="detail-form-actions">
                 {detailEditing && (
                   <>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
+                    <PanelCancelButton
                       onClick={cancelDetailEdit}
                       disabled={detailSaving}
-                    >
-                    <i className="fa-solid fa-xmark" /> Cancelar
-                    </button>
-                    <Button
+                    />
+                    <PanelSaveButton
                       type="submit"
                       busy={detailSaving}
-                    >
-                      <><i className="fa-solid fa-floppy-disk" /> Guardar</>
-                    </Button>
+                      busyLabel="Guardando…"
+                    />
                   </>
                 )}
               </div>
+              {/* Email y Creado: solo lectura permanente (no dependen de
+                  detailEditing), por eso van fuera del fieldset y debajo de
+                  Cancelar/Guardar — mismo patrón que la ficha de usuario. */}
+              <div className="detail-fields-stack detail-readonly-fields">
+                <div className="form-group">
+                  <label htmlFor="detail-client-email">Email</label>
+                  <div className="input-wrapper">
+                    <i className="fa-solid fa-envelope input-icon" />
+                    <input
+                      id="detail-client-email"
+                      name="email"
+                      type="email"
+                      value={detailClient.email || ''}
+                      placeholder="Sin email"
+                      readOnly
+                      disabled
+                    />
+                  </div>
+                </div>
+                {detailClient.creado_en && (
+                  <div className="form-group">
+                    <label htmlFor="detail-client-created">Creado</label>
+                    <div className="input-wrapper">
+                      <i className="fa-solid fa-calendar input-icon" />
+                      <input
+                        id="detail-client-created"
+                        name="creado"
+                        type="text"
+                        value={new Date(detailClient.creado_en).toLocaleDateString()}
+                        readOnly
+                        disabled
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Estado: mismo patrón que la ficha de usuario — campo visible
+                  para todos, con la acción de baja/reactivación integrada para
+                  administradores (antes vivía solo en Opciones avanzadas). */}
+              <div className="detail-fields-stack detail-change-fields">
+                <div className="form-group">
+                  {isAdmin ? (
+                    <>
+                      <label htmlFor="detail-client-status">Estado</label>
+                      <div className="detail-change-row">
+                        <div className="input-wrapper">
+                          <i className="fa-solid fa-circle-check input-icon" />
+                          <input
+                            id="detail-client-status"
+                            name="estado"
+                            type="text"
+                            value={detailClient.activo !== false ? 'Activo' : 'Inactivo'}
+                            readOnly
+                            disabled
+                          />
+                        </div>
+                        <DetailActionButton
+                          icon={detailClient.activo !== false ? 'fa-user-slash' : 'fa-user-check'}
+                          label={detailClient.activo !== false ? 'Dar de baja' : 'Reactivar'}
+                          title={detailClient.activo !== false ? `Desactivar acceso de ${detailClient.nombre}` : `Reactivar acceso de ${detailClient.nombre}`}
+                          aria-label={detailClient.activo !== false ? 'Dar de baja' : 'Reactivar'}
+                          disabled={detailSaving}
+                          iconOnlyOnMobile={false}
+                          onClick={() => askToggleStatus(detailClient)}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <label htmlFor="detail-client-status">Estado</label>
+                      <div className="input-wrapper">
+                        <i className="fa-solid fa-circle-check input-icon" />
+                        <input
+                          id="detail-client-status"
+                          name="estado"
+                          type="text"
+                          value={detailClient.activo !== false ? 'Activo' : 'Inactivo'}
+                          readOnly
+                          disabled
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </form>
+
+            {isSuperadmin && (
+              <div className="detail-advanced">
+                <h4>Opciones avanzadas</h4>
+                <div className="detail-advanced-actions">
+                  <DetailActionButton
+                    icon="fa-trash-can"
+                    label="Eliminar"
+                    variant="danger"
+                    title="Eliminar clienta"
+                    aria-label="Eliminar clienta"
+                    disabled={detailSaving}
+                    onClick={() => askDeleteClient(detailClient)}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="client-history-heading">
               <strong>Historial de turnos</strong>
@@ -728,7 +873,7 @@ function ClientsPanel({ session, notify, showLoader }) {
                       <i className="fa-regular fa-calendar client-history-calendar" />
                       {formatDateTimeArgentina(apt.horaInicio || apt.fecha)}
                       {' · '}
-                      <span className={`status-tag client-history-status-tag ${statusBadgeClass(apt.estado)}`}>{apt.estado}</span>
+                      <span className={`status-tag client-history-status-tag ${estadoBadgeClass(apt.estado)}`}>{apt.estado}</span>
                     </div>
                   </div>
                   <div className="client-history-item-side">
@@ -738,7 +883,7 @@ function ClientsPanel({ session, notify, showLoader }) {
                     <button
                       type="button"
                       className="client-history-more"
-                      title="Ver más"
+                      title="Consultar ficha"
                       onClick={() => setSelectedHistoryService({
                         ...apt,
                         cliente: detailClient.nombre,
@@ -753,16 +898,29 @@ function ClientsPanel({ session, notify, showLoader }) {
                 </div>
               ))}
             </div>
-          </div>
-        )}
-      </Modal>
+            {/* Acciones de la ventana al fondo, igual que en la ficha de
+                turno/venta: la cabecera queda solo con Volver. */}
+            {isAdmin && !detailEditing && (
+              <div className="detail-window-footer">
+                <DetailActionButton
+                  icon="fa-pen-to-square"
+                  label="Editar"
+                  aria-label="Editar clienta"
+                  onClick={() => setDetailEditing(true)}
+                />
+              </div>
+            )}
+        </DetailWindow>
+      )}
 
-      <ServiceDetailModal
+      <VentaDetalleModal
         open={!!selectedHistoryService}
         service={selectedHistoryService}
+        turnoId={selectedHistoryService?.turnoId || null}
         notify={notify}
-        sizeClass="client-service-detail-modal-card"
+        sizeClass="detail-modal-card"
         onClose={() => setSelectedHistoryService(null)}
+        isAdmin={isAdmin}
       />
 
       <ConfirmModal

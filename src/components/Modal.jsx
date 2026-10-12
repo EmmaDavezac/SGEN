@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 function Modal({
   open = false,
@@ -8,11 +9,15 @@ function Modal({
   actions,
   onClose,
   closeOnBackdrop = true,
+  showCloseButton = false,
   sizeClass = '',
 }) {
   const cardRef = useRef(null);
   const previousFocusRef = useRef(null);
+  const onCloseRef = useRef(onClose);
   const titleId = useId();
+
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -23,8 +28,8 @@ function Modal({
       (firstControl || cardRef.current)?.focus?.();
     });
     const onKey = (e) => {
-      if (e.key === 'Escape' && onClose) {
-        onClose();
+      if (e.key === 'Escape' && onCloseRef.current) {
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !cardRef.current) return;
@@ -48,7 +53,7 @@ function Modal({
       document.body.style.overflow = '';
       previousFocusRef.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -59,7 +64,7 @@ function Modal({
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="modal-overlay"
       role="dialog"
@@ -67,7 +72,12 @@ function Modal({
       aria-labelledby={title ? titleId : undefined}
       onClick={handleBackdrop}
     >
-      <div ref={cardRef} className={`modal-card ${sizeClass}`.trim()} tabIndex="-1">
+      <div ref={cardRef} className={`modal-card ${showCloseButton ? 'modal-card--with-close' : ''} ${sizeClass}`.trim()} tabIndex="-1">
+        {showCloseButton && onClose && (
+          <button type="button" className="modal-close-button" onClick={onClose} aria-label="Cerrar" title="Cerrar">
+            <i className="fa-solid fa-xmark" aria-hidden="true" />
+          </button>
+        )}
         {title && <h3 id={titleId}>{title}</h3>}
         {subtitle && <p className="modal-sub">{subtitle}</p>}
 
@@ -75,7 +85,60 @@ function Modal({
 
         {actions && <div className="modal-actions">{actions}</div>}
       </div>
-    </div>
+    </div>,
+    document.body
+    );
+}
+
+/**
+ * Botón base reutilizable para acciones de modales. Centraliza variantes
+ * (.btn-secondary / .btn-primary / .btn-danger), el icono Font Awesome y el
+ * estado "ocupado" (reemplaza el contenido por busyLabel y deshabilita).
+ */
+export function ModalButton({
+  variant = 'secondary',
+  icon,
+  busy = false,
+  busyLabel,
+  disabled = false,
+  children,
+  ...rest
+}) {
+  const variantClass = variant === 'danger'
+    ? 'btn-danger'
+    : variant === 'primary'
+      ? 'btn-primary'
+      : 'btn-secondary';
+  return (
+    <button
+      type="button"
+      className={`btn ${variantClass}`}
+      disabled={disabled || busy}
+      {...rest}
+    >
+      {!busy && icon && <i className={`fa-solid ${icon}`} aria-hidden="true"></i>}
+      {busy && busyLabel ? busyLabel : children}
+    </button>
+  );
+}
+
+/** Acción de cancelar: secundaria, icono ✕ por defecto. */
+export function ModalCancelButton({ label = 'Cancelar', icon = 'fa-xmark', ...rest }) {
+  return <ModalButton variant="secondary" icon={icon} {...rest}>{label}</ModalButton>;
+}
+
+/** Acción de confirmar/guardar: primaria (o danger), icono ✓ por defecto. */
+export function ModalConfirmButton({
+  label = 'Confirmar',
+  icon = 'fa-check',
+  variant = 'primary',
+  busyLabel = 'Procesando...',
+  ...rest
+}) {
+  return (
+    <ModalButton variant={variant} icon={icon} busyLabel={busyLabel} {...rest}>
+      {label}
+    </ModalButton>
   );
 }
 
@@ -85,10 +148,15 @@ export function ConfirmModal({
   message,
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
+  extraText,
+  extraVariant = 'danger',
   confirmVariant = 'primary',
   onConfirm,
   onCancel,
+  onExtra,
   busy = false,
+  confirmDisabled = false,
+  children,
 }) {
   return (
     <Modal
@@ -98,30 +166,28 @@ export function ConfirmModal({
       closeOnBackdrop={!busy}
       actions={
         <>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onCancel}
-            disabled={busy}
-          >
-            <i className="fa-solid fa-xmark" aria-hidden="true"></i>
-            {cancelText}
-          </button>
-          <button
-            type="button"
-            className={`btn ${confirmVariant === 'danger' ? 'btn-danger' : 'btn-primary'}`}
+          <ModalCancelButton label={cancelText} onClick={onCancel} disabled={busy} />
+          {extraText && onExtra && (
+            <ModalButton
+              variant={extraVariant}
+              icon="fa-rotate-left"
+              onClick={onExtra}
+              disabled={busy}
+            >
+              {extraText}
+            </ModalButton>
+          )}
+          <ModalConfirmButton
+            label={confirmText}
+            variant={confirmVariant}
             onClick={onConfirm}
-            disabled={busy}
-          >
-            <i className="fa-solid fa-check" aria-hidden="true"></i>
-            {busy ? 'Procesando...' : confirmText}
-          </button>
+            busy={busy}
+            disabled={confirmDisabled}
+          />
         </>
       }
     >
-      <div className="confirm-message">
-        {message}
-      </div>
+      {children || <div className="confirm-message">{message}</div>}
     </Modal>
   );
 }

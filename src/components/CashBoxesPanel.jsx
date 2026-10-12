@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabase.js';
-import Button from './Button.jsx';
+import Button, { PanelCancelButton, PanelSaveButton } from './Button.jsx';
 import { ConfirmModal } from './Modal.jsx';
+import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { loadCashboxDataFromDatabase, saveCashMovementToDatabase } from '../services.js';
 
 function todayISO() {
@@ -20,6 +21,19 @@ function CashBoxesPanel({ session, notify, showLoader }) {
     const [submitting, setSubmitting] = useState(false);
     const [formOpen, setFormOpen] = useState(false);
     const [confirmation, setConfirmation] = useState(null);
+    const [search, setSearch] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+    const [filterTipo, setFilterTipo] = useState('todos');
+    const isSearching = useSearching(search);
+
+    const normalizedSearch = search.trim().toLowerCase();
+    const movimientosFiltrados = movimientos.filter((m) => {
+        const fechaStr = m.fecha ? String(m.fecha) : '';
+        const texto = `${m.concepto || ''} ${m.tipo || ''} ${fechaStr}`.toLowerCase();
+        const matchesSearch = !normalizedSearch || texto.includes(normalizedSearch);
+        const matchesTipo = filterTipo === 'todos' || (m.tipo || '') === filterTipo;
+        return matchesSearch && matchesTipo;
+    });
 
     useEffect(() => {
         loadData();
@@ -184,13 +198,14 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                 </div>
                 <button
                     type="button"
-                    className="btn btn-primary btn-sm panel-header-action"
+                    className="btn btn-primary btn-sm panel-header-action mobile-icon-only"
                     onClick={toggleMovementForm}
                     aria-expanded={formOpen}
                     aria-controls="cash-movement-form"
+                    aria-label={formOpen ? 'Cerrar movimiento' : 'Nuevo movimiento'}
                 >
                     <i className={`fa-solid ${formOpen ? 'fa-xmark' : 'fa-plus'}`} aria-hidden="true" />
-                    {formOpen ? 'Cerrar' : 'Nuevo movimiento'}
+                    <span className="mobile-action-label">{formOpen ? 'Cerrar' : 'Nuevo'}</span>
                 </button>
             </div>
 
@@ -231,7 +246,7 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>Fecha</label>
+                            <label>Fecha <span className="field-required">(obligatorio)</span></label>
                             <div className="input-wrapper">
                                 <i className="fa-solid fa-calendar-day input-icon"></i>
                                 <input
@@ -246,7 +261,7 @@ function CashBoxesPanel({ session, notify, showLoader }) {
 
                     <div className="form-row-2">
                         <div className="form-group">
-                            <label>Monto ($)</label>
+                            <label>Monto ($) <span className="field-required">(obligatorio)</span></label>
                             <div className="input-wrapper">
                                 <i className="fa-solid fa-sack-dollar input-icon"></i>
                                 <input
@@ -262,7 +277,7 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>Concepto</label>
+                            <label>Concepto <span className="field-required">(obligatorio)</span></label>
                             <div className="input-wrapper">
                                 <i className="fa-solid fa-file-lines input-icon"></i>
                                 <input
@@ -276,27 +291,80 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                         </div>
                     </div>
 
-                    <Button type="submit" className="btn-block" disabled={submitting}>
-                        <i className="fa-solid fa-plus"></i> {submitting ? 'Guardando...' : 'Registrar Movimiento'}
-                    </Button>
+                    <div className="form-actions">
+                        <PanelCancelButton onClick={closeMovementForm} disabled={submitting} />
+                        <PanelSaveButton
+                            type="submit"
+                            label="Registrar Movimiento"
+                            icon="fa-plus"
+                            busy={submitting}
+                            busyLabel="Guardando..."
+                            disabled={submitting}
+                        />
+                    </div>
                 </form>
             </div>}
 
-            <div className="chart-section">
+            {!formOpen && (
+                <div className="filters-container">
+                    <div className="search-box-container">
+                        <i className="fa-solid fa-magnifying-glass search-icon"></i>
+                        <input
+                            type="search"
+                            placeholder="Buscar movimiento..."
+                            className="search-input"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        className="filter-toggle-btn"
+                        title="Filtrar movimientos"
+                        aria-label="Filtrar movimientos"
+                        aria-expanded={showFilters}
+                        onClick={() => setShowFilters((v) => !v)}
+                    >
+                        <i className="fa-solid fa-filter"></i>
+                    </button>
+                    {showFilters && (
+                        <div className="filter-button-panel">
+                            <div className="filter-button-group">
+                                {[
+                                    { key: 'todos', label: 'Todos' },
+                                    { key: 'deposito', label: 'Depósitos' },
+                                    { key: 'retiro', label: 'Extracciones' }
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.key}
+                                        type="button"
+                                        className={`filter-choice ${filterTipo === opt.key ? 'active' : ''}`}
+                                        onClick={() => setFilterTipo(opt.key)}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {!formOpen && <div className="chart-section list-section-gap">
                 <h4><i className="fa-solid fa-clock-rotate-left panel-heading-icon"></i>Movimientos Recientes</h4>
-                <div className="day-appointments-container list-scroll panel-list-top-spaced">
-                    {movimientos.length === 0 ? (
-                        <div className="no-appointments-placeholder">
-                            <i className="fa-solid fa-inbox cash-inbox-icon"></i>
-                            No hay movimientos registrados todavía.
+                <div className="day-appointments-container unified-list list-scroll list-section-gap">
+                    {isSearching && <SkeletonList count={5} />}
+                    {!isSearching && movimientosFiltrados.length === 0 ? (
+                        <div className="list-empty-state">
+                            <p>{movimientos.length === 0 ? 'No hay movimientos registrados todavía.' : 'No se encontraron movimientos que coincidan con la búsqueda.'}</p>
                         </div>
                     ) : (
-                        movimientos.map((m) => {
+                        !isSearching && movimientosFiltrados.map((m) => {
                             const isDeposito = m.tipo === 'deposito';
                             const dateObj = m.fecha ? new Date(String(m.fecha).includes('T') ? m.fecha : `${m.fecha}T00:00:00`) : new Date();
                             const fechaStr = isNaN(dateObj.getTime()) ? String(m.fecha) : dateObj.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
                             return (
-                                <div key={m.id || m.legacy_id} className="appointment-card">
+                                <div key={m.id || m.legacy_id} className="appointment-card unified-card">
                                     <div className="appointment-time-col">
                                         <div className={`appointment-time-start cash-movement-icon ${isDeposito ? 'is-deposit' : 'is-withdrawal'}`}>
                                             <i className={`fa-solid ${isDeposito ? 'fa-arrow-up-right-dots' : 'fa-arrow-down-wide-short'}`}></i>
@@ -323,7 +391,7 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                         })
                     )}
                 </div>
-            </div>
+            </div>}
         </div>
     );
 }

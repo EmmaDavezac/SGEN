@@ -3,7 +3,8 @@ import AppFooter from './AppFooter.jsx';
 
 function AppLayout({ children, session, onLogout, activeTab, setActiveTab, settings = {} }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const isAdmin = session && session.rol === 'admin';
+  const isAdmin = session && (session.rol === 'admin' || session.rol === 'superadmin');
+  const isSuperadmin = session && session.rol === 'superadmin';
   const { allowRegisterTab = false, allowCajasTab = false } = settings;
 
   return (
@@ -14,9 +15,8 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
           <div className="mini-logo">
             <img className="mini-logo-image" src="/icons/favicon.svg?v=2" alt="Logo" />
           </div>
-          <div>
-            <span className="welcome-text">Hola,</span>
-            <h2 id="user-display-name" className="user-name">{session?.nombre || 'Manicurista'}</h2>
+          <div className="header-business-block">
+            <h2 id="user-display-name" className="user-name">Evolet Nails</h2>
           </div>
         </div>
         
@@ -33,6 +33,17 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
               <i className="fa-solid fa-chevron-down"></i>
             </button>
             <div id="account-menu" className={`account-menu ${menuOpen ? '' : 'hidden'}`}>
+              <div className="account-menu-profile">
+                <div className="account-menu-avatar">
+                  <i className="fa-solid fa-user"></i>
+                </div>
+                <div className="account-menu-profile-text">
+                  <strong>{session?.nombre || 'Manicurista'}</strong>
+                  <span>
+                    {session?.rol === 'superadmin' ? 'Superadmin' : session?.rol === 'admin' ? 'Administrador' : 'Manicurista'}
+                  </span>
+                </div>
+              </div>
               <button 
                 id="menu-cuenta" 
                 className="account-menu-item" 
@@ -44,37 +55,19 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
               >
                 <i className="fa-solid fa-user-gear"></i> Mi cuenta
               </button>
-              {isAdmin && (
-                <button 
-                  id="menu-ajustes" 
-                  className="account-menu-item" 
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('ajustes');
-                    setMenuOpen(false);
-                  }}
-                >
-                  <i className="fa-solid fa-gears"></i> Ajustes
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  id="menu-usuarios"
-                  className="account-menu-item"
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('usuarios');
-                    setMenuOpen(false);
-                  }}
-                >
-                  <i className="fa-solid fa-user-group"></i> Usuarios
-                </button>
-              )}
+              <button 
+                id="menu-logout" 
+                className="account-menu-item account-menu-item--danger" 
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onLogout();
+                }}
+              >
+                <i className="fa-solid fa-arrow-right-from-bracket"></i> Cerrar sesión
+              </button>
             </div>
           </div>
-          <button id="btn-logout" className="btn-logout" title="Cerrar Sesión" onClick={onLogout}>
-            <i className="fa-solid fa-arrow-right-from-bracket"></i>
-          </button>
         </div>
       </header>
 
@@ -85,7 +78,7 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
       </main>
 
       {/* MENU DE NAVEGACION FLOTANTE INFERIOR */}
-      <nav className="app-nav">
+      <nav className="app-nav" aria-label="Navegación principal">
         <button 
           className={`nav-item ${activeTab === 'registrar' ? 'active' : ''} ${!allowRegisterTab ? 'hidden' : ''}`}
           onClick={() => setActiveTab('registrar')}
@@ -147,6 +140,29 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
             <span className="nav-text">Cajas</span>
           </button>
         )}
+
+        {isSuperadmin && (
+          <button
+            id="nav-btn-users"
+            className={`nav-item ${activeTab === 'usuarios' ? 'active' : ''}`}
+            onClick={() => setActiveTab('usuarios')}
+          >
+            <span className="nav-icon"><i className="fa-solid fa-user-group"></i></span>
+            <span className="nav-text">Usuarios</span>
+          </button>
+        )}
+
+        {isAdmin && (
+          <button
+            id="nav-btn-settings"
+            className={`nav-item ${activeTab === 'ajustes' ? 'active' : ''}`}
+            onClick={() => setActiveTab('ajustes')}
+          >
+            <span className="nav-icon"><i className="fa-solid fa-gears"></i></span>
+            <span className="nav-text">Ajustes</span>
+          </button>
+        )}
+
       </nav>
     </section>
   );

@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabase.js';
 import { completePendingPayment, deleteServiceFromDatabase, loadServicesFromDatabase } from '../services.js';
 import Modal, { ConfirmModal } from './Modal.jsx';
-import ServiceDetailModal from './ServiceDetailModal.jsx';
+import { ListIconButton } from './Button.jsx';
+import VentaDetalleModal from './VentaDetalleModal.jsx';
+import SkeletonList, { useSearching } from './SkeletonList.jsx';
 
 const PERIOD_OPTIONS = [
     { key: 'todos', label: 'Todos' },
@@ -85,7 +87,7 @@ const paymentIcon = (method) => {
     return 'fa-hand-holding-hand';
 };
 
-const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
+const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null }) => {
     const [services, setServices] = useState([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
@@ -93,6 +95,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
     const [period, setPeriod] = useState('todos');
     const [category, setCategory] = useState('todos');
     const [payment, setPayment] = useState('todos');
+    const isSearching = useSearching(search);
 
     const [detailOpen, setDetailOpen] = useState(false);
     const [selectedService, setSelectedService] = useState(null);
@@ -108,7 +111,6 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
     const loadServices = async () => {
         if (!session?.authId || !supabase) return;
         setLoading(true);
-        if (showLoader) showLoader(true, 'Cargando historial...');
         try {
             const data = await loadServicesFromDatabase();
             setServices(data.map(normalizeServiceRecord));
@@ -117,7 +119,6 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
             if (notify) notify('No se pudo cargar el historial de ventas.', 'error');
         } finally {
             setLoading(false);
-            if (showLoader) showLoader(false);
         }
     };
 
@@ -157,7 +158,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
         });
     }, [services, search, category, payment, period]);
 
-    const isAdmin = session?.rol === 'admin';
+    const isAdmin = session?.rol === 'admin' || session?.rol === 'superadmin';
 
     const openDetail = (svc) => {
         setSelectedService(svc);
@@ -236,22 +237,23 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
     };
 
     return (
-            <section className="panel-stack">
-            <div className="section-title section-title-with-action">
-                <div>
+            <section id="tab-historial" className="panel-stack view-enter">
+            <div className="section-title section-title-with-back">
+                <button type="button" className="btn btn-primary btn-sm panel-header-action btn-back mobile-icon-only" onClick={onBack} aria-label="Volver al calendario">
+                    <i className="fa-solid fa-arrow-left"></i>
+                    <span className="mobile-action-label">Volver</span>
+                </button>
+                <div className="section-title-text">
                     <h3>Historial de Ventas</h3>
                     <p>Visualiza y administra los servicios cargados.</p>
                 </div>
-                <button type="button" className="btn btn-secondary btn-back" onClick={onBack}>
-                    <i className="fa-solid fa-arrow-left"></i> Volver
-                </button>
             </div>
 
             <div className="filters-container">
                 <div className="search-box-container">
                     <i className="fa-solid fa-magnifying-glass search-icon"></i>
                     <input
-                        type="text"
+                        type="search"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Buscar clienta o servicio..."
@@ -309,18 +311,19 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
                 )}
             </div>
 
-            <div className="history-list list-scroll">
-                {loading && filtered.length === 0 && (
-                    <div className="list-empty-state"><p>Cargando registros...</p></div>
-                )}
-                {!loading && filtered.length === 0 && (
+            <div className="history-list unified-list list-scroll list-section-gap">
+                {(loading || isSearching) && <SkeletonList count={6} />}
+                {!loading && !isSearching && filtered.length === 0 && (
                     <div className="list-empty-state"><p>No se encontraron registros 💔</p></div>
                 )}
 
-                {filtered.map((svc) => {
+                {!loading && !isSearching && filtered.map((svc) => {
                     const isFiado = (svc.metodoPago || '').toLowerCase() === 'fiado';
                     return (
-                        <div key={svc.id} className={`history-card ${isFiado ? 'card-pending' : ''}`}>
+                        <div key={svc.id} className={`history-card unified-card ${isFiado ? 'card-pending' : ''}`}>
+                            <div className="client-avatar" aria-hidden="true">
+                                <i className="fa-solid fa-receipt"></i>
+                            </div>
                             <div className="card-details">
                                 <div className="card-client">{svc.cliente}</div>
                                 <div className="card-service">{svc.servicio}</div>
@@ -342,13 +345,23 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
                                 </div>
                             </div>
                             <div className="card-actions-col">
-                                <button className="btn-view-detail" title="Ver Detalle" onClick={() => openDetail(svc)}>
-                                    <i className="fa-solid fa-eye"></i>
-                                </button>
+                                <ListIconButton
+                                  icon="fa-eye"
+                                  label="Consultar"
+                                  title="Consultar ficha"
+                                  variant="primary"
+                                  onClick={() => openDetail(svc)}
+                                  aria-label="Consultar ficha"
+                                />
                                 {isAdmin && (
-                                    <button className="btn-delete-card" title="Eliminar Registro" onClick={() => requestDelete(svc)}>
-                                        <i className="fa-solid fa-trash-can"></i>
-                                    </button>
+                                    <ListIconButton
+                                      icon="fa-trash-can"
+                                      label="Eliminar"
+                                      title="Eliminar Registro"
+                                      variant="danger"
+                                      onClick={() => requestDelete(svc)}
+                                      aria-label="Eliminar Registro"
+                                    />
                                 )}
                             </div>
                         </div>
@@ -356,14 +369,17 @@ const HistoryPanel = ({ session, notify, showLoader, onBack }) => {
                 })}
             </div>
 
-            <ServiceDetailModal
+            <VentaDetalleModal
                 open={detailOpen && !!selectedService}
                 service={selectedService}
+                turnoId={selectedService?.turnoId || null}
                 notify={notify}
                 onClose={() => { setDetailOpen(false); setSelectedService(null); }}
                 onPay={selectedService && (selectedService.metodoPago || '').toLowerCase() === 'fiado'
                     ? () => { setDetailOpen(false); requestPayFiado(selectedService); }
                     : null}
+                onVerCliente={onVerCliente}
+                isAdmin={isAdmin}
             />
 
             <ConfirmModal

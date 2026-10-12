@@ -57,11 +57,11 @@ end $$;
 -- 2. Helper para normalizar emails y que perfiles siempre coincidan con auth.users
 -- =====================================================================
 create or replace function public.email_normalizado(p_email text)
-returns citext
+returns text
 language sql
 immutable
 as $$
-    select lower(trim(both ' ' from p_email))::citext;
+    select lower(trim(both ' ' from p_email));
 $$;
 
 revoke all on function public.email_normalizado(text) from public;

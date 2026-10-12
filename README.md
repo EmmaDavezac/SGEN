@@ -198,6 +198,8 @@ supabase db push
 ```
 Esto crea tablas (`perfiles`, `clientes`, `turnos`, `servicios`, `pagos`, `gastos`, `precios`, `movimientos_caja`) y aplica las políticas RLS. El proceso no modifica Google Sheets.
 
+La migración `20260823000023_manage_service_catalog.sql` agrega el catálogo administrable. Aplicala antes de usar **Precios** para crear o dar de baja categorías y servicios. Las bajas son lógicas: las opciones dejan de aparecer al registrar nuevos servicios, pero los precios guardados y el historial permanecen.
+
 ### 4. (Opcional) Sincronización con Google Calendar
 1. Crear OAuth Client ID en Google Cloud Console con scope `https://www.googleapis.com/auth/calendar.events`.
 2. Cargar estos Secrets en Supabase → Edge Functions: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_CALENDAR_ID`.

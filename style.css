@@ -31,8 +31,14 @@
     /* Efectos & Bordes */
     --glass-bg: rgba(255, 255, 255, 0.75);
     --glass-border: rgba(255, 105, 180, 0.25);
-    --shadow-pink: 0 8px 24px rgba(255, 20, 147, 0.12);
-    --shadow-inset: inset 0 2px 4px rgba(255, 105, 180, 0.1);
+    /* Sombras unificadas en tono neutro (marrón chocolate, el mismo del texto)
+       para el estilo flat de la app: se mantiene la elevación de cada
+       elemento, solo cambia el color — ninguna sombra lleva rosa. */
+    --shadow-md: 0 8px 24px rgba(90, 61, 70, 0.12);
+    --shadow-inset: inset 0 2px 4px rgba(90, 61, 70, 0.1);
+    --shadow-focus: 0 0 0 3px rgba(90, 61, 70, 0.2);
+    /* Borde neutro para fichas y superficies (reemplaza al rosa). */
+    --border-neutral: rgba(90, 61, 70, 0.18);
     --radius-lg: 24px;
     --radius-md: 16px;
     --radius-sm: 10px;
@@ -204,7 +210,7 @@ button {
     padding: 14px 20px;
     border-radius: var(--radius-md);
     margin-bottom: 10px;
-    box-shadow: 0 10px 30px rgba(255, 105, 180, 0.2);
+    box-shadow: 0 10px 30px rgba(90, 61, 70, 0.2);
     border-left: 5px solid var(--barbie-pink);
     display: flex;
     align-items: center;
@@ -290,7 +296,7 @@ button {
     border-radius: var(--radius-lg);
     width: 100%;
     max-width: 380px;
-    box-shadow: 0 15px 35px rgba(255, 20, 147, 0.15);
+    box-shadow: 0 15px 35px rgba(90, 61, 70, 0.15);
     text-align: center;
     position: relative;
     z-index: 10;
@@ -321,7 +327,7 @@ button {
     display: flex;
     justify-content: center;
     align-items: center;
-    box-shadow: 0 4px 15px rgba(255, 105, 180, 0.3);
+    box-shadow: 0 4px 15px rgba(90, 61, 70, 0.3);
     overflow: hidden;
     animation: floatLogo 4s ease-in-out infinite;
 }
@@ -411,7 +417,7 @@ button {
 .form-group input:focus,
 .form-group select:focus {
     border-color: var(--barbie-pink);
-    box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.2), var(--shadow-inset);
+    box-shadow: var(--shadow-focus), var(--shadow-inset);
     outline: none;
 }
 
@@ -461,7 +467,7 @@ input:focus::placeholder {
     background-color: white;
     transition: var(--transition);
     border-radius: 50%;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 5px rgba(90, 61, 70, 0.2);
 }
 
 .switch-toggle input:checked + .slider {
@@ -487,23 +493,29 @@ input:focus::placeholder {
    ========================================================================= */
 
 .btn {
+    min-width: 44px;
+    min-height: 44px;
     font-family: 'Comfortaa', sans-serif;
     font-weight: 700;
     padding: 12px 24px;
+    border: 2px solid transparent;
     border-radius: var(--radius-md);
-    transition: var(--transition);
+    box-sizing: border-box;
+    transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
     text-align: center;
     font-size: 15px;
     display: inline-flex;
     justify-content: center;
     align-items: center;
     gap: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    box-shadow: none;
+    -webkit-tap-highlight-color: transparent;
+    text-decoration: none;
 }
 
 .btn:hover:not(:disabled) {
-    filter: brightness(0.98);
-    transform: translateY(-1px);
+    transform: none;
+    filter: none;
 }
 
 .btn:focus-visible,
@@ -525,25 +537,39 @@ button:disabled {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--barbie-pink) 0%, var(--barbie-dark) 100%);
+    background: var(--barbie-pink);
     color: var(--white);
-    box-shadow: 0 5px 15px rgba(255, 20, 147, 0.3);
+    border-color: var(--barbie-pink);
 }
 
-.btn-primary:active {
-    transform: scale(0.96);
-    box-shadow: 0 2px 6px rgba(255, 20, 147, 0.2);
+.btn-primary:hover:not(:disabled),
+.btn-primary:active:not(:disabled) {
+    background: var(--white);
+    color: var(--barbie-dark);
+    border-color: var(--barbie-pink);
+    box-shadow: none;
 }
 
 .btn-secondary {
     background: var(--white);
-    border: 2px solid var(--barbie-light);
+    border-color: var(--barbie-pink);
     color: var(--barbie-dark);
 }
 
-.btn-secondary:active {
-    background: var(--barbie-pale);
-    transform: scale(0.96);
+.btn-secondary:hover:not(:disabled),
+.btn-secondary:active:not(:disabled) {
+    background: var(--barbie-pink);
+    border-color: var(--barbie-pink);
+    color: var(--white);
+    box-shadow: none;
+}
+
+/* Escala compacta unificada (encabezados y acciones dentro de paneles). */
+.btn-sm {
+    min-width: 0;
+    min-height: 38px;
+    padding: 8px 16px;
+    font-size: 13px;
 }
 
 .btn-block {
@@ -557,17 +583,6 @@ button:disabled {
     padding: 8px 12px;
     white-space: nowrap;
     font-size: 12px;
-}
-
-.btn-sparkle::before {
-    content: "✨";
-    margin-right: 4px;
-}
-
-.login-footer {
-    margin-top: 25px;
-    font-size: 11px;
-    color: var(--text-muted);
 }
 
 .app-footer {
@@ -605,18 +620,6 @@ button:disabled {
     text-align: center;
 }
 
-.route-not-found-icon {
-    display: grid;
-    width: 96px;
-    height: 96px;
-    place-items: center;
-    border: 2px dashed var(--barbie-light);
-    border-radius: 50%;
-    color: var(--barbie-pink);
-    background: var(--barbie-pale);
-    font-size: 36px;
-}
-
 .route-not-found-eyebrow {
     margin: 0;
     color: var(--barbie-pink);
@@ -641,15 +644,6 @@ button:disabled {
     max-width: 380px;
     color: var(--text-muted);
     font-size: 14px;
-}
-
-.demo-tag {
-    margin-top: 15px;
-    color: var(--barbie-dark);
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: underline;
-    display: inline-block;
 }
 
 /* =========================================================================
@@ -678,7 +672,8 @@ button:disabled {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 4px 12px rgba(255, 105, 180, 0.05);
+    gap: 12px;
+    box-shadow: 0 4px 12px rgba(90, 61, 70, 0.05);
     z-index: 50;
 }
 
@@ -686,6 +681,14 @@ button:disabled {
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
+    flex: 1;
+}
+
+.header-business-block {
+    display: flex;
+    align-items: center;
+    min-width: 0;
 }
 
 .mini-logo {
@@ -714,44 +717,26 @@ button:disabled {
     }
 }
 
-.welcome-text {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-muted);
-    font-weight: 600;
-}
-
 .user-name {
+    margin: 0;
     font-size: 18px;
     color: var(--barbie-dark);
     line-height: 1.1;
-}
-
-.btn-logout {
-    color: var(--text-muted);
-    padding: 6px;
-    border-radius: var(--radius-sm);
-    transition: var(--transition);
-}
-
-.btn-logout:active {
-    color: var(--barbie-dark);
-    background-color: var(--barbie-pale);
+    display: flex;
+    align-items: center;
 }
 
 /* Contenido Scrollable */
 .app-content {
     flex: 1;
     overflow-y: auto;
-    padding: 20px 20px 90px 20px;
-    /* Margen inferior extra para que no tape el menu */
+    padding: 16px clamp(14px, 2vw, 24px) 90px;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    scrollbar-width: thin;
 }
 
 .app-content::-webkit-scrollbar {
-    display: none;
+    width: 8px;
 }
 
 /* Ocultar / Mostrar pestañas */
@@ -762,6 +747,16 @@ button:disabled {
 
 .tab-pane.active {
     display: block;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* Animación de entrada unificada para las secciones/sub-vistas/modales que no
+   usan .tab-pane: mismo slide vertical suave (fadeInTab) que ya tienen las
+   pestañas activas, reutilizando la misma curva y duración. */
+.view-enter {
+    animation: fadeInTab 0.3s ease forwards;
 }
 
 @keyframes fadeInTab {
@@ -777,14 +772,17 @@ button:disabled {
 }
 
 .section-title {
-    margin-bottom: 20px;
+    margin-bottom: 16px;
+    padding: 0;
 }
 
 .section-title h3 {
-    font-size: 22px;
+    margin: 0;
+    font-size: clamp(20px, 2vw, 24px);
 }
 
 .section-title p {
+    margin: 4px 0 0;
     font-size: 13px;
     color: var(--text-muted);
 }
@@ -796,9 +794,43 @@ button:disabled {
     gap: 10px;
 }
 
+/* Cabecera con "Volver" a la izquierda: patrón unificado en todas las pantallas
+   con navegación hacia atrás (Historial, Precios, Registrar, Mi cuenta y las
+   fichas). El botón va primero en el DOM, el título (y subtítulo) sigue creciendo
+   a su derecha sin estorbar, y las acciones restantes, si las hay, quedan al fondo
+   de la fila. Si no cabe todo en el ancho disponible, wrap: el título pasa a la
+   segunda fila y en mobile (≤520px) se alinea arriba (flex-start). */
+.section-title-with-back {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+}
+
+.section-title-with-back .btn-back {
+    flex: 0 0 auto;
+}
+
+.section-title-with-back .section-title-text {
+    flex: 1 1 220px;
+    min-width: 0;
+}
+
+.section-title-with-back .account-header-actions,
+.section-title-with-back .detail-window-actions {
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+.section-title-with-action > .btn,
+.catalog-list-header > .btn,
+.catalog-services-header > .btn {
+    margin-left: auto;
+}
+
 .card-meta-icon {
     margin-right: 3px;
-    color: var(--barbie-pink);
+    color: var(--barbie-dark);
 }
 
 .history-card-price {
@@ -807,8 +839,85 @@ button:disabled {
 }
 
 @media (max-width: 520px) {
-    .section-title-with-action {
+    .section-title-with-action,
+    .section-title-with-back {
         align-items: flex-start;
+    }
+
+    .btn {
+        min-height: 48px;
+        padding: 10px 14px;
+        font-size: 14px;
+    }
+
+    .btn-sm {
+        min-height: 44px;
+        padding: 8px 12px;
+    }
+
+    .btn-back,
+    .calendar-header-button,
+    .account-edit-action,
+    .account-small-action {
+        min-height: 44px;
+    }
+
+    .btn-cat {
+        min-height: 44px;
+        padding: 9px 14px;
+    }
+
+    .btn-service {
+        min-height: 48px;
+        padding: 10px 8px;
+    }
+
+    .filter-toggle-btn,
+.card-icon-btn,
+.btn-cal-nav,
+.header-action-btn {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0;
+    }
+
+    .filter-toggle-btn,
+.calendar-add-btn,
+.header-action-btn {
+        border-radius: 50%;
+    }
+
+    .calendar-add-btn {
+        width: 50px;
+        height: 50px;
+        min-width: 50px;
+        min-height: 50px;
+        font-size: 20px;
+    }
+
+    .app-nav {
+        height: 68px;
+        border-radius: 28px;
+    }
+
+    .nav-item {
+        min-height: 48px;
+    }
+
+    .nav-text {
+        font-size: 9px;
+    }
+
+    .account-menu-item {
+        min-height: 44px;
+        padding-block: 10px;
+    }
+
+    .detail-form-actions .btn,
+.account-form-actions .btn {
+        min-height: 48px;
     }
 }
 
@@ -841,14 +950,21 @@ button:disabled {
     background: var(--white);
     color: var(--text-color);
     border: 2px solid var(--barbie-light);
-    transition: var(--transition);
+    box-sizing: border-box;
+    transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.btn-cat:hover:not(.active) {
+    background: var(--barbie-pink);
+    color: var(--white);
+    border-color: var(--barbie-pink);
 }
 
 .btn-cat.active {
     background: var(--barbie-pink);
     color: var(--white);
     border-color: var(--barbie-pink);
-    box-shadow: 0 4px 10px rgba(255, 105, 180, 0.3);
+    box-shadow: 0 4px 10px rgba(90, 61, 70, 0.3);
 }
 
 /* Grid de Subservicios (Botones Internos) */
@@ -868,7 +984,8 @@ button:disabled {
     font-size: 13px;
     font-weight: 600;
     color: var(--text-color);
-    transition: var(--transition);
+    box-sizing: border-box;
+    transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -885,102 +1002,26 @@ button:disabled {
 }
 
 .btn-service.active {
-    background: var(--barbie-pale);
+    background: var(--barbie-pink);
+    border-color: var(--barbie-pink);
+    color: var(--white);
+    box-shadow: none;
+}
+
+.btn-service.active .price-tag {
+    color: var(--white);
+}
+
+.btn-service:hover:not(.active) {
+    background: var(--white);
     border-color: var(--barbie-pink);
     color: var(--barbie-dark);
-    transform: scale(1.02);
-    box-shadow: 0 4px 12px rgba(255, 105, 180, 0.15);
+    box-shadow: none;
 }
 
 /* Gestión de Seña Box */
-.deposit-box {
-    background: var(--white);
-    border: 2px solid var(--barbie-light);
-    border-radius: var(--radius-md);
-    padding: 14px;
-    margin-bottom: 18px;
-    box-shadow: var(--shadow-inset);
-}
-
-.deposit-header {
-    display: flex;
-    align-items: center;
-}
-
-.deposit-fields {
-    margin-top: 14px;
-    padding-top: 14px;
-    border-top: 1px dashed var(--barbie-light);
-}
-
-.deposit-fields.hidden {
-    display: none;
-}
 
 /* Checkbox Personalizado Y2K */
-.checkbox-container {
-    display: block;
-    position: relative;
-    padding-left: 32px;
-    margin-bottom: 0px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-color);
-    user-select: none;
-    min-height: 22px;
-    display: inline-flex;
-    align-items: center;
-}
-
-.checkbox-container input {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
-}
-
-.checkmark {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 22px;
-    width: 22px;
-    background-color: var(--white);
-    border: 2px solid var(--barbie-light);
-    border-radius: 6px;
-    transition: var(--transition);
-}
-
-.checkbox-container:hover input~.checkmark {
-    border-color: var(--barbie-pink);
-}
-
-.checkbox-container input:checked~.checkmark {
-    background-color: var(--barbie-pink);
-    border-color: var(--barbie-pink);
-}
-
-.checkmark:after {
-    content: "";
-    position: absolute;
-    display: none;
-}
-
-.checkbox-container input:checked~.checkmark:after {
-    display: block;
-}
-
-.checkbox-container .checkmark:after {
-    left: 7px;
-    top: 3px;
-    width: 5px;
-    height: 10px;
-    border: solid white;
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-}
 
 /* Selector de Método de Pago */
 .payment-method-selector {
@@ -1028,25 +1069,19 @@ button:disabled {
    HISTORIAL TAB
    ========================================================================= */
 
-.section-title-action {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 20px;
-}
-
 .filters-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 8px;
+    margin: 0 0 4px;
 }
 
 .search-input {
     flex: 1;
+    min-height: 42px;
     background: var(--white);
-    border: 2px solid var(--barbie-light);
-    border-radius: var(--radius-md);
+    border: 1px solid var(--barbie-light);
+    border-radius: var(--radius-sm);
     padding: 10px 14px;
     color: var(--text-color);
     font-weight: 500;
@@ -1070,7 +1105,7 @@ button:disabled {
     border-radius: 50%;
     color: var(--white);
     background: linear-gradient(135deg, var(--barbie-pink), var(--barbie-dark));
-    box-shadow: 0 4px 10px rgba(255, 20, 147, .24);
+    box-shadow: 0 4px 10px rgba(90, 61, 70, .24);
 }
 
 .filter-button-panel {
@@ -1100,20 +1135,104 @@ button:disabled {
     margin: 0;
 }
 
-#tab-historial .search-box-container {
-    flex: 1 1 220px;
+/* Estado de carga unificado de los listados: mismo recuadro punteado que el
+   estado vacío, con el corazón latiendo (marca de la app) sobre el texto. */
+
+/* =========================================================================
+   Skeleton de carga de listados: imita la card (avatar + líneas + acciones)
+   con un brillo que barre de izquierda a derecha. Reutiliza .unified-card.
+   ========================================================================= */
+.skeleton-list {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 12px;
 }
 
-#tab-historial .filter-button-panel {
-    flex-basis: 100%;
-    order: 5;
+.skeleton-card {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 12px;
 }
 
+.skeleton-avatar,
+.skeleton-line,
+.skeleton-action {
+    background: linear-gradient(
+        90deg,
+        var(--barbie-pale) 25%,
+        var(--barbie-light) 37%,
+        var(--barbie-pale) 63%
+    );
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+    border-radius: var(--radius-sm);
+}
+
+.skeleton-avatar {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 42px;
+    border-radius: 50%;
+}
+
+.skeleton-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.skeleton-line {
+    height: 13px;
+    width: 100%;
+    max-width: 260px;
+}
+
+.skeleton-line--short {
+    width: 55%;
+    max-width: 160px;
+}
+
+.skeleton-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.skeleton-action {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+}
+
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0 50%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton-avatar,
+    .skeleton-line,
+    .skeleton-action {
+        animation: none;
+    }
+}
+
+#tab-historial .search-box-container,
 #tab-clientes .search-box-container,
 #tab-gastos .search-box-container {
     flex: 1 1 220px;
 }
 
+#tab-historial .filter-button-panel,
 #tab-clientes .filter-button-panel,
 #tab-gastos .filter-button-panel {
     flex-basis: 100%;
@@ -1173,18 +1292,11 @@ button:disabled {
     color: var(--barbie-dark);
 }
 
-/* Lista de Tarjetas del Historial */
-.history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
 .list-scroll {
     min-height: 0;
-    max-height: min(52vh, 520px);
+    max-height: none;
     overflow-y: auto;
-    padding-right: 8px;
+    padding-right: 6px;
     scrollbar-color: var(--barbie-pink) var(--barbie-pale);
     scrollbar-width: thin;
     -webkit-overflow-scrolling: touch;
@@ -1205,13 +1317,6 @@ button:disabled {
     border-radius: 8px;
 }
 
-.prices-editor-container.list-scroll {
-   max-height: min(68vh, 680px);
-    padding: 4px 8px 4px 0;
-}
-
-
-
 .history-card {
     background: var(--white);
     border-radius: var(--radius-sm);
@@ -1220,7 +1325,7 @@ button:disabled {
     box-shadow: none;
     position: relative;
     display: grid;
-    grid-template-columns: 1fr 90px 40px; /* texto | precio | icono borrar */
+    grid-template-columns: auto minmax(0, 1fr) auto auto; /* avatar | texto | precio | acciones */
     align-items: center;
     gap: 10px;
     transition: var(--transition);
@@ -1317,52 +1422,152 @@ button:disabled {
 
 
 
-.card-actions-col {
+/* Contenedores de acciones de tarjeta — misma disposición en todos los listados.
+   Alineadas a la DERECHA: es la posición convenida para las acciones de tarjeta
+   en toda la app, y así el bloque de botones queda en el mismo eje en Clientes,
+   Turnos, Ventas, Cajas, Precios, Usuarios y Deudores. */
+.card-actions-col,
+.client-actions-col,
+.user-card-actions,
+.appointment-actions-col,
+.calendar-appointment-actions {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
+    gap: 6px;
 }
 
 
-.btn-delete-card,
-.btn-view-detail {
+/* Acciones de icono dentro de tarjetas — familia unificada en todos los listados */
+.card-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 30px;
     height: 30px;
     padding: 0;
+    border: 1px solid var(--barbie-pale);
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: var(--transition);
-    background: none;
-}
-
-.btn-view-detail {
-    color: var(--barbie-pink);
-}
-
-.btn-view-detail:active {
-    color: var(--barbie-dark);
-    background-color: var(--barbie-pale);
-}
-
-.btn-delete-card {
+    background: var(--white);
     color: var(--text-light);
+    font-size: 13px;
+    cursor: pointer;
+    transition: var(--transition);
+    text-decoration: none;
 }
 
-.btn-delete-card:active {
-    color: #FF4D4D;
-    background-color: #FFF0F0;
+.card-icon-btn:hover,
+.card-icon-btn:active {
+    background: var(--barbie-pink);
+    border-color: var(--barbie-pink);
+    color: var(--white);
 }
+
+.card-icon-btn--primary {
+    color: var(--barbie-pink);
+    border-color: var(--barbie-pink);
+}
+
+.card-icon-btn--danger {
+    color: #c92f46;
+    border-color: #f0b4bd;
+}
+
+.card-icon-btn--danger:hover,
+.card-icon-btn--danger:active {
+    background: #c92f46;
+    border-color: #c92f46;
+    color: var(--white);
+}
+
+.card-icon-btn--warning {
+    color: #e65100;
+    border-color: #ffd8a8;
+}
+
+.card-icon-btn--warning:hover,
+.card-icon-btn--warning:active {
+    background: #e65100;
+    border-color: #e65100;
+    color: var(--white);
+}
+
+.card-icon-btn--info {
+    color: #0d47a1;
+    border-color: #bbdefb;
+}
+
+.card-icon-btn--info:hover,
+.card-icon-btn--info:active {
+    background: #0d47a1;
+    border-color: #0d47a1;
+    color: var(--white);
+}
+
+.card-icon-btn--success {
+    color: #2e7d32;
+    border-color: #c8e6c9;
+}
+
+.card-icon-btn--success:hover,
+.card-icon-btn--success:active {
+    background: #2e7d32;
+    border-color: #2e7d32;
+    color: var(--white);
+}
+
+/* Botón de tarjeta con etiqueta: icono + texto en desktop; solo icono en
+   mobile (el label se oculta por .mobile-icon-only en el media query y el
+   botón colapsa a 44px cuadrados). Patrón unificado para todos los listados. */
+.list-icon-btn {
+    width: auto;
+    min-width: 0;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: var(--radius-sm);
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.list-icon-btn .mobile-action-label {
+    color: inherit;
+    font-weight: 600;
+}
+
+/* Variante con los colores de WhatsApp para los iconos de lista. */
+.card-icon-btn--whatsapp {
+    color: #128c7e;
+    border-color: #b7e4c7;
+}
+
+.card-icon-btn--whatsapp:hover,
+.card-icon-btn--whatsapp:active {
+    background: #25d366;
+    border-color: #25d366;
+    color: var(--white);
+}
+
+/* Acciones deshabilitadas por la matriz de turnos (ej. "Cobrar" antes de la
+   hora, o "Sincronizar" en curso). Debe ir al final para ganarle al :hover. */
+.card-icon-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: var(--white);
+    border-color: var(--barbie-pale);
+    color: var(--text-light);
+    transform: none;
+}
+
 /* =========================================================================
    ESTADÍSTICAS TAB
    ========================================================================= */
 
 .stats-cards-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
     margin-bottom: 25px;
 }
@@ -1375,27 +1580,13 @@ button:disabled {
     display: flex;
     align-items: center;
     gap: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 4px 10px rgba(90, 61, 70, 0.02);
 }
 
 .stat-card.pink-glow {
     border-color: var(--barbie-light);
     background: linear-gradient(135deg, var(--white) 70%, var(--barbie-pale) 100%);
-    box-shadow: 0 6px 15px rgba(255, 105, 180, 0.1);
-}
-
-.stat-card.red-glow {
-    border-color: #ffcccc;
-    background: linear-gradient(135deg, var(--white) 70%, #fff0f0 100%);
-    box-shadow: 0 6px 15px rgba(255, 77, 77, 0.1);
-}
-
-.stat-card.red-glow .stat-info h2 {
-    color: #ff4d4d !important;
-}
-
-.stat-card.warning-glow {
-    border-color: #FFE4B5;
+    box-shadow: 0 6px 15px rgba(90, 61, 70, 0.1);
 }
 
 .stat-icon {
@@ -1422,17 +1613,13 @@ button:disabled {
     color: var(--barbie-dark);
 }
 
-.text-warning {
-    color: #D27D2D !important;
-}
-
 .chart-section {
     background: var(--white);
     border-radius: var(--radius-lg);
     border: 2px solid var(--barbie-pale);
     padding: 18px;
     margin-bottom: 20px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 4px 12px rgba(90, 61, 70, 0.02);
 }
 
 .chart-section h4 {
@@ -1444,6 +1631,12 @@ button:disabled {
 }
 
 /* Estadísticas de Métodos de Pago (Barras) */
+.stats-distribution-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
 .payment-stats-container {
     display: flex;
     flex-direction: column;
@@ -1490,34 +1683,6 @@ button:disabled {
 }
 
 /* Servicios Populares List */
-.popular-services-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.pop-service-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    background-color: var(--barbie-pale);
-    border-radius: var(--radius-sm);
-    font-size: 13px;
-    font-weight: 600;
-}
-
-.pop-service-name {
-    color: var(--text-color);
-}
-
-.pop-service-count {
-    background-color: var(--barbie-pink);
-    color: var(--white);
-    padding: 2px 8px;
-    border-radius: 20px;
-    font-size: 11px;
-}
 
 /* Info Boxes en Ajustes */
 .card-info-box {
@@ -1537,12 +1702,6 @@ button:disabled {
     font-size: 12px;
     color: var(--text-muted);
     line-height: 1.4;
-}
-
-.input-help {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 4px;
 }
 
 .text-muted {
@@ -1567,7 +1726,7 @@ button:disabled {
     display: flex;
     justify-content: space-around;
     align-items: center;
-    box-shadow: 0 10px 30px rgba(255, 105, 180, 0.15);
+    box-shadow: 0 10px 30px rgba(90, 61, 70, 0.15);
     z-index: 1000;
 }
 
@@ -1578,10 +1737,21 @@ button:disabled {
     justify-content: center;
     gap: 3px;
     color: var(--text-muted);
-    transition: var(--transition);
-    flex: 1;
-    height: 100%;
-    min-width: 0;
+    transition: transform 160ms ease, color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+    flex: 0 0 auto;
+    height: auto;
+    min-width: 44px;
+    min-height: 44px;
+    padding-inline: 2px;
+    border-radius: 12px;
+}
+
+.nav-item:hover,
+.nav-item:focus-visible {
+    color: var(--barbie-dark);
+    background: rgba(255, 105, 180, 0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(90, 61, 70, 0.12);
 }
 
 .nav-icon {
@@ -1613,6 +1783,105 @@ button:disabled {
    VENTANA MODAL DE CONFIRMACIÓN (GLASSMORPHISM)
    ========================================================================= */
 
+/* Ventana de ficha (ficha cliente / ficha usuario): reutiliza la estética de la
+   tarjeta de modal pero vive en el flujo del panel —sin backdrop ni bloqueo de
+   scroll— para que los toasts se vean siempre. Cabecera con el patrón unificado
+   .section-title-with-back (Volver a la izquierda) y botones .panel-header-action. */
+.detail-window {
+    background: var(--glass-bg);
+    border: 2px solid var(--border-neutral);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: 0 20px 40px rgba(90, 61, 70, 0.2);
+    display: grid;
+    gap: 18px;
+    scroll-margin-top: 24px;
+}
+
+.detail-window-header {
+    margin: 0;
+}
+
+.detail-window-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Acciones de la cabecera de la ficha (solo Volver, ahora que Editar y el
+   resto viven en el pie): mismo tamaño que los botones unificados de cabecera
+   de panel (.panel-header-action). */
+.detail-window-actions .btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 9px 12px;
+    white-space: nowrap;
+}
+
+.detail-window-actions .mobile-action-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: inherit;
+}
+
+.detail-window-body {
+    display: grid;
+    gap: 18px;
+}
+
+/* Acciones de la ventana al fondo, después de las secciones (Editar,
+   Compartir comprobante, Cobrar…), igual en todas las fichas: alineadas a la
+   derecha, con los labels largos sin estirarse ni cortarse. */
+.detail-window-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px 12px;
+}
+
+.detail-window-footer .btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 9px 12px;
+    white-space: nowrap;
+}
+
+.detail-window-footer .mobile-action-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: inherit;
+}
+
+/* Clase reutilizable para botones del pie de ficha (.detail-window-footer o
+   .modal-actions de la ficha): en mobile ocupa toda la fila (una acción por
+   fila, con su label visible) y en desktop vuelve a su ancho contenido.
+   Ej.: Compartir comprobante en la ficha de turno/venta. */
+@media (max-width: 560px) {
+    .detail-window-footer .detail-btn-full-mobile,
+    .detail-modal-card .modal-actions .detail-btn-full-mobile {
+        flex: 1 0 100%;
+        justify-content: center;
+    }
+}
+
+/* El historial de turnos fluye dentro de la ventana (la página hace scroll). */
+.detail-window .client-history-list {
+    max-height: none;
+    overflow-y: visible;
+}
+
+@media (max-width: 560px) {
+    .detail-window {
+        padding: 16px;
+    }
+}
+
 .modal-overlay {
     position: fixed !important;
     inset: 0;
@@ -1639,25 +1908,41 @@ button:disabled {
 
 .modal-card {
     background: var(--glass-bg);
-    border: 2px solid var(--barbie-pink);
+    border: 2px solid var(--border-neutral);
     border-radius: var(--radius-lg);
     width: 90%;
     max-width: 380px;
     padding: 24px;
-    box-shadow: 0 20px 40px rgba(255, 20, 147, 0.2);
-    animation: modalPopIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    box-shadow: 0 20px 40px rgba(90, 61, 70, 0.2);
+    animation: fadeInTab 0.3s ease forwards;
 }
 
-@keyframes modalPopIn {
-    from {
-        transform: scale(0.9);
-        opacity: 0;
-    }
+.modal-card--with-close {
+    position: relative;
+}
 
-    to {
-        transform: scale(1);
-        opacity: 1;
-    }
+.modal-close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--barbie-pale);
+    border-radius: 50%;
+    color: var(--text-muted);
+    background: var(--white);
+    cursor: pointer;
+}
+
+.modal-close-button:hover,
+.modal-close-button:focus-visible {
+    border-color: var(--barbie-pink);
+    color: var(--barbie-dark);
+    outline: 2px solid rgba(255, 105, 180, 0.2);
+    outline-offset: 1px;
 }
 
 .modal-card h3 {
@@ -1721,7 +2006,10 @@ button:disabled {
     line-height: 1.4;
 }
 
-.confirm-item {
+/* Fila etiqueta→valor: misma presentación en los modales de confirmación
+   (.confirm-*) y en las secciones de las fichas (.detail-*). */
+.confirm-item,
+.detail-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1729,24 +2017,33 @@ button:disabled {
     font-size: 14px;
 }
 
-.confirm-item:not(:last-child) {
+.confirm-item:not(:last-child),
+.detail-row:not(:last-child) {
     border-bottom: 1px dashed var(--barbie-pale);
 }
 
-.confirm-label {
+.confirm-label,
+.detail-row-label {
     color: var(--text-muted);
     font-weight: 500;
 }
 
-.confirm-item strong {
+.confirm-item strong,
+.detail-row strong {
     color: var(--text-color);
     font-weight: 700;
 }
 
 .modal-actions {
-    display: grid;
-    grid-template-columns: 1fr 1.2fr;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 12px;
+}
+
+.modal-actions .btn {
+    flex: 1 1 0;
+    min-width: 120px;
 }
 
 .confirm-message {
@@ -1778,40 +2075,22 @@ button:disabled {
     padding-left: 40px !important;
 }
 
-.client-phone-value {
-    display: inline-flex;
+/* Campo de teléfono de la ficha de cliente: input + botón de WhatsApp en fila. */
+.client-phone-input-row {
+    display: flex;
     align-items: center;
-    gap: 4px;
-    margin-right: 10px;
+    gap: 8px;
 }
 
-.whatsapp-link {
-    display: inline-grid;
-    width: 26px;
-    height: 26px;
-    place-items: center;
-    border-radius: 50%;
-    color: #128c7e;
-    font-size: 16px;
-    transition: var(--transition);
+.client-phone-input-row .input-wrapper {
+    flex: 1;
+    min-width: 0;
 }
 
-.whatsapp-link:hover {
-    background: #e4f8f1;
-    color: #075e54;
-    transform: translateY(-1px);
-}
-
-/* Respuesta de Toque Táctil (Haptic Vibe) */
-.btn:active,
-.btn-cat:active,
-.btn-service:active,
-.pay-btn-content:active,
-.btn-logout:active,
-.btn-delete-card:active {
-    transform: scale(0.96) !important;
-    filter: brightness(0.95);
-    transition: transform 0.1s ease !important;
+/* Interacción estática: los botones nunca cambian de posición o dimensiones. */
+button:hover,
+button:active {
+    transform: none !important;
 }
 
 /* Estilo para los spinner de FontAwesome */
@@ -1823,82 +2102,129 @@ button:disabled {
 
 /* Botón de peligro (Eliminar) */
 .btn-danger {
-    background: var(--color-danger);
+    background: #dc3f55;
     color: #fff !important;
-    border: 2px solid rgba(255, 77, 77, 0.25);
-    box-shadow: 0 4px 15px rgba(255, 77, 77, 0.2);
+    border: 2px solid #dc3f55;
+    box-shadow: none;
 }
 
 .btn-danger:hover {
-    background: var(--color-danger-dark);
-    box-shadow: 0 6px 20px rgba(255, 77, 77, 0.4);
-    transform: translateY(-2px);
+    background: var(--white);
+    color: #b92d43 !important;
+    border-color: #dc3f55;
+    box-shadow: none;
 }
 
 .btn-danger:active {
-    transform: scale(0.96) !important;
+    background: #fff4f5;
+    color: #b92d43 !important;
+    border-color: #dc3f55;
 }
 
 /* =========================================================================
    CRÉDITOS DE DESARROLLO
    ========================================================================= */
 
-.credits-footer {
-    text-align: center;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--text-muted);
-    opacity: 0.8;
-    margin-top: 15px;
-    padding: 10px 0;
-    font-family: 'Outfit', sans-serif;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-}
-
-.credits-footer i {
-    color: var(--barbie-pink);
-    animation: heartBeat 1.5s infinite;
-    display: inline-block;
-}
-
-.credits-footer.app-credits {
-    margin-top: 30px;
-    margin-bottom: 80px;
-    /* Evita colisión con el menú flotante */
-    border-top: 1px dashed var(--barbie-pale);
-    width: 100%;
-}
-
 /* =========================================================================
    EDITOR DE PRECIOS (ADMIN)
    ========================================================================= */
 
-.prices-editor-container {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
 .price-category-group {
-    background: var(--white);
-    border: 2px solid var(--barbie-pale);
-    border-radius: var(--radius-md);
     padding: 16px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
 }
 
-.price-category-title {
-    font-family: 'Comfortaa', sans-serif;
-    font-size: 14px;
+.catalog-service-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.catalog-management-form {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 14px;
+    border: 1px solid var(--barbie-pale);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    box-shadow: 0 2px 8px rgba(90, 61, 70, 0.02);
+}
+
+.catalog-management-form label {
+    color: var(--text-color);
+    font-size: 13px;
     font-weight: 700;
-    color: var(--barbie-dark);
-    margin-bottom: 12px;
-    border-bottom: 2px dashed var(--barbie-pale);
-    padding-bottom: 6px;
-    text-transform: capitalize;
+}
+
+.catalog-management-form input,
+.catalog-management-form .price-input-wrapper input,
+.catalog-name-row input,
+.catalog-category-form-row input,
+.price-item-row .price-input-wrapper input {
+    min-width: 0;
+    width: 100%;
+    height: 42px;
+    padding: 8px 12px;
+    border: 1px solid var(--barbie-light);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    color: var(--text-color);
+    font: inherit;
+    font-size: 14px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.catalog-management-form input:focus,
+.catalog-management-form .price-input-wrapper input:focus,
+.catalog-name-row input:focus,
+.catalog-category-form-row input:focus,
+.price-item-row .price-input-wrapper input:focus {
+    outline: none;
+    border-color: var(--barbie-pink);
+    box-shadow: var(--shadow-focus);
+}
+
+.catalog-service-label {
+    min-width: 0;
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+.catalog-service-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.catalog-status-label {
+    width: max-content;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.catalog-empty-note {
+    margin: 8px 0 14px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.catalog-item-inactive {
+    color: var(--text-muted);
+}
+
+.price-item-row.catalog-item-inactive .price-item-name {
+    color: var(--text-muted);
+    text-decoration: line-through;
 }
 
 .price-item-row {
@@ -1907,6 +2233,191 @@ button:disabled {
     justify-content: space-between;
     gap: 15px;
     padding: 8px 0;
+}
+
+.prices-list-readonly {
+    /* Hereda disposición de .unified-list */
+}
+
+.prices-category-list {
+    grid-template-columns: minmax(0, 1fr);
+    flex: 1;
+    min-height: 0;
+}
+
+.catalog-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.prices-category-detail {
+    display: grid;
+    flex: 1;
+    min-height: 0;
+    gap: 16px;
+}
+
+.prices-category-detail .section-title {
+    margin-bottom: 0;
+}
+
+.prices-category-detail .catalog-category-form {
+    margin-bottom: 0;
+}
+
+.catalog-category-form {
+    margin-bottom: 12px;
+    padding: 0;
+}
+
+.catalog-category-form-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.catalog-category-form-row .btn,
+.catalog-services-header .btn {
+    min-height: 42px;
+    min-width: 0;
+}
+
+.catalog-services-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.catalog-services-list {
+    display: grid;
+    gap: 4px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0;
+    /* Reserva el gutter de la barra SOLO a la derecha (donde vive el scroll),
+       así el borde izquierdo del contenido queda alineado con el título y no
+       aparece el gutter artificial de la izquierda que "metía" la lista. */
+    scrollbar-gutter: stable;
+}
+
+.catalog-service-form-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 120px;
+    gap: 10px;
+}
+
+.catalog-name-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px;
+}
+
+.catalog-service-form-grid input,
+.catalog-category-form-row input {
+    min-width: 0;
+}
+
+.catalog-category-form-row input {
+    flex: 1;
+}
+
+.catalog-category-form-row .btn {
+    flex: 0 0 auto;
+}
+
+/* El nombre arranca en solo lectura hasta pulsar "Editar": fondo grisáceo y
+   cursor normal para que se note que no se escribe directamente. */
+.catalog-category-form-row input[readonly] {
+    background: #faf7f8;
+    cursor: default;
+}
+
+/* En mobile el nombre se apila: input arriba y botón(es) abajo a todo el ancho,
+   sin el margen fantasma que dejaba la 3ª columna del grid. */
+@media (max-width: 560px) {
+    #tab-precios .catalog-category-form-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+@media (max-width: 560px) {
+
+    .prices-category-list {
+        grid-template-columns: 1fr;
+    }
+
+    #tab-precios .price-category-group {
+        padding: 12px;
+    }
+
+    #tab-precios .catalog-list-header,
+    #tab-precios .catalog-services-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    #tab-precios .catalog-service-form-grid,
+    #tab-precios .catalog-name-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #tab-precios .catalog-name-row {
+        width: 100%;
+    }
+
+    #tab-precios .catalog-category-form-row .btn,
+#tab-precios .catalog-name-row .btn,
+#tab-precios .catalog-service-form-grid .btn {
+        width: 100%;
+    }
+
+    #tab-precios .catalog-services-header .btn {
+        width: 100%;
+    }
+
+    #tab-clientes,
+    #tab-gastos,
+    #tab-precios {
+        min-height: calc(100vh - 220px);
+    }
+
+    #tab-precios .price-item-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+    }
+
+    #tab-precios .price-input-wrapper {
+        width: 92px;
+    }
+
+    #tab-precios .catalog-service-label {
+        overflow-wrap: anywhere;
+    }
+
+    #tab-precios .price-item-name {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    /* Listado solo lectura: las filas tienen 2 hijos (nombre + monto) y no hay
+       columna de acciones; la col extra de40px separaba el monto del borde.
+       Se repite #tab-precios para superar en especificidad a la regla anterior. */
+    #tab-precios .prices-list-readonly .price-item-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .prices-list-readonly .price-val-label {
+        justify-self: end;
+        text-align: right;
+    }
 }
 
 .price-item-row:not(:last-child) {
@@ -1935,47 +2446,27 @@ button:disabled {
     color: var(--text-muted);
 }
 
-.price-input-field {
-    width: 100%;
-    padding: 8px 8px 8px 20px;
-    border: 2px solid var(--barbie-light);
-    border-radius: var(--radius-sm);
-    font-family: 'Outfit', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-color);
-    background-color: var(--cream-bg);
+/* Precio en línea del detalle: deja ver el $ y alinea el número a la derecha. */
+.price-item-row .price-input-wrapper input {
+    padding-left: 24px;
     text-align: right;
-    transition: var(--transition);
 }
 
-.price-input-field:focus {
-    border-color: var(--barbie-pink);
-    background-color: var(--white);
-    outline: none;
-    box-shadow: 0 0 8px rgba(255, 105, 180, 0.2);
-}
-
-/* Ocultar flechas de tipo número */
-.price-input-field::-webkit-outer-spin-button,
-.price-input-field::-webkit-inner-spin-button {
+/* Inputs numéricos de la sección Precios sin flechitas. */
+#tab-precios input[type="number"]::-webkit-outer-spin-button,
+#tab-precios input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
 
-.price-input-field[type=number] {
+#tab-precios input[type="number"] {
     appearance: textfield;
     -moz-appearance: textfield;
 }
 
+/* Ocultar flechas de tipo número */
+
 /* Estilos para el refinamiento del editor de precios */
-.old-price-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-muted);
-    opacity: 0.75;
-    font-style: italic;
-}
 
 .price-val-label {
     font-family: 'Comfortaa', sans-serif;
@@ -1996,7 +2487,7 @@ button:disabled {
     border: 2px solid var(--barbie-pale);
     border-radius: var(--radius-md);
     padding: 18px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 4px 12px rgba(90, 61, 70, 0.02);
     margin-bottom: 25px;
     position: relative;
 }
@@ -2027,12 +2518,15 @@ button:disabled {
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    transition: var(--transition);
+    box-sizing: border-box;
+    transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
 }
 
-.btn-cal-nav:hover {
-    background: var(--barbie-light);
-    transform: scale(1.05);
+.btn-cal-nav:hover,
+.btn-cal-nav:active {
+    background: var(--white);
+    color: var(--barbie-dark);
+    border-color: var(--barbie-pink);
 }
 
 .calendar-weekdays {
@@ -2091,7 +2585,7 @@ button:disabled {
     background: var(--barbie-pink);
     color: var(--white);
     font-weight: 700;
-    box-shadow: 0 4px 8px rgba(255, 105, 180, 0.3);
+    box-shadow: 0 4px 8px rgba(90, 61, 70, 0.3);
 }
 
 .day-number {
@@ -2166,13 +2660,14 @@ button:disabled {
 }
 .appointment-card.provisional:hover {
     border-color: #9ca3af;
+    transform: none;
 }
 
 .appointment-card.reservado,
 .appointment-card.reserved {
     border: 2px solid #7dd3fc;
     background-color: #f0f9ff;
-    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
+    box-shadow: 0 2px 8px rgba(90, 61, 70, 0.08);
 }
 .appointment-card.reservado .appointment-time-start,
 .appointment-card.reserved .appointment-time-start {
@@ -2182,6 +2677,7 @@ button:disabled {
 .appointment-card.reservado:hover,
 .appointment-card.reserved:hover {
     border-color: #0284c7;
+    transform: none;
 }
 
 .appointment-card.completado,
@@ -2196,13 +2692,169 @@ button:disabled {
 .appointment-card.completado:hover,
 .appointment-card.completed:hover {
     border-color: #2e7d32;
+    transform: none;
 }
 
-/* Tarjetas de Turnos */
-.day-appointments-container {
+/* Turnos cancelados: apagados, sin borde de color, para que no compitan con
+   los activos. Antes caían en el modificador "reservado" por error. */
+.appointment-card.cancelado {
+    border: 2px dashed #e5e7eb;
+    background-color: #fafafa;
+    opacity: 0.75;
+}
+.appointment-card.cancelado .appointment-time-start {
+    color: #9ca3af;
+}
+.appointment-card.cancelado:hover {
+    border-color: #d1d5db;
+    transform: none;
+}
+
+.event-preview-pill.cancelado {
+    background-color: #f3f4f6;
+    color: #9ca3af;
+    border-left-color: #d1d5db;
+    text-decoration: line-through;
+}
+
+.status-tag.cancelado {
+    background-color: #F3F4F6;
+    color: #6B7280;
+}
+
+/* Ficha unificada de venta y turno (VentaDetalleModal), ambos formatos */
+.detail-modal-card {
+    max-width: 520px;
+}
+
+/* El atajo "Consultar" de la clienta vive junto a su nombre dentro de la fila
+   (no en la cabecera de la ficha): se alinea al texto y no rompe la fila. */
+.detail-row .client-ficha-shortcut {
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+/* La ficha de turno/venta en ventana (DetailWindow, as="window") no tiene
+   clases ni layouts propios: sus secciones y su pie fluyen en el cuerpo de la
+   ventana (.detail-window-body, una sola columna con gap uniforme) igual que
+   en la ficha de cliente y de usuario. */
+
+/* Los labels de las acciones son largos ("Descargar comprobante"): no se
+   estiran a media fila como en otros modales, toman su ancho y pasan a la
+   siguiente fila si no entran. */
+.detail-modal-card .modal-actions .btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* Sección de una ficha: título en mayúsculas y sus filas. El espacio entre
+   secciones lo da el contenedor: 16px dentro del modal (.modal-body) y el gap
+   uniforme del cuerpo de la ventana (.detail-window-body) en las ventanas. */
+.modal-body .detail-block {
+    margin-bottom: 16px;
+}
+
+.detail-block > h4 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--barbie-pink);
+}
+
+.detail-block--cancel > h4 {
+    color: #B4453C;
+}
+
+.detail-block--cancel .detail-row:last-child strong {
+    color: #8A3A32;
+}
+
+.detail-loading,
+.detail-empty {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.detail-empty {
+    font-style: italic;
+}
+
+/* Movimientos del turno: seña, cobro y ajustes en orden cronologico */
+.detail-payments {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
+}
+
+.detail-payments li {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+        "tipo monto metodo"
+        "tipo fecha fecha";
+    align-items: center;
+    gap: 2px 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--barbie-pale);
+    border-radius: 10px;
+    background: var(--white);
+    font-size: 13px;
+}
+
+.detail-payments li span {
+    grid-area: tipo;
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+.detail-payments li strong {
+    grid-area: monto;
+    text-align: right;
+    color: #1E824C;
+}
+
+.detail-payments li em {
+    grid-area: metodo;
+    font-style: normal;
+    text-align: right;
+    color: var(--text-muted);
+}
+
+.detail-payments li small {
+    grid-area: fecha;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+/* Aviso dentro del modal de cancelacion */
+.cancel-reason-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+    border-radius: 10px;
+    background: #FFF6E5;
+    border: 1px solid #F5D9A0;
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: #7A5A1E;
+}
+
+.cancel-reason-note i {
+    margin-top: 2px;
+    flex-shrink: 0;
+    color: #C9922B;
+}
+
+.cancel-reason-note strong {
+    font-weight: 700;
 }
 
 .no-appointments-placeholder {
@@ -2217,15 +2869,97 @@ button:disabled {
 
 .appointment-card {
     display: grid;
-     grid-template-columns: minmax(64px, auto) 1fr auto; /* hora | info | acciones */
+    grid-template-columns: minmax(64px, auto) 1fr auto; /* hora | info | acciones */
     align-items: center;
-    background: var(--white);
-    border: 2px solid var(--barbie-pale);
-    border-radius: var(--radius-sm);
-    padding: 12px;
     gap: 12px;
-    transition: var(--transition);
 }
+
+/* Turnos: hora | info | acciones en UNA sola fila, sin que las acciones roben
+   el ancho del nombre.
+
+   El bug original de la grilla base: la pista `auto` de acciones toma su
+   max-content, que con hasta seis pastillas de texto (Consultar, Confirmar,
+   Reagendar, Cobrar, Sincronizar, Eliminar) supera los 600px; en cambio la
+   pista `1fr` de info tiene como mínimo `auto` (≈ 0 con ellipsis) y colapsaba
+   contra ella, dejando el nombre ilegible.
+
+   La solución no es bajar las acciones a una segunda fila —eso sumaba
+   ~55px de alto por tarjeta (border-top + padding-top + row-gap ≈ 21px más
+   los botones) y entraban cuatro turnos por pantalla— sino pisar el piso de
+   la pista de info con minmax(150px, 1fr): ese mínimo no depende de las
+   acciones, la pista auto solo crece con el espacio libre que sobra y los
+   botones hacen wrap dentro de su columna. Tarjeta típica de ~70-105px en
+   vez de ~130-170px. (El piso es 160px para que los nombres de dos palabras
+   entren sin ellipsis.)
+
+   En mobile (≤520px) los botones son solo-icono de 44px y no caben "a un
+   lado" del nombre sin dejarlo en ~40px de ancho: la hora sube sobre el
+   nombre y las acciones quedan en la columna derecha acotadas a dos iconos
+   por fila (ver bloque móvil más abajo).
+
+   Es específica de turnos: Cajas reutiliza .appointment-card con el monto en
+   la tercera columna y no debe cambiar de layout. */
+.appointment-card--stacked {
+    grid-template-columns: minmax(64px, auto) minmax(160px, 1fr) auto; /* hora | info | acciones */
+    grid-template-areas: 'hora info acciones';
+    align-items: center;
+}
+
+.appointment-card--stacked > .appointment-time-col {
+    grid-area: hora;
+}
+
+.appointment-card--stacked > .appointment-info-col {
+    grid-area: info;
+    align-self: center;
+}
+
+.appointment-card--stacked > .appointment-actions-col {
+    grid-area: acciones;
+    justify-content: flex-end;
+}
+
+/* Mobile: los botones pasan a quedar A UN LADO del dato en vez de una segunda
+   fila. Con iconos de 44px, poner tres columnas dejaría el nombre en ~40px, así
+   que la hora sube sobre la clienta y la columna de acciones se acota a dos
+   iconos por fila (44 + 6 + 44 = 94px). */
+@media (max-width: 520px) {
+    .appointment-card.appointment-card--stacked {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            'hora acciones'
+            'info acciones';
+        column-gap: 8px;
+        row-gap: 2px;
+        align-items: start;
+        padding: 10px 12px;
+    }
+
+    .appointment-card--stacked > .appointment-time-col {
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: baseline;
+        gap: 6px;
+        padding-right: 0;
+        border-right: 0;
+    }
+
+    .appointment-card--stacked > .appointment-info-col {
+        align-self: start;
+        padding-left: 0;
+    }
+
+    .appointment-card--stacked > .appointment-actions-col {
+        max-width: 94px; /* dos iconos por fila; el wrap ocurre acá */
+        align-self: center;
+        row-gap: 4px;
+    }
+
+    #tab-calendario .day-appointments-container {
+        gap: 8px;
+    }
+}
+
 
 .pending-debtor-card {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -2236,8 +2970,7 @@ button:disabled {
 }
 
 .appointment-card:hover {
-    border-color: var(--barbie-light);
-    transform: translateY(-2px);
+    /* Hereda hover unificado */
 }
 
 .appointment-time-col {
@@ -2286,29 +3019,6 @@ button:disabled {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis
-}
-
-.appointment-actions-col {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding-left: 10px;
-}
-
-.btn-delete-appointment {
-    background: transparent;
-    border: none;
-    color: var(--text-light);
-    cursor: pointer;
-    font-size: 15px;
-    padding: 6px;
-    border-radius: 50%;
-    transition: var(--transition);
-}
-
-.btn-delete-appointment:hover {
-    color: #ff4d4d;
-    background: #fff0f0;
 }
 
 /* Posicionamiento del icono dentro de inputs con wrapper */
@@ -2361,22 +3071,26 @@ button:disabled {
     width: 42px;
     height: 42px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--barbie-pink) 0%, var(--barbie-dark) 100%);
+    background: var(--barbie-pink);
     color: var(--white);
-    border: none;
-    box-shadow: 0 4px 10px rgba(255, 20, 147, 0.3);
+    border: 2px solid var(--barbie-pink);
+    box-sizing: border-box;
+    box-shadow: none;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 18px;
     cursor: pointer;
     z-index: 10;
-    transition: var(--transition);
+    transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
 }
 
+.calendar-add-btn:hover,
 .calendar-add-btn:active {
-    transform: scale(0.9) !important;
-    box-shadow: 0 2px 5px rgba(255, 20, 147, 0.2);
+    background: var(--white);
+    color: var(--barbie-dark);
+    border-color: var(--barbie-pink);
+    box-shadow: none;
 }
 
 #tab-calendario {
@@ -2403,9 +3117,13 @@ button:disabled {
 }
 
 .avatar-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     gap: 5px;
     padding: 4px 6px 4px 4px;
     border: none;
+    height: 36px;
 }
 
 .header-avatar {
@@ -2458,13 +3176,22 @@ button:disabled {
 }
 
 @media (max-width: 520px) {
-    .avatar-menu-btn .fa-chevron-down { display: none; }
+    .avatar-menu-btn {
+        padding: 4px 8px 4px 6px;
+    }
+
+    .avatar-menu-btn .fa-chevron-down {
+        display: inline-block;
+        opacity: 0.8;
+    }
 }
 
 .header-actions {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 8px;
+    flex-shrink: 0;
 }
 
 .account-menu-wrapper {
@@ -2476,12 +3203,51 @@ button:disabled {
     top: calc(100% + 8px);
     right: 0;
     z-index: 100;
-    min-width: 170px;
-    padding: 6px;
+    min-width: 200px;
+    padding: 8px;
     border: 1px solid var(--barbie-light);
     border-radius: var(--radius-sm);
     background: var(--white);
     box-shadow: 0 12px 28px rgba(90, 61, 70, .18);
+}
+
+.account-menu-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px 12px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--barbie-pale);
+}
+
+.account-menu-avatar {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    color: var(--barbie-dark);
+    background: var(--barbie-pale);
+    font-size: 12px;
+}
+
+.account-menu-profile-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.3;
+}
+
+.account-menu-profile-text strong {
+    color: var(--text-color);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.account-menu-profile-text span {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
 }
 
 .account-menu-item {
@@ -2497,10 +3263,20 @@ button:disabled {
     text-align: left;
 }
 
+.account-menu-item--danger {
+    color: var(--color-danger);
+}
+
 .account-menu-item:hover,
 .account-menu-item:focus-visible {
     background: var(--barbie-pale);
     color: var(--barbie-dark);
+}
+
+.account-menu-item--danger:hover,
+.account-menu-item--danger:focus-visible {
+    background: #fff1f1;
+    color: var(--color-danger-dark);
 }
 
 .client-card {
@@ -2509,6 +3285,87 @@ button:disabled {
 
 .client-registration-form--spaced {
     margin-bottom: 20px;
+}
+
+.client-registration-form {
+    display: grid;
+    gap: 18px;
+    padding: 20px;
+    border: 1px solid var(--barbie-pale);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    box-shadow: var(--shadow-md);
+}
+
+.client-registration-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--barbie-pale);
+}
+
+.client-registration-heading h4 {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 16px;
+}
+
+.client-registration-heading p {
+    margin: 4px 0 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.client-registration-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+    gap: 16px;
+}
+
+.client-registration-fields .form-group {
+    min-width: 0;
+    margin: 0;
+}
+
+.client-registration-form .form-group label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.field-required,
+.field-optional {
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.field-required {
+    color: var(--barbie-dark);
+}
+
+.client-registration-form .input-wrapper .input-icon {
+    left: 14px;
+}
+
+@media (max-width: 640px) {
+    .client-registration-form {
+        gap: 14px;
+        padding: 16px;
+    }
+
+    .client-registration-fields {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+    }
+
+    .client-registration-heading {
+        align-items: flex-start;
+    }
 }
 
 .client-info-col {
@@ -2526,13 +3383,13 @@ button:disabled {
 
 .client-contact-icon {
     margin-right: 4px;
-    color: var(--barbie-pink);
+    color: var(--barbie-dark);
 }
 
 .client-avatar {
     display: grid;
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     flex: 0 0 42px;
     place-items: center;
     border-radius: 50%;
@@ -2560,50 +3417,21 @@ button:disabled {
     grid-template-columns: auto 1fr auto;
 }
 
+.client-card.is-inactive {
+    opacity: 0.65;
+}
+
 .client-actions-col {
     display: flex;
     align-items: center;
     gap: 6px;
 }
 
-.client-card .client-status-btn {
-    color: var(--text-light);
-}
-
-.client-card .client-status-btn.is-inactive {
-    color: var(--barbie-dark);
-}
-
-.client-detail-header {
-    margin-bottom: 16px;
-    justify-content: flex-end;
-}
-
-.client-detail-header-actions {
+/* Fila de acciones de la card de clientas: WhatsApp a la izquierda del ojo. */
+.client-card-actions-row {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.client-detail-action {
-    width: auto;
-    padding: 8px 12px;
-    white-space: nowrap;
-    font-size: 12px;
-}
-
-.client-detail-action--edit {
-    padding-right: 16px;
-    padding-left: 16px;
-    font-size: 13px;
-}
-
-.client-card .client-status-btn:hover,
-.client-card .client-status-btn:focus-visible {
-    color: var(--barbie-dark);
-    background: var(--barbie-pale);
+    gap: 4px;
 }
 
 .quick-client-panel {
@@ -2625,14 +3453,6 @@ button:disabled {
     font-size: 12px;
 }
 
-.client-registration-form {
-    padding: 20px;
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-md);
-    background: var(--glass-bg);
-    box-shadow: var(--shadow-pink);
-}
-
 .client-card-details {
     grid-column: 1 / -1;
     padding-top: 14px;
@@ -2641,7 +3461,7 @@ button:disabled {
 
 .client-history-list {
     display: grid;
-    gap: 8px;
+    gap: 12px;
     margin-top: 10px;
     min-height: 0;
     max-height: min(32vh, 300px);
@@ -2702,76 +3522,26 @@ button:disabled {
     color: var(--barbie-dark);
 }
 
-.client-detail-modal-card {
-    width: min(1120px, 98vw);
-    max-height: calc(100vh - 32px);
-    height: min(900px, calc(100vh - 32px));
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.client-detail-modal-card .modal-body {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.client-detail-modal-card .modal-body > div {
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.client-detail-modal-card .client-history-list {
-    flex: 1 1 auto;
-    max-height: none;
-}
-
-.client-service-detail-modal-card {
-    width: min(760px, 94vw);
-}
-
-@media (max-width: 520px) {
-    .client-detail-modal-card {
-        width: calc(100vw - 16px);
-        max-height: calc(100vh - 16px);
-        height: calc(100vh - 16px);
-        padding: 16px;
-    }
-
-    .client-detail-modal-card .modal-body {
-        padding: 12px;
-    }
-
-    .client-detail-modal-card .modal-header-row {
-        margin-bottom: 10px;
-    }
-}
-
-.client-detail-fields-stack {
+.detail-fields-stack {
     display: grid;
     gap: 12px;
 }
 
-.client-detail-form {
+.detail-form {
     margin-bottom: 15px;
 }
 
-.client-detail-fields {
+.detail-fields {
     border: 0;
     padding: 0;
     margin: 0;
 }
 
-.client-detail-fields-stack .form-group {
+.detail-fields-stack .form-group {
     min-width: 0;
 }
 
-.modal-header-row,
 .client-history-heading,
-.client-modal-actions,
 .account-form-actions {
     display: flex;
     align-items: center;
@@ -2779,15 +3549,15 @@ button:disabled {
     gap: 10px;
 }
 
-.client-detail-modal-card .modal-header-row {
-    margin-bottom: 16px;
+.detail-form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
 }
 
-.client-detail-modal-card .modal-header-row h3 {
-    margin-bottom: 0;
-}
-
-.client-modal-actions,
 .account-form-actions {
     justify-content: flex-end;
     flex-wrap: wrap;
@@ -2795,14 +3565,7 @@ button:disabled {
 }
 
 .account-readonly-form input[readonly],
-#client-detail-fields:disabled input {
-    color: var(--text-color);
-    background: #faf7f8;
-    cursor: default;
-    opacity: 1;
-}
-
-#client-name[readonly] {
+.detail-fields:disabled input {
     color: var(--text-color);
     background: #faf7f8;
     cursor: default;
@@ -2815,44 +3578,9 @@ button:disabled {
     border-top: 1px solid var(--barbie-pale);
 }
 
-.client-modal-actions .btn,
 .account-form-actions .btn {
     min-width: 154px;
     min-height: 42px;
-}
-
-.client-modal-actions .btn {
-    flex: 1 1 0;
-}
-
-.client-detail-notes-field {
-    margin-top: 12px;
-}
-
-.client-detail-notes-field textarea {
-    width: 100%;
-    min-height: 104px;
-    resize: none;
-    padding: 12px 16px 12px 42px;
-    background: var(--white);
-    border: 2px solid var(--barbie-light);
-    border-radius: var(--radius-md);
-    color: var(--text-color);
-    font: inherit;
-    font-weight: 500;
-    box-shadow: var(--shadow-inset);
-    transition: var(--transition);
-}
-
-.client-detail-notes-field textarea:focus {
-    border-color: var(--barbie-pink);
-    box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.2), var(--shadow-inset);
-    outline: none;
-}
-
-.client-detail-notes-field .input-wrapper .input-icon {
-    top: 16px;
-    transform: none;
 }
 
 .checkout-sena-banner {
@@ -2868,25 +3596,11 @@ button:disabled {
     font-weight: 600;
 }
 
-#client-detail-fields:disabled textarea {
+.detail-fields:disabled textarea {
     color: var(--text-color);
     background: #faf7f8;
     cursor: default;
     opacity: 1;
-}
-
-.client-registration-notes-field textarea {
-    width: 100%;
-    min-height: 48px;
-    resize: none;
-    padding: 12px 16px 12px 42px;
-    background: var(--white);
-    border: 2px solid var(--barbie-light);
-    border-radius: var(--radius-md);
-    color: var(--text-color);
-    font: inherit;
-    font-weight: 500;
-    box-shadow: var(--shadow-inset);
 }
 
 .schedule-client-field {
@@ -2895,18 +3609,35 @@ button:disabled {
 
 .history-card:hover {
     border-color: var(--barbie-light);
-    transform: translateY(-2px);
 }
 
 .stats-distribution-section {
     min-height: 190px;
 }
 
+@media (max-width: 900px) {
+    .stats-cards-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .stats-distribution-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 520px) {
+    .stats-cards-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 .stats-panel {
     border-radius: var(--radius-lg);
     border: 2px solid var(--barbie-pale);
     background: var(--white);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 4px 12px rgba(90, 61, 70, 0.02);
 }
 
 .empty-schedule-state {
@@ -2953,7 +3684,7 @@ button:disabled {
     border: 1px solid rgba(255, 20, 147, .22);
     border-radius: 50%;
     background: rgba(255, 255, 255, .62);
-    box-shadow: 0 22px 50px rgba(255, 20, 147, .16);
+    box-shadow: 0 22px 50px rgba(90, 61, 70, .16);
     transform: rotate(-4deg);
 }
 .route-not-found-brand img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
@@ -2993,14 +3724,19 @@ button:disabled {
     border-radius: var(--radius-md);
     color: var(--white);
     background: linear-gradient(135deg, var(--barbie-pink) 0%, var(--barbie-dark) 100%);
-    box-shadow: 0 5px 15px rgba(255, 20, 147, 0.3);
+    box-shadow: 0 5px 15px rgba(90, 61, 70, 0.3);
     font-family: 'Comfortaa', sans-serif;
     font-weight: 700;
     text-decoration: none;
-    transition: var(--transition);
+    border: 2px solid var(--barbie-pink);
+    box-sizing: border-box;
+    transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
 }
+.route-not-found-copy .home-link:hover,
 .route-not-found-copy .home-link:active {
-    transform: scale(0.96);
+    background: var(--white);
+    color: var(--barbie-dark);
+    border-color: var(--barbie-pink);
 }
 .route-not-found-page > .app-footer {
     width: min(920px, 100%);
@@ -3109,46 +3845,55 @@ button:disabled {
     margin-top: 18px;
 }
 
-.users-panel-header {
+.login-rate-limit-note {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    justify-content: center;
+    gap: 6px;
+    margin: 0 0 14px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius-sm);
+    /* Mismo fondo de error que .toast.error, ya usado en el sistema. */
+    background: #fff0f0;
+    color: var(--color-danger);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
 }
 
 .users-invite-form {
+    display: grid;
+    gap: 12px;
     margin-bottom: 18px;
 }
 
-.users-list {
+.users-invite-form .form-row-2 {
     display: grid;
-    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.users-invite-form .form-group {
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+.users-invite-form .form-group input,
+.users-invite-form .form-group select {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
 }
 
 .user-card {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 12px;
-    padding: 14px;
-    border: 2px solid var(--barbie-pale);
-    border-radius: var(--radius-md);
-    background: var(--white);
-    box-shadow: var(--shadow-pink);
 }
 
 .user-card.is-inactive {
     opacity: 0.65;
-}
-
-.user-card-avatar {
-    display: grid;
-    width: 40px;
-    height: 40px;
-    place-items: center;
-    border-radius: 50%;
-    color: var(--barbie-dark);
-    background: var(--barbie-pale);
 }
 
 .user-card-info {
@@ -3157,40 +3902,115 @@ button:disabled {
     gap: 2px;
 }
 
-.user-card-info strong,
-.user-card-info span,
-.user-card-info small {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+/* Sección compartida "Opciones avanzadas" de las fichas de cliente y usuario. */
+.detail-advanced {
+    display: grid;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--barbie-pale);
 }
 
-.user-card-info strong {
-    color: var(--text-color);
+.detail-advanced h4 {
+    margin: 0;
+    font-size: 14px;
 }
 
-.user-card-info span,
-.user-card-info small {
-    color: var(--text-muted);
-    font-size: 12px;
+/* Campos de ficha con acción (Rol, Estado): cada campo aparece una sola vez
+   en la ficha, fuera del fieldset de edición. El control interactivo se ve
+   solo para superadmin viendo a otro usuario; el resto, de solo lectura.
+   Ambos campos comparten tamaño (260px) y formato de control (alto 36px). */
+/* Campos de solo lectura permanente (Email, Creado): van fuera del fieldset
+   y debajo de Cancelar/Guardar, con el mismo espaciado que los campos con
+   acción (Rol, Estado). */
+.detail-readonly-fields {
+    margin-top: 12px;
 }
 
-.user-card-actions {
+.detail-change-fields {
+    margin-top: 12px;
+}
+
+.detail-change-row {
     display: flex;
-    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.detail-change-row .user-role-select,
+.detail-change-row .input-wrapper {
+    width: 100%;
+    max-width: 260px;
+}
+
+/* Select de Rol e input de Estado con el mismo tamaño y formato. */
+.detail-change-row .user-role-select,
+.detail-change-row .input-wrapper input {
+    min-height: 36px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    font-size: 12px;
+    border: 2px solid var(--barbie-light);
+    border-radius: 10px;
+}
+
+/* Rol bloqueado: mismo aspecto de solo lectura que los inputs de la ficha. */
+.user-role-select:disabled {
+    cursor: default;
+    background-color: #faf7f8;
+}
+
+.detail-advanced-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.user-role-select {
+    min-width: 120px;
+    min-height: 36px;
+    padding: 6px 32px 6px 10px;
+    border: 2px solid var(--barbie-light);
+    border-radius: 10px;
+    color: var(--text-color);
+    background: var(--white);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--barbie-pink) 50%), linear-gradient(135deg, var(--barbie-pink) 50%, transparent 50%);
+    background-position: calc(100% - 15px) calc(50% - 2px), calc(100% - 10px) calc(50% - 2px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+}
+
+.user-role-select:focus {
+    outline: 2px solid var(--barbie-pink);
+    outline-offset: 2px;
 }
 
 @media (max-width: 520px) {
-    .users-panel-header {
-        align-items: flex-start;
-    }
-
-    .user-card {
-        grid-template-columns: auto minmax(0, 1fr);
+    .users-invite-form .form-row-2 {
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .user-card-actions {
-        grid-column: 2;
+        justify-content: flex-end;
+    }
+
+    .detail-advanced-actions {
+        display: grid;
+    }
+
+    .user-role-select {
+        min-width: 0;
+        width: 100%;
+        max-width: 160px;
+    }
+
+    .detail-change-row .user-role-select,
+    .detail-change-row .input-wrapper {
+        max-width: 100%;
     }
 }
 
@@ -3363,6 +4183,12 @@ button:disabled {
     margin-top: 20px;
 }
 
+.calendar-layout {
+    display: grid;
+    align-items: start;
+    gap: 20px;
+}
+
 .calendar-selected-day-header {
     display: flex;
     align-items: center;
@@ -3406,43 +4232,6 @@ button:disabled {
     font-size: 9px;
 }
 
-.calendar-appointment-actions {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.calendar-appointment-action {
-    display: inline-flex;
-    width: 28px;
-    height: 28px;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    border-radius: 50%;
-    cursor: pointer;
-}
-
-.calendar-appointment-action--reschedule {
-    color: #e65100;
-    background: #fff3e0;
-}
-
-.calendar-appointment-action--deposit {
-    color: #0d47a1;
-    background: #e3f2fd;
-}
-
-.calendar-appointment-action--checkout {
-    color: #2e7d32;
-    background: #e8f5e9;
-}
-
-.calendar-appointment-action-icon {
-    font-size: 11px;
-}
-
 .calendar-card-spaced {
     position: relative;
     margin-top: 20px;
@@ -3470,7 +4259,8 @@ button:disabled {
 }
 
 .schedule-date-time-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
 }
 
@@ -3479,10 +4269,129 @@ button:disabled {
     min-width: 0;
 }
 
+@media (min-width: 900px) {
+    /* La lista es el contenido que se lee (nombre de clienta + acciones) y el
+       calendario es navegación: le sobra con su mínimo. Antes era 0.95fr/1.05fr,
+       que dejaba la lista en ~478px en un viewport de 1280px. */
+    .calendar-layout {
+        grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.85fr);
+    }
+    .calendar-day-section {
+        margin-top: 0;
+    }
+
+    .calendar-card-spaced {
+        margin-top: 0;
+    }
+
+    .app-screen {
+        padding-bottom: 0;
+    }
+
+    .app-content {
+        padding: 20px clamp(20px, 2.5vw, 32px) 32px;
+        margin-left: 188px;
+    }
+
+    .app-nav {
+        left: 20px;
+        top: 88px;
+        bottom: 20px;
+        width: 168px;
+        height: calc(100vh - 108px);
+        padding: 12px 8px;
+        border-radius: 22px;
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: 6px;
+        overflow: visible;
+        scrollbar-width: none;
+    }
+
+    .nav-item {
+        width: 100%;
+        min-height: 48px;
+        border-radius: 14px;
+        flex: 0 0 auto;
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 10px;
+        padding: 0 10px;
+    }
+
+    .nav-icon {
+        font-size: 18px;
+        width: 24px;
+        text-align: center;
+    }
+
+    .nav-text {
+        font-size: 10px;
+        letter-spacing: .02em;
+        white-space: normal;
+        line-height: 1.2;
+        text-align: left;
+        overflow: visible;
+    }
+
+    .app-content .tab-pane.active {
+        padding-left: 0;
+        padding-right: 0;
+        max-width: 1160px;
+    }
+}
+
+/* Ventanas entre 900px y ~1200px: el calendario se queda con su mínimo de 420px y
+   la lista caía a ~230px, truncando el nombre de la clienta. Antes de ese ancho
+   conviene apilar (lista arriba, calendario abajo) en vez de repartir en dos
+   columnas que no entran. */
+@media (min-width: 900px) and (max-width: 1180px) {
+    .calendar-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .calendar-card-spaced {
+        margin-top: 20px;
+    }
+}
+
 @media (max-width: 520px) {
     .schedule-date-time-row {
-        flex-direction: column;
-        gap: 0;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+    }
+
+    .calendar-layout {
+        gap: 2px;
+    }
+
+    .calendar-day-section {
+        margin-top: 0;
+    }
+
+    .calendar-card-spaced {
+        margin-top: 2px;
+    }
+
+    .calendar-selected-day-header {
+        margin-bottom: 6px;
+        gap: 4px;
+    }
+
+    .mobile-icon-only .mobile-action-label,
+.calendar-header-button .mobile-action-label {
+        display: none;
+    }
+
+    .mobile-icon-only,
+.calendar-header-button,
+.card-icon-btn,
+.btn-cal-nav,
+.filter-toggle-btn,
+.header-action-btn {
+        width: 44px;
+        min-width: 44px;
+        padding-inline: 0;
     }
 }
 
@@ -3567,17 +4476,25 @@ button:disabled {
     margin-top: 15px;
 }
 
+/* Acción de cabecera de panel: patrón unificado para Añadir/Nuevo/Invitar y
+   Volver (btn-primary): mismo alto, gap y label muted en
+   desktop; solo icono en móvil vía .mobile-icon-only. */
 .panel-header-action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     width: auto;
+    min-height: 44px;
+    padding: 9px 12px;
     white-space: nowrap;
 }
 
-.panel-action-spaced {
-    margin-top: 20px;
-}
-
-.chart-section-spaced {
-    margin-top: 20px;
+.panel-header-action .mobile-action-label {
+    font-size: 12px;
+    font-weight: 600;
+    /* Hereda el color del botón: si fuera fijo a blanco, el texto quedaría
+       invisible en hover de los botones primarios (fondo pasa a blanco). */
+    color: inherit;
 }
 
 .panel-subsection-header {
@@ -3592,17 +4509,114 @@ button:disabled {
     margin-bottom: 0;
 }
 
-.expense-icon {
-    color: var(--color-danger);
-    font-size: 22px;
+.expense-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    transition: var(--transition);
 }
 
-.expense-date {
-    margin-top: 4px;
+/* Separación uniforme entre búsqueda/filtros y listados */
+.list-section-gap {
+    margin-top: 16px;
 }
 
-.expense-payment-badge {
-    margin-right: 6px;
+/* Gastos: misma separación búsqueda → listado que Clientes/Usuarios (16px).
+   #tab-gastos es .panel-stack (grid con gap: 18px), así que los márgenes no
+   colapsan: .filters-container aporta 4px + gap 18px + este margin-top.
+   Se compensa (-6px) para que el total sea 16px, igual que en #tab-clientes
+   y Usuarios (flujo de bloque, márgenes colapsados a 16px). */
+#tab-gastos #expenses-list.list-section-gap {
+    margin-top: -6px;
+}
+
+/* Historial: mismo caso que Gastos (section#tab-historial.panel-stack, grid).
+   Mismo total de 16px entre barra de búsqueda y listado. */
+#tab-historial .history-list.list-section-gap {
+    margin-top: -6px;
+}
+
+/* Separación título → barra de búsqueda uniforme (16px) en todos los paneles.
+   En .panel-stack (grid, gap: 18px) el margin-bottom: 16px de .section-title
+   no colapsa con el gap → 34px; se anula el gap solo cuando el buscador sigue
+   inmediatamente al título: 16 + 18 - 18 = 16px, igual que en Clientes,
+   Usuarios y Precios (flujo de bloque, márgenes colapsados a 16px). */
+.panel-stack > .section-title + .filters-container {
+    margin-top: -18px;
+}
+
+/* Estadísticas/Cajas: el buscador va después de .stats-cards-grid (margin-bottom:
+   25px). Se ajusta a 16px para igualar el espacio superior del buscador al del
+   resto de paneles. En Cajas (flujo de bloque) 25 - 9 = 16px (márgenes colapsados);
+   en Estadísticas (.panel-stack, grid) 25 + gap 18 - 27 = 16px. */
+.stats-cards-grid + .filters-container {
+    margin-top: -9px;
+}
+
+.panel-stack > .stats-cards-grid + .filters-container {
+    margin-top: -27px;
+}
+
+/* =========================================================================
+   LISTADOS UNIFICADOS — un solo patrón para todos los listados:
+   .unified-list (contenedor) + .unified-card (tarjeta).
+   Las clases legacy se conservan como alias del mismo estilo.
+   ========================================================================= */
+
+.unified-list,
+.history-list,
+.users-list,
+.expense-list,
+.day-appointments-container,
+.prices-list-readonly,
+.prices-category-list {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.unified-card,
+.user-card,
+.client-card,
+.history-card,
+.expense-card,
+.appointment-card,
+.price-category-group {
+    padding: 14px;
+    border: 2px solid var(--barbie-pale);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    box-shadow: var(--shadow-md);
+    transition: var(--transition);
+}
+
+.unified-card:hover,
+.user-card:hover,
+.client-card:hover,
+.history-card:hover,
+.expense-card:hover,
+.appointment-card:hover,
+.price-category-group:hover {
+    border-color: var(--barbie-light);
+    transform: none;
+}
+
+/* Título principal de tarjeta: misma escala tipográfica en todos los listados. */
+.client-card .appointment-client-name,
+.appointment-card .appointment-client-name,
+.history-card .card-client,
+.expense-name {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.expense-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .expense-category {
@@ -3614,6 +4628,357 @@ button:disabled {
     color: var(--color-danger);
     font-size: 16px;
     font-weight: 700;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   ESTILOS UNIFICADOS — PESO DE LISTADOS (ExpensesPanel + HistoryPanel)
+   Un mismo patrón para todas las tarjetas de listado:
+   .unified-card / .client-card / .history-card
+   ───────────────────────────────────────────────────────────── */
+
+/* Tarjeta de gasto / cliente / historial: misma tarjeta unificada
+   del resto de la app (12px de padding, border-radius: var(--radius-sm),
+   grid "avatar | texto | precio/acciones"). */
+.expense-card,
+.client-card,
+.history-card {
+    padding: 12px;
+    border: 2px solid var(--barbie-pale);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    box-shadow: none;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    transition: var(--transition);
+}
+
+/* El historial tiene columna propia de precio: avatar | texto | precio | acciones */
+.history-card {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+}
+
+.expense-card:hover,
+.client-card:hover,
+.history-card:hover {
+    border-color: var(--barbie-light);
+    transform: none;
+}
+
+/* Contenido principal: mismo diseño en todos los listados */
+.expense-name,
+.client-info-col .client-name,
+.appointment-client-name,
+.card-client,
+.card-service {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-color);
+    word-break: break-word;
+}
+
+/* Detalle: categoría y forma de pago */
+.client-contact-row,
+.card-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.pay-badge i {
+    font-size: 11px;
+}
+
+/* Precio de la tarjeta */
+.expense-amount,
+.card-price,
+.history-card-price {
+    font-family: 'Comfortaa', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--barbie-dark);
+    white-space: nowrap;
+}
+
+.expense-amount {
+    font-size: 15px;
+}
+
+/* Avatar del gasto (icono de categoría): mismo círculo que Clientes/Usuarios y
+   misma paleta de iconos (color: var(--barbie-dark) sobre background: var(--barbie-pale)) */
+.expense-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--barbie-pale);
+    color: var(--barbie-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+/* Columna de acciones: precio arriba y acciones debajo, alineados a la derecha
+   como en el resto de los listados. */
+.client-actions-col,
+.card-actions-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+/* Precios: la card de categorías muestra 3 botones de acción seguidos — en fila
+   con wrap en vez del apilado en columna que usan el resto de listados. */
+#tab-precios .client-actions-col {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Ventas: los botones de acción van en fila horizontal como en el resto de
+   los listados (.card-actions-col los apila en columna por defecto). */
+.history-card .card-actions-col {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Resumen móvil y responsive del listado: tarjeta compacta en pantallas estrechas,
+   precio alineado a la derecha. */
+@media (max-width: 560px) {
+    .expense-card,
+    .client-card,
+    .history-card,
+    .user-card {
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+        gap: 10px;
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    /* El historial conserva columna propia de precio en móvil */
+    .history-card {
+        grid-template-columns: 44px minmax(0, 1fr) auto auto;
+    }
+
+    .expense-avatar {
+        width: 44px;
+        height: 44px;
+        font-size: 16px;
+    }
+
+    .expense-name,
+    .card-client,
+    .card-service {
+        overflow: hidden;
+        font-size: 15px;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        line-height: 1.35;
+    }
+
+    .expense-amount {
+        flex: 0 0 auto;
+        min-width: 0;
+        overflow: hidden;
+        color: var(--color-danger);
+        font-size: 14px;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+}
+
+/* ===== Unificación de estilos del formulario de gastos ===== */
+
+/* Formulario de registro de gasto: misma arquitectura que los demás formularios
+   (cute-form + form-group + input-wrapper). */
+#expense-registration-form {
+    margin-top: 15px;
+}
+
+#expense-registration-form .cute-form {
+    text-align: left;
+}
+
+#expense-registration-form .form-group {
+    margin-bottom: 18px;
+    display: flex;
+    flex-direction: column;
+}
+
+#expense-registration-form .form-group label {
+    font-family: 'Comfortaa', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-color);
+    margin-bottom: 6px;
+    padding-left: 4px;
+}
+
+#expense-registration-form .input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+#expense-registration-form .input-wrapper .input-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 14px;
+    pointer-events: none;
+}
+
+#expense-registration-form .input-wrapper input,
+#expense-registration-form .input-wrapper select {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px 10px 40px;
+    background: var(--white);
+    border: 1px solid var(--barbie-light);
+    border-radius: var(--radius-sm);
+    color: var(--text-color);
+    font-size: 14px;
+    font-family: inherit;
+}
+
+#expense-registration-form .input-wrapper select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239E7D86' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 40px;
+}
+
+#expense-registration-form .input-wrapper input:focus,
+#expense-registration-form .input-wrapper select:focus {
+    border-color: var(--barbie-pink);
+    box-shadow: var(--shadow-focus);
+    outline: none;
+}
+
+#expense-registration-form .form-row-2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 14px;
+}
+
+#expense-registration-form .form-row-2 .form-group {
+    margin-bottom: 0;
+}
+
+/* Selector de forma de pago */
+.payment-method-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.payment-method-selector .pay-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--barbie-light);
+    border-radius: var(--radius-sm);
+    background: var(--white);
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-color);
+    transition: var(--transition);
+}
+
+.payment-method-selector .pay-btn:hover,
+.payment-method-selector .pay-btn:focus-visible {
+    border-color: var(--barbie-pink);
+    box-shadow: var(--shadow-focus);
+    outline: none;
+}
+
+.payment-method-selector .pay-btn input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.payment-method-selector .pay-btn .pay-icon {
+    font-size: 16px;
+    margin-bottom: 0;
+}
+
+/* .pay-btn-content es solo un contenedor de icono+texto: la "caja" visual es
+   .pay-btn. Se neutraliza el borde/fondo/padding heredado del estilo tarjeta
+   para eliminar el recuadro doble y unificar Gastos/Calendario/Registrar. */
+.payment-method-selector .pay-btn .pay-btn-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    padding: 0;
+    border-radius: 0;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    text-align: center;
+}
+
+/* Resaltado de selección sobre la caja .pay-btn (no sobre el content). */
+.payment-method-selector .pay-btn:has(input:checked) {
+    border-color: var(--barbie-pink);
+    background: var(--barbie-pale);
+    color: var(--barbie-dark);
+}
+
+/* Neutraliza el resaltado viejo de .pay-btn-content (ahora transparente). */
+.payment-method-selector .pay-btn input:checked + .pay-btn-content {
+    background: transparent;
+    border-color: transparent;
+    color: inherit;
+}
+
+/* Acciones del formulario */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--barbie-light);
+}
+
+/* Estado vacío del listado */
+#expenses-list .list-empty-state {
+    min-height: 120px;
+    padding: 24px;
+}
+
+/* Título y acciones del panel */
+#tab-gastos .section-title h3 {
+    font-size: clamp(20px, 2vw, 24px);
+}
+
+#tab-gastos .section-title p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+#tab-gastos .btn-sm {
+    min-height: 44px;
+    padding: 9px 12px;
+    font-size: 13px;
 }
 
 .prices-access-denied {
@@ -3676,13 +5041,8 @@ button:disabled {
     color: var(--text-light);
 }
 
-.panel-form-top-spaced,
-.panel-list-top-spaced {
+.panel-form-top-spaced {
     margin-top: 10px;
-}
-
-.cash-inbox-icon {
-    margin-right: 6px;
 }
 
 .pending-debtors-header {
@@ -3695,33 +5055,26 @@ button:disabled {
     background: linear-gradient(135deg, var(--white) 90%, #FFFDF0 100%);
 }
 
-.pending-debtor-actions {
-    flex-direction: column;
-    gap: 8px;
-}
-
 .pending-debtor-amount {
     color: var(--color-danger);
     font-size: 16px;
     font-weight: 700;
 }
 
-.pending-debtor-pay-action {
-    min-width: 88px;
-    padding: 6px 12px;
-    font-size: 12px;
-}
-
 .cash-movement-icon {
-    font-size: 18px;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--barbie-pale);
+    font-size: 16px;
 }
 
-.cash-movement-icon.is-deposit {
-    color: var(--barbie-pink);
-}
-
+/* Iconos de listado: paleta unificada (mismo tono que los avatares) */
+.cash-movement-icon.is-deposit,
 .cash-movement-icon.is-withdrawal {
-    color: #D27D2D;
+    color: var(--barbie-dark);
 }
 
 .cash-movement-separator {
@@ -3749,208 +5102,7 @@ button:disabled {
     color: var(--color-danger);
 }
 
-.agenda-new-action {
-    width: auto;
-    padding: 8px 16px;
-    white-space: nowrap;
-    font-size: 13px;
-}
-
-.agenda-empty-card {
-    padding: 20px;
-    border-radius: 18px;
-}
-
-.agenda-empty-message {
-    margin: 0;
-}
-
-.agenda-day-card {
-    padding: 18px;
-    border-radius: 18px;
-}
-
-.agenda-day-title {
-    margin: 0 0 12px;
-    color: var(--barbie-dark);
-}
-
-.agenda-day-list {
-    display: grid;
-    gap: 10px;
-}
-
-.agenda-appointment-card {
-    position: relative;
-    display: grid;
-    gap: 4px;
-    padding: 12px 14px;
-    border: 1px solid rgba(255, 105, 180, 0.2);
-    border-radius: 12px;
-    background: #fff8fb;
-}
-
-.agenda-appointment-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.agenda-client-name {
-    color: var(--barbie-dark);
-}
-
-.agenda-appointment-meta {
-    color: #5e5e5e;
-    font-size: 12px;
-}
-
-.agenda-appointment-meta--top {
-    margin-top: 2px;
-}
-
-.agenda-status-badge {
-    display: inline-block;
-    margin-top: 6px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-}
-
-.agenda-menu-wrapper {
-    position: relative;
-}
-
-.agenda-menu-toggle {
-    display: inline-flex;
-    width: 28px;
-    height: 28px;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    color: var(--barbie-pink);
-    background: rgba(255, 105, 180, 0.12);
-    cursor: pointer;
-}
-
-.agenda-actions-menu {
-    position: absolute;
-    z-index: 20;
-    top: 34px;
-    right: 0;
-    display: grid;
-    min-width: 200px;
-    gap: 2px;
-    padding: 6px;
-    border: 1px solid rgba(255, 105, 180, 0.25);
-    border-radius: 12px;
-    background: #fff;
-    box-shadow: 0 6px 14px rgba(150, 60, 120, 0.15);
-}
-
-.agenda-modal-form {
-    display: grid;
-    gap: 12px;
-}
-
-.agenda-client-input-wrapper {
-    position: relative;
-}
-
-.agenda-client-suggestions {
-    position: absolute;
-    z-index: 50;
-    top: 100%;
-    right: 0;
-    left: 0;
-    max-height: 180px;
-    margin-top: 4px;
-    overflow-y: auto;
-    padding: 4px;
-    border: 1px solid rgba(255, 105, 180, 0.2);
-    border-radius: 10px;
-    background: var(--white);
-}
-
-.agenda-client-suggestion {
-    display: block;
-    width: 100%;
-    padding: 8px 10px;
-    border: 0;
-    border-radius: 8px;
-    color: var(--text-color);
-    background: transparent;
-    font-size: 14px;
-    text-align: left;
-    cursor: pointer;
-}
-
-.agenda-client-suggestion:hover,
-.agenda-client-suggestion:focus-visible {
-    background: var(--barbie-pale);
-}
-
-.agenda-form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-.agenda-form-field {
-    margin: 0;
-}
-
-.agenda-form-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 6px;
-}
-
-.agenda-form-context {
-    margin: 0;
-    color: var(--text-muted);
-    font-size: 13px;
-}
-
-.agenda-menu-item {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    gap: 8px;
-    padding: 7px 10px;
-    border: 0;
-    border-radius: 8px;
-    color: var(--text-muted);
-    background: transparent;
-    font-size: 13px;
-    text-align: left;
-    cursor: pointer;
-}
-
-.agenda-menu-item:hover,
-.agenda-menu-item:focus-visible {
-    background: rgba(255, 105, 180, 0.08);
-}
-
-.agenda-menu-item.is-danger {
-    color: #ef5350;
-}
-
-.agenda-menu-divider {
-    height: 1px;
-    margin: 4px 0;
-    background: rgba(150, 60, 120, 0.15);
-}
-
 @media (max-width: 520px) {
-    .agenda-form-grid {
-        grid-template-columns: 1fr;
-    }
 }
 
 .stats-kpi-icon {
@@ -3974,4 +5126,58 @@ button:disabled {
 
 .ticket-canvas-hidden {
     display: none;
+}
+
+@media (max-height: 640px) {
+    .login-screen {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: auto;
+        min-height: 100dvh;
+        align-items: flex-start;
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding: 16px;
+    }
+
+    .login-card {
+        flex: 0 0 auto;
+        margin: 16px auto;
+        transform: none;
+        animation: none;
+        opacity: 1;
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RESPONSIVE — pestaña Gastos
+   ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 520px) {
+    #tab-gastos .form-row-2 {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    #expense-registration-form .input-wrapper input,
+    #expense-registration-form .input-wrapper select {
+        padding: 12px 14px;
+    }
+
+    #expense-registration-form .input-wrapper .input-icon {
+        left: 12px;
+        font-size: 13px;
+    }
+
+    #tab-gastos .btn-sm {
+        min-height: 44px;
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+
+    #expenses-list .list-empty-state {
+        min-height: 100px;
+        padding: 18px;
+    }
 }

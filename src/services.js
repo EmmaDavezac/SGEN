@@ -113,7 +113,7 @@ export async function loadAppointmentsFromDatabase() {
     if (!supabase) throw new Error('Supabase no está disponible.');
     const { data, error } = await supabase
         .from('turnos')
-        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, cliente_id')
+        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, motivo_cancelacion, event_id, cliente_id')
         .order('hora_inicio', { ascending: false });
     if (error) throw error;
     return data || [];
@@ -224,7 +224,7 @@ export async function saveAppointmentToDatabase(payload) {
     const { data, error } = await supabase
         .from('turnos')
         .insert(payload)
-        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, cliente_id, usuario_id')
+        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, motivo_cancelacion, event_id, cliente_id, usuario_id')
         .single();
     if (error) throw error;
     return data;
@@ -248,12 +248,136 @@ export async function updateAppointmentInDatabase({ id = null, legacyId = null, 
     let query = supabase.from('turnos').update(updates);
     query = id ? query.eq('id', id) : query.eq('legacy_id', legacyId);
     const { data, error } = await query
-        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, cliente_id, usuario_id')
+        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, motivo_cancelacion, event_id, cliente_id, usuario_id')
         .maybeSingle();
     if (error) throw error;
     if (!data) throw new Error('No se encontró el turno para actualizar.');
     return data;
 }
+function isUuid(value) {
+    return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+async function resolveTurnoUuid(turnoId) {
+    if (!turnoId) return null;
+    if (isUuid(turnoId)) return turnoId;
+    // Puede venir legacy_id (app_...) desde caché vieja: resolver a UUID real.
+    const { data, error } = await supabase
+        .from('turnos')
+        .select('id')
+        .eq('legacy_id', turnoId)
+        .maybeSingle();
+    if (error) throw error;
+    return data?.id || null;
+}
+export async function hasSenaForTurno(turnoId) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    if (!turnoId) return false;
+    const uuid = await resolveTurnoUuid(turnoId).catch(() => null);
+    if (!uuid) return false;
+    const { data, error } = await supabase
+        .from('pagos')
+        .select('id')
+        .eq('turno_id', uuid)
+        .eq('tipo', 'sena')
+        .limit(1)
+        .maybeSingle();
+    if (error) throw error;
+    return Boolean(data);
+}
+
+export async function hasLinkedServiceForTurno(turnoId) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    if (!turnoId) return false;
+    const uuid = await resolveTurnoUuid(turnoId).catch(() => null);
+    if (!uuid) return false;
+    const { data, error } = await supabase
+        .from('servicios')
+        .select('id')
+        .eq('turno_id', uuid)
+        .limit(1)
+        .maybeSingle();
+    if (error) throw error;
+    return Boolean(data);
+}
+
+/**
+ * Trae el respaldo completo de un turno para la ficha de consulta: los pagos
+ * registrados (seña, cobros, ajustes) y el servicio vinculado, si se hizo.
+ *
+ * @returns {Promise<{pagos: Array, servicio: object|null>}
+ */
+export async function loadTurnoDetail(turnoId) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const empty = { pagos: [], servicio: null };
+    if (!turnoId) return empty;
+    const uuid = await resolveTurnoUuid(turnoId).catch(() => null);
+    if (!uuid) return empty;
+
+    const [pagosResult, servicioResult] = await Promise.all([
+        supabase
+            .from('pagos')
+            .select('id, fecha, monto, metodo_pago, tipo')
+            .eq('turno_id', uuid)
+            .order('fecha', { ascending: true }),
+        supabase
+            .from('servicios')
+            .select('id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, perfiles(nombre)')
+            .eq('turno_id', uuid)
+            .maybeSingle()
+    ]);
+    if (pagosResult.error) throw pagosResult.error;
+    if (servicioResult.error) throw servicioResult.error;
+    return {
+        pagos: pagosResult.data || [],
+        servicio: servicioResult.data || null
+    };
+}
+
+/**
+ * Cancela un turno: lo marca como cancelado y guarda el motivo.
+ * No borra nada, así que la seña y el historial se mantienen consultables.
+ */
+export async function cancelAppointmentInDatabase({ id = null, legacyId = null, motivo = '' } = {}) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    const reason = String(motivo || '').trim();
+    if (!reason) throw new Error('Escribí el motivo de la cancelación.');
+    let query = supabase
+        .from('turnos')
+        .update({ estado: 'cancelado', motivo_cancelacion: reason });
+    query = id ? query.eq('id', id) : query.eq('legacy_id', legacyId);
+    const { data, error } = await query
+        .select('id, legacy_id, estado, motivo_cancelacion')
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('No se encontró el turno para cancelar. Puede que tu rol no tenga permiso o la sesión expiró.');
+    return data;
+}
+
+export async function deleteAppointmentFromDatabase(id) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    if (!id) throw new Error('Falta el ID del turno.');
+    const uuid = await resolveTurnoUuid(id).catch(() => null);
+    // Intentar por UUID y por legacy_id para cubrir caché vieja.
+    let lastError = null;
+    const attempts = [];
+    if (uuid) attempts.push({ col: 'id', val: uuid });
+    if (!isUuid(id)) attempts.push({ col: 'legacy_id', val: id });
+    if (attempts.length === 0) attempts.push({ col: 'id', val: id });
+    for (const attempt of attempts) {
+        const { data, error } = await supabase
+            .from('turnos')
+            .delete()
+            .eq(attempt.col, attempt.val)
+            .select('id')
+            .maybeSingle();
+        if (!error && data) return { success: true };
+        if (error) lastError = error;
+    }
+    if (lastError) throw lastError;
+    throw new Error('No se encontró el turno para eliminar. Puede que tu rol no tenga permiso (solo admin puede borrar) o la sesión expiró.');
+}
+
 
 export async function deleteServiceFromDatabase(id) {
     if (!supabase) throw new Error('Supabase no está disponible.');
@@ -262,13 +386,11 @@ export async function deleteServiceFromDatabase(id) {
     return { success: true };
 }
 
-export function normalizeTurnoEstado(raw) {
-    const value = (raw || '').toString().trim().toLowerCase();
-    if (['completed', 'completado', 'cobrado', 'pagado'].includes(value)) return 'completado';
-    if (['reservado', 'reserved'].includes(value)) return 'reservado';
-    if (['cancelado', 'cancelled'].includes(value)) return 'cancelado';
-    return 'provisional';
-}
+// La normalización del estado del turno vive en appointmentActions.js (fuente
+// única del flujo de turnos). Se importa y reexporta acá para no romper ni los
+// imports ni los usos internos de este módulo.
+import { normalizeTurnoEstado } from './appointmentActions.js';
+export { normalizeTurnoEstado };
 
 export async function repairMissingTurnoLinks({ clientId = null, serviceDate = null, serviceName = '' } = {}) {
     if (!supabase || !clientId) return { updated: 0, total: 0 };

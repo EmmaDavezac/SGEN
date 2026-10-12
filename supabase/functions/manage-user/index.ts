@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 function requireEnv(name: string, value: string | undefined) {
@@ -11,43 +12,69 @@ function requireEnv(name: string, value: string | undefined) {
   return value;
 }
 
-function corsJson(data: unknown, status = 200) {
+function corsHeaders(req?: Request) {
+  const origin = req?.headers.get('origin');
+  return {
+    'Access-Control-Allow-Origin': origin || '*',
+    'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin'
+  };
+}
+
+function corsJson(data: unknown, status = 200, req?: Request) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      ...corsHeaders(req)
     }
   });
 }
 
 type ManagePayload =
-  | { accion: 'update'; id: string; nombre?: string; telefono?: string; dni?: string; comision_pct?: number; rol?: 'admin' | 'manicurista' }
+  | { accion: 'update'; id: string; nombre?: string; telefono?: string; dni?: string; comision_pct?: number; rol?: 'superadmin' | 'admin' | 'manicurista' }
   | { accion: 'toggle_activo'; id: string; activo?: boolean }
   | { accion: 'resend_invite'; id: string }
   | { accion: 'reset_password'; id: string };
 
+async function getAvailableProfileColumns(serviceClient: any) {
+  const { data, error } = await serviceClient
+    .from('information_schema.columns')
+    .select('column_name')
+    .eq('table_schema', 'public')
+    .eq('table_name', 'perfiles');
+
+  if (error || !data) return new Set<string>();
+  return new Set((data as Array<{ column_name: string }>).map((row) => row.column_name));
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return corsJson(null, 204);
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders(req)
+    });
   }
 
   try {
     requireEnv('SUPABASE_URL', SUPABASE_URL);
+    requireEnv('SUPABASE_ANON_KEY', SUPABASE_ANON_KEY);
     requireEnv('SUPABASE_SERVICE_ROLE_KEY', SUPABASE_SERVICE_ROLE_KEY);
 
     const authz = req.headers.get('authorization');
     if (!authz || !authz.toLowerCase().startsWith('bearer ')) {
-      return corsJson({ code: 'NO_AUTH', message: 'Falta token de autorización.' }, 401);
+      return corsJson({ code: 'NO_AUTH', message: 'Falta token de autorización.' }, 401, req);
     }
     const bearer = authz.slice('bearer '.length);
 
-    const adminClientAnon = createClient(SUPABASE_URL!, bearer, { auth: { persistSession: false } });
+    const adminClientAnon = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${bearer}` } }
+    });
     const { data: adminUser, error: adminErr } = await adminClientAnon.auth.getUser(bearer);
     if (adminErr || !adminUser?.user) {
-      return corsJson({ code: 'BAD_AUTH', message: 'Token inválido.' }, 401);
+      return corsJson({ code: 'BAD_AUTH', message: 'Token inválido.' }, 401, req);
     }
 
     const { data: adminProfile } = await adminClientAnon
@@ -56,22 +83,23 @@ serve(async (req) => {
       .eq('id', adminUser.user.id)
       .maybeSingle();
 
-    if (!adminProfile || adminProfile.rol !== 'admin') {
-      return corsJson({ code: 'FORBIDDEN', message: 'Solo administradores pueden gestionar usuarios.' }, 403);
+    if (!adminProfile || adminProfile.rol !== 'superadmin') {
+      return corsJson({ code: 'FORBIDDEN', message: 'Solo el superadmin puede gestionar usuarios.' }, 403, req);
     }
     if (!adminProfile.activo) {
-      return corsJson({ code: 'ADMIN_INACTIVO', message: 'Tu perfil se encuentra desactivado.' }, 403);
-    }
-
-    const payload: ManagePayload = await req.json().catch(() => ({ accion: 'update', id: '' }) as ManagePayload);
-
-    if (!payload.accion || !payload.id) {
-      return corsJson({ code: 'BAD_PAYLOAD', message: 'Faltan accion o id.' }, 400);
+      return corsJson({ code: 'ADMIN_INACTIVO', message: 'Tu perfil se encuentra desactivado.' }, 403, req);
     }
 
     const serviceClient = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
+
+    const payload: ManagePayload = await req.json().catch(() => ({ accion: 'update', id: '' }) as ManagePayload);
+    const availableColumns = await getAvailableProfileColumns(serviceClient);
+
+    if (!payload.accion || !payload.id) {
+      return corsJson({ code: 'BAD_PAYLOAD', message: 'Faltan accion o id.' }, 400, req);
+    }
 
     const { data: targetProfile, error: errTarget } = await serviceClient
       .from('perfiles')
@@ -82,7 +110,8 @@ serve(async (req) => {
     if (errTarget || !targetProfile) {
       return corsJson(
         { code: 'NOT_FOUND', message: 'Perfil no encontrado.' },
-        404
+        404,
+        req
       );
     }
 
@@ -90,24 +119,24 @@ serve(async (req) => {
     if (payload.accion === 'update') {
       const patch: Record<string, any> = {};
       if (typeof payload.nombre === 'string' && payload.nombre.trim().length >= 2) patch.nombre = payload.nombre.trim();
-      if (typeof payload.telefono === 'string') patch.telefono = payload.telefono.trim() || null;
-      if (typeof payload.dni === 'string') patch.dni = payload.dni.trim() || null;
-      if (typeof payload.comision_pct === 'number') {
+      if (typeof payload.telefono === 'string' && availableColumns.has('telefono')) patch.telefono = payload.telefono.trim() || null;
+      if (typeof payload.dni === 'string' && availableColumns.has('dni')) patch.dni = payload.dni.trim() || null;
+      if (typeof payload.comision_pct === 'number' && availableColumns.has('comision_pct')) {
         const n = Math.max(0, Math.min(100, Number(payload.comision_pct) || 0));
         patch.comision_pct = n;
       }
-      if (payload.rol === 'admin' || payload.rol === 'manicurista') {
-        // No permitimos quitar el ultimo admin
-        if (payload.rol !== 'admin' && targetProfile.rol === 'admin') {
+      if (payload.rol === 'superadmin' || payload.rol === 'admin' || payload.rol === 'manicurista') {
+        if (targetProfile.rol === 'superadmin' && payload.rol !== 'superadmin') {
           const { count } = await serviceClient
             .from('perfiles')
             .select('*', { count: 'exact', head: true })
-            .eq('rol', 'admin')
+            .eq('rol', 'superadmin')
             .eq('activo', true);
           if ((count || 0) <= 1) {
             return corsJson(
-              { code: 'LAST_ADMIN', message: 'No se puede degradar al único administrador activo.' },
-              409
+              { code: 'LAST_SUPERADMIN', message: 'No se puede quitar el único superadmin activo.' },
+              409,
+              req
             );
           }
         }
@@ -130,7 +159,7 @@ serve(async (req) => {
       }
 
       if (patch.rol) {
-        await serviceClient.auth.admin.updateUserById(payload.id, { role: patch.rol === 'admin' ? 'service_role' : undefined, app_metadata: { rol: patch.rol } }).catch(() => null);
+        await serviceClient.auth.admin.updateUserById(payload.id, { app_metadata: { rol: patch.rol } }).catch(() => null);
       }
 
       return corsJson({ ok: true, accion: 'update', profile: updated });
@@ -140,15 +169,15 @@ serve(async (req) => {
     if (payload.accion === 'toggle_activo') {
       const nuevo = typeof payload.activo === 'boolean' ? payload.activo : !targetProfile.activo;
 
-      if (!nuevo && targetProfile.rol === 'admin') {
+      if (!nuevo && targetProfile.rol === 'superadmin') {
         const { count } = await serviceClient
           .from('perfiles')
           .select('*', { count: 'exact', head: true })
-          .eq('rol', 'admin')
+          .eq('rol', 'superadmin')
           .eq('activo', true);
         if ((count || 0) <= 1) {
           return corsJson(
-            { code: 'LAST_ADMIN', message: 'No se puede desactivar al único administrador activo.' },
+            { code: 'LAST_SUPERADMIN', message: 'No se puede desactivar al único superadmin activo.' },
             409
           );
         }

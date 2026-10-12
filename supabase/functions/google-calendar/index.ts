@@ -1,86 +1,34 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GOOGLE_CALENDAR_BASE_URL = 'https://www.googleapis.com/calendar/v3/calendars';
-
-const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID');
-const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET');
-const GOOGLE_REFRESH_TOKEN = Deno.env.get('GOOGLE_REFRESH_TOKEN');
-const GOOGLE_CALENDAR_ID = Deno.env.get('GOOGLE_CALENDAR_ID') ?? 'primary';
+const GOOGLE_APPS_SCRIPT_URL = Deno.env.get('GOOGLE_APPS_SCRIPT_URL');
+const GOOGLE_APPS_SCRIPT_SECRET = Deno.env.get('GOOGLE_APPS_SCRIPT_SECRET');
+const GOOGLE_CALENDAR_ID = Deno.env.get('GOOGLE_CALENDAR_ID') || Deno.env.get('CALENDAR_ID') || Deno.env.get('GOOGLE_APPS_SCRIPT_CALENDAR_ID');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+function corsHeaders(req: Request) {
+  return {
+    'Access-Control-Allow-Origin': req.headers.get('origin') || '*',
+    'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin'
+  };
+}
+
+function jsonResponse(req: Request, body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', ...corsHeaders(req) }
+  });
+}
 
 function requireEnv(name: string, value: string | undefined) {
   if (!value) {
     throw new Error(`Falta la variable de entorno ${name}.`);
   }
   return value;
-}
-
-function parseDate(value: string | null | undefined, fallbackDate?: Date) {
-  if (!value) {
-    return fallbackDate ? new Date(fallbackDate) : new Date();
-  }
-
-  const parsed = new Date(value);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed;
-  }
-
-  return fallbackDate ? new Date(fallbackDate) : new Date();
-}
-
-function buildCalendarEvent(appointment: Record<string, any>) {
-  const clientName = appointment.cliente || 'Cliente';
-  const startRaw = appointment.hora_inicio || appointment.horaInicio || `${appointment.fecha || new Date().toISOString().slice(0, 10)}T09:00:00`;
-  const endRaw = appointment.hora_fin || appointment.horaFin || null;
-
-  const startDate = parseDate(startRaw);
-  const endDate = endRaw ? parseDate(endRaw, startDate) : new Date(startDate.getTime() + 90 * 60 * 1000);
-
-  return {
-    summary: `Turno - ${clientName}`,
-    description: [
-      `Servicio: ${appointment.servicio || 'Turno'}`,
-      `Cliente: ${clientName}`,
-      `Estado: ${appointment.estado || 'provisional'}`,
-      `Precio: $${Number(appointment.precio || 0).toLocaleString('es-AR')}`,
-      `Recordatorio interno: ${appointment.id || appointment.legacy_id || 'sin-id'}`
-    ].join('\n'),
-    start: {
-      dateTime: startDate.toISOString()
-    },
-    end: {
-      dateTime: endDate.toISOString()
-    }
-  };
-}
-
-async function getAccessToken() {
-  const clientId = requireEnv('GOOGLE_CLIENT_ID', GOOGLE_CLIENT_ID);
-  const clientSecret = requireEnv('GOOGLE_CLIENT_SECRET', GOOGLE_CLIENT_SECRET);
-  const refreshToken = requireEnv('GOOGLE_REFRESH_TOKEN', GOOGLE_REFRESH_TOKEN);
-
-  const response = await fetch(GOOGLE_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token'
-    }).toString()
-  });
-
-  const payload = await response.json();
-  if (!response.ok || !payload.access_token) {
-    throw new Error(`No se pudo obtener el access token de Google: ${payload.error || 'unknown_error'}`);
-  }
-
-  return payload.access_token as string;
 }
 
 async function withRetry<T>(label: string, callback: () => Promise<T>) {
@@ -100,51 +48,66 @@ async function withRetry<T>(label: string, callback: () => Promise<T>) {
   throw new Error(`Fallo en ${label}: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
 }
 
-async function syncGoogleCalendarEvent(action: string, appointment: Record<string, any>, accessToken: string) {
-  const calendarId = encodeURIComponent(GOOGLE_CALENDAR_ID);
-  const eventId = appointment.event_id || appointment.eventId;
-
-  if (action === 'delete') {
-    if (!eventId) {
-      return { deleted: false, eventId: null };
-    }
-
-    const response = await fetch(`${GOOGLE_CALENDAR_BASE_URL}/${calendarId}/events/${encodeURIComponent(eventId)}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${accessToken}` }
-    });
-
-    if (!response.ok && response.status !== 404) {
-      throw new Error(`Error al borrar el evento de Google Calendar: ${response.status}`);
-    }
-
-    return { deleted: true, eventId };
-  }
-
-  const eventBody = buildCalendarEvent(appointment);
-  const url = eventId
-    ? `${GOOGLE_CALENDAR_BASE_URL}/${calendarId}/events/${encodeURIComponent(eventId)}`
-    : `${GOOGLE_CALENDAR_BASE_URL}/${calendarId}/events`;
-
+async function syncWithAppsScript(appointment: Record<string, any>, scriptAction = 'sync_calendar_event') {
+  const url = requireEnv('GOOGLE_APPS_SCRIPT_URL', GOOGLE_APPS_SCRIPT_URL);
+  const secret = requireEnv('GOOGLE_APPS_SCRIPT_SECRET', GOOGLE_APPS_SCRIPT_SECRET);
+  const calendarId = GOOGLE_CALENDAR_ID || appointment.calendar_id || appointment.calendarId || null;
   const response = await fetch(url, {
-    method: eventId ? 'PUT' : 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(eventBody)
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: scriptAction,
+      secret,
+      calendarId,
+      appointment: {
+        id: appointment.database_id || appointment.id,
+        eventId: appointment.event_id || appointment.eventId || null,
+        fecha: appointment.fecha,
+        horaInicio: appointment.hora_inicio,
+        horaFin: appointment.hora_fin,
+        cliente: appointment.cliente,
+        servicio: appointment.servicio,
+        precio: appointment.precio,
+        estado: appointment.estado
+      }
+    })
   });
 
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error?.message || 'No se pudo sincronizar con Google Calendar.');
+  const result = await response.json().catch(() => null);
+  if (scriptAction === 'delete_calendar_event') {
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.message || `Apps Script respondió HTTP ${response.status}.`);
+    }
+    return result;
   }
+  if (!response.ok || !result?.success || !result.eventId) {
+    throw new Error(result?.message || `Apps Script respondió HTTP ${response.status}.`);
+  }
+  return result;
+}
 
-  return {
-    eventId: payload.id,
-    deleted: false,
-    payload
-  };
+function isUuidLike(value) {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+async function findTurnoByIdOrLegacy(authClient, databaseId) {
+  if (!databaseId) return { stored: null, error: null };
+  if (isUuidLike(databaseId)) {
+    const { data, error } = await authClient
+      .from('turnos')
+      .select('id, legacy_id, cliente_id, usuario_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, clientes(nombre)')
+      .eq('id', databaseId)
+      .maybeSingle();
+    if (data) return { stored: data, error: null };
+    // Si el UUID no existe, igual intentar por legacy por las dudas, sin romper por 22P02.
+    return { stored: null, error };
+  }
+  const { data, error } = await authClient
+    .from('turnos')
+    .select('id, legacy_id, cliente_id, usuario_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, event_id, clientes(nombre)')
+    .eq('legacy_id', databaseId)
+    .maybeSingle();
+  return { stored: data, error };
 }
 
 async function persistEventId(appointment: Record<string, any>, eventId: string | null) {
@@ -156,76 +119,146 @@ async function persistEventId(appointment: Record<string, any>, eventId: string 
     auth: { persistSession: false, autoRefreshToken: false }
   });
 
-  const query = supabase.from('turnos').update({ event_id: eventId });
+  let query = supabase.from('turnos').update({ event_id: eventId });
 
-  if (appointment.legacy_id) {
-    query.eq('legacy_id', appointment.legacy_id);
+  if (appointment.database_id) {
+    query.eq('id', appointment.database_id);
   } else if (appointment.id) {
-    query.eq('legacy_id', appointment.id);
+    query.eq('id', appointment.id);
+  } else if (appointment.legacy_id) {
+    query.eq('legacy_id', appointment.legacy_id);
   } else if (appointment.event_id) {
     query.eq('event_id', appointment.event_id);
   }
 
-  const { error } = await query;
+  const { data, error } = await query.select('id').maybeSingle();
   if (error) {
     console.warn('No se pudo persistir event_id en Supabase:', error.message);
     return { skipped: false, error };
+  }
+  if (!data) {
+    return { skipped: false, error: new Error('No se encontró el turno para asociar el evento de Calendar.') };
   }
 
   return { skipped: false, updated: true };
 }
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders(req) });
+  }
+
   try {
+    requireEnv('SUPABASE_URL', SUPABASE_URL);
+    requireEnv('SUPABASE_ANON_KEY', SUPABASE_ANON_KEY);
+    requireEnv('SUPABASE_SERVICE_ROLE_KEY', SUPABASE_SERVICE_ROLE_KEY);
+
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.toLowerCase().startsWith('bearer ')) {
+      return jsonResponse(req, { success: false, message: 'Falta la sesión de usuario.' }, 401);
+    }
+    const bearer = authHeader.slice('bearer '.length);
+    const authClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${bearer}` } }
+    });
+    const { data: authData, error: authError } = await authClient.auth.getUser(bearer);
+    if (authError || !authData.user) {
+      return jsonResponse(req, { success: false, message: 'La sesión no es válida. Volvé a ingresar.' }, 401);
+    }
+    const { data: profile, error: profileError } = await authClient
+      .from('perfiles')
+      .select('activo, rol')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+    if (profileError || !profile?.activo) {
+      return jsonResponse(req, { success: false, message: 'El usuario no tiene acceso activo.' }, 403);
+    }
+
     const payload = await req.json().catch(() => ({}));
     const action = String(payload.action || 'create').toLowerCase();
-    const appointment = payload.appointment || {};
+    let appointment = payload.appointment || {};
+
+    if (appointment.database_id) {
+      // No romper por 22P02 cuando viene legacy_id (app_...) en columna UUID.
+      const { stored: storedAppointment } = await findTurnoByIdOrLegacy(authClient, appointment.database_id);
+      if (!storedAppointment) {
+        // En delete no bloqueamos por esto: la fila pudo borrarse justo antes;
+        // igual intentamos borrar en Calendar por event_id si lo tenemos.
+        if (action === 'delete' && (appointment.event_id || appointment.eventId)) {
+          const orphanEventId = appointment.event_id || appointment.eventId;
+          const result = await withRetry('eliminar evento con Apps Script', () => syncWithAppsScript({
+            database_id: appointment.database_id,
+            id: appointment.database_id,
+            event_id: orphanEventId,
+            eventId: orphanEventId
+          }, 'delete_calendar_event'));
+          return jsonResponse(req, { success: true, action, deleted: result.deleted !== false, eventId: orphanEventId });
+        }
+        // create/update sí necesitan el turno en DB.
+        if (action !== 'delete') {
+          return jsonResponse(req, { success: false, message: 'No se encontró el turno o no tienes acceso.' }, 404);
+        }
+      } else {
+        // Cualquiera autenticado y activo puede sincronizar/borrar su turno.
+        // El DELETE físico en la tabla lo autoriza RLS (dueño o admin).
+        appointment = {
+          ...storedAppointment,
+          database_id: storedAppointment.id,
+          cliente: storedAppointment.clientes?.nombre || 'Cliente'
+        };
+      }
+    }
 
     if (!appointment || !appointment.cliente && action !== 'delete') {
-      return new Response(JSON.stringify({ success: false, message: 'Falta appointment.' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return jsonResponse(req, { success: false, message: 'Falta appointment.' }, 400);
     }
-
-    const accessToken = await withRetry('obtener token OAuth', () => getAccessToken());
-    const result = await withRetry(`sincronizar evento ${action}`, () => syncGoogleCalendarEvent(action, appointment, accessToken));
 
     if (action === 'delete') {
-      const eventIdToClear = appointment.event_id || appointment.eventId || result.eventId;
-      await persistEventId(appointment, null);
-      return new Response(JSON.stringify({
+      const deleteId = appointment.database_id || appointment.id || appointment.legacy_id || null;
+      const deleteEventId = appointment.event_id || appointment.eventId || null;
+      if (!deleteId && !deleteEventId) {
+        return jsonResponse(req, { success: false, message: 'Falta el turno a eliminar en Calendar.' }, 400);
+      }
+      const result = await withRetry('eliminar evento con Apps Script', () => syncWithAppsScript({
+        database_id: deleteId,
+        id: deleteId,
+        event_id: deleteEventId,
+        eventId: deleteEventId
+      }, 'delete_calendar_event'));
+      return jsonResponse(req, {
         success: true,
         action,
-        eventId: eventIdToClear,
-        deleted: result.deleted
-      }), {
-        headers: { 'Content-Type': 'application/json' }
+        deleted: result.deleted !== false,
+        eventId: deleteEventId
       });
     }
 
-    const eventId = result.eventId || appointment.event_id || appointment.eventId || null;
-    await persistEventId(appointment, eventId);
+    if (action !== 'create' && action !== 'update') {
+      return jsonResponse(req, { success: false, message: 'Acción no soportada. Usa create, update o delete.' }, 400);
+    }
+    const result = await withRetry(action === 'update' ? 'actualizar evento con Apps Script' : 'crear evento con Apps Script', () => syncWithAppsScript(appointment, 'sync_calendar_event'));
 
-    return new Response(JSON.stringify({
+    const eventId = result.eventId;
+    const persisted = await persistEventId(appointment, eventId);
+    if (persisted.error || persisted.skipped) {
+      throw new Error('El evento se creó en Google Calendar, pero no se pudo guardar su ID en el turno de Supabase.');
+    }
+
+    return jsonResponse(req, {
       success: true,
       action,
       eventId,
-      calendarEvent: result.payload || null
-    }), {
-      headers: { 'Content-Type': 'application/json' }
+      calendarEvent: result.event || null
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error desconocido';
     console.error('[google-calendar]', message);
 
-    return new Response(JSON.stringify({
+    return jsonResponse(req, {
       success: false,
       message,
       warning: true
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
     });
   }
 });

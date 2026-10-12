@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { supabase } from '../supabase.js';
 import { completePendingPayment, loadExpensesFromDatabase, loadServicesFromDatabase, saveExpenseToDatabase } from '../services.js';
-import Modal, { ConfirmModal } from '../components/Modal.jsx';
+import Modal, { ConfirmModal, ModalCancelButton, ModalConfirmButton } from '../components/Modal.jsx';
+import { ListIconButton } from './Button.jsx';
 
 const INCOME_CATEGORIES = ['semi', 'kapping', 'softgel', 'esculpidas', 'personalizado', 'remocion'];
 const INCOME_CATEGORY_LABELS = {
@@ -105,6 +107,10 @@ const StatsPanel = ({ session }) => {
     const [returnMethod, setReturnMethod] = useState('Efectivo');
     const [paying, setPaying] = useState(false);
     const [payDiscardConfirmOpen, setPayDiscardConfirmOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const isSearching = useSearching(search);
+    const [showFilters, setShowFilters] = useState(false);
+    const [debtOrder, setDebtOrder] = useState('mayor');
     const payInitialRef = React.useRef(null);
 
     const now = new Date();
@@ -196,6 +202,15 @@ const StatsPanel = ({ session }) => {
             });
         return Array.from(map.values()).sort((a, b) => b.total - a.total);
     }, [services]);
+
+    const debtorsFiltrados = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        const filtered = !query ? [...debtors] : debtors.filter((d) =>
+            d.cliente.toLowerCase().includes(query)
+            || d.servicios.some((s) => (s.servicio || '').toLowerCase().includes(query))
+        );
+        return filtered.sort((a, b) => debtOrder === 'mayor' ? b.total - a.total : a.total - b.total);
+    }, [debtors, search, debtOrder]);
 
     const incomeByCategory = useMemo(() => {
         const totals = {};
@@ -390,7 +405,7 @@ const StatsPanel = ({ session }) => {
     ];
 
     return (
-        <section className="panel-stack">
+        <section className="panel-stack view-enter">
             <ConfirmModal
                 open={payDiscardConfirmOpen}
                 title="Descartar cobro"
@@ -420,70 +435,124 @@ const StatsPanel = ({ session }) => {
             </div>
 
             {debtors.length > 0 && (
-                <div className="chart-section stats-panel">
-                    <div className="panel-subsection-header pending-debtors-header">
-                        <h4 className="panel-subsection-title">Clientes con pagos pendientes</h4>
+                <>
+                    <div className="filters-container">
+                        <div className="search-box-container">
+                            <i className="fa-solid fa-magnifying-glass search-icon"></i>
+                            <input
+                                type="search"
+                                placeholder="Buscar cliente..."
+                                className="search-input"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            className="filter-toggle-btn"
+                            title="Filtrar deudores"
+                            aria-label="Filtrar deudores"
+                            aria-expanded={showFilters}
+                            onClick={() => setShowFilters((v) => !v)}
+                        >
+                            <i className="fa-solid fa-filter"></i>
+                        </button>
+                        {showFilters && (
+                            <div className="filter-button-panel">
+                                <div className="filter-button-group">
+                                    {[
+                                        { key: 'mayor', label: 'Mayor deuda' },
+                                        { key: 'menor', label: 'Menor deuda' }
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.key}
+                                            type="button"
+                                            className={`filter-choice ${debtOrder === opt.key ? 'active' : ''}`}
+                                            onClick={() => setDebtOrder(opt.key)}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                    <div className="day-appointments-container list-scroll">
-                        {debtors.map((d) => (
-                            <div key={d.cliente} className="appointment-card pending-debtor-card">
-                                <div className="appointment-info-col">
-                                    <div className="appointment-client-name">{d.cliente}</div>
-                                    <div className="appointment-service-name">
-                                        {summarizeService(d.servicios)} · {d.servicios.length} servicio{d.servicios.length !== 1 ? 's' : ''}
+                    <div className="chart-section stats-panel list-section-gap">
+                        <div className="panel-subsection-header pending-debtors-header">
+                            <h4 className="panel-subsection-title">Clientes con pagos pendientes</h4>
+                        </div>
+                        <div className="day-appointments-container unified-list list-scroll list-section-gap">
+                            {(loading || isSearching) && <SkeletonList count={5} />}
+                            {!loading && !isSearching && debtorsFiltrados.length === 0 ? (
+                                <div className="list-empty-state"><p>No se encontraron clientes que coincidan con la búsqueda.</p></div>
+                            ) : (
+                                !loading && !isSearching && debtorsFiltrados.map((d) => (
+                                    <div key={d.cliente} className="appointment-card client-card pending-debtor-card unified-card">
+                                        <div className="client-avatar" aria-hidden="true">
+                                            <i className="fa-solid fa-user"></i>
+                                        </div>
+                                        <div className="appointment-info-col client-info-col">
+                                            <div className="appointment-client-name">{d.cliente}</div>
+                                            <div className="appointment-service-name client-contact-row">
+                                                {summarizeService(d.servicios)} · {d.servicios.length} servicio{d.servicios.length !== 1 ? 's' : ''}
+                                            </div>
+                                        </div>
+                                        <div className="client-actions-col pending-debtor-actions">
+                                            <div className="card-price pending-debtor-amount">
+                                                ${formatPrice(d.total)}
+                                            </div>
+                                            <ListIconButton
+                                                icon="fa-sack-dollar"
+                                                label="Cobrar"
+                                                title={`Cobrar a ${d.cliente}`}
+                                                variant="success"
+                                                onClick={() => requestPayDebtor(d)}
+                                                aria-label={`Cobrar a ${d.cliente}`}
+                                            />
+                                        </div>
                                     </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
+
+            <div className="stats-distribution-grid">
+                <div className="chart-section stats-panel stats-distribution-section">
+                    <h4>Distribución de Ingresos de los últimos 30 días</h4>
+                    <div className="payment-stats-container">
+                        {incomeByCategory.map((row) => (
+                            <div key={row.key} className="payment-stat-row">
+                                <span className="payment-stat-label">{row.label}</span>
+                                <div className="payment-progress-bar">
+                                    <div
+                                        className="progress income-progress"
+                                        style={{ width: `${row.percent}%` }}
+                                    ></div>
                                 </div>
-                                <div className="appointment-actions-col pending-debtor-actions">
-                                    <div className="card-price pending-debtor-amount">
-                                        ${formatPrice(d.total)}
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="btn btn-primary pending-debtor-pay-action"
-                                        onClick={() => requestPayDebtor(d)}
-                                    >
-                                        <i className="fa-solid fa-sack-dollar"></i> Cobrar
-                                    </button>
-                                </div>
+                                <span className="payment-stat-val">${formatPrice(row.value)}</span>
                             </div>
                         ))}
                     </div>
                 </div>
-            )}
 
-            <div className="chart-section stats-panel stats-distribution-section">
-                <h4>Distribución de Ingresos de los últimos 30 días</h4>
-                <div className="payment-stats-container">
-                    {incomeByCategory.map((row) => (
-                        <div key={row.key} className="payment-stat-row">
-                            <span className="payment-stat-label">{row.label}</span>
-                            <div className="payment-progress-bar">
-                                <div
-                                    className="progress income-progress"
-                                    style={{ width: `${row.percent}%` }}
-                                ></div>
+                <div className="chart-section stats-panel stats-distribution-section">
+                    <h4>Distribución de Gastos de los últimos 30 días</h4>
+                    <div className="payment-stats-container">
+                        {expensesByCategory.map((row) => (
+                            <div key={row.key} className="payment-stat-row">
+                                <span className="payment-stat-label">{row.label}</span>
+                                <div className="payment-progress-bar">
+                                    <div
+                                        className="progress expense-progress"
+                                        style={{ width: `${row.percent}%` }}
+                                    ></div>
+                                </div>
+                                <span className="payment-stat-val">${formatPrice(row.value)}</span>
                             </div>
-                            <span className="payment-stat-val">${formatPrice(row.value)}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            <div className="chart-section stats-panel stats-distribution-section">
-                <h4>Distribución de Gastos de los últimos 30 días</h4>
-                <div className="payment-stats-container">
-                    {expensesByCategory.map((row) => (
-                        <div key={row.key} className="payment-stat-row">
-                            <span className="payment-stat-label">{row.label}</span>
-                            <div className="payment-progress-bar">
-                                <div
-                                    className="progress expense-progress"
-                                    style={{ width: `${row.percent}%` }}
-                                ></div>
-                            </div>
-                            <span className="payment-stat-val">${formatPrice(row.value)}</span>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -495,8 +564,13 @@ const StatsPanel = ({ session }) => {
                 closeOnBackdrop={!paying}
                 actions={
                     <>
-                        <button type="button" className="btn btn-secondary" onClick={cancelPay} disabled={paying}>Cancelar</button>
-                        <button type="submit" form="pending-payment-form" className="btn btn-primary" disabled={paying}>Continuar</button>
+                        <ModalCancelButton onClick={cancelPay} disabled={paying} />
+                        <ModalConfirmButton
+                            label="Continuar"
+                            type="submit"
+                            form="pending-payment-form"
+                            disabled={paying}
+                        />
                     </>
                 }
             >
@@ -512,7 +586,7 @@ const StatsPanel = ({ session }) => {
                         </div>
                     </div>
                     <div className="form-group">
-                        <label htmlFor="pending-payment-amount">¿Cuánto entregó la clienta?</label>
+                        <label htmlFor="pending-payment-amount">¿Cuánto entregó la clienta? <span className="field-required">(obligatorio)</span></label>
                         <div className="input-wrapper">
                             <i className="fa-solid fa-dollar-sign input-icon" />
                             <input
@@ -520,6 +594,7 @@ const StatsPanel = ({ session }) => {
                                 type="number"
                                 min={debtorToPay?.total || 0}
                                 step="1"
+                                placeholder="Ej. 15000"
                                 value={payAmount}
                                 onChange={(e) => setPayAmount(e.target.value)}
                                 required
