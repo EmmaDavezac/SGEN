@@ -555,10 +555,9 @@ function UsersPanel({ session, notify, showLoader }) {
           <div className="form-actions">
             <PanelSaveButton
               type="submit"
-              label="Enviar invitación"
-              icon="fa-paper-plane"
+              label="Guardar"
+              iconOnlyOnMobile={false}
               busy={saving}
-              busyLabel="Enviando…"
             />
           </div>
         </form>

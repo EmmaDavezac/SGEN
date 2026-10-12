@@ -58,9 +58,10 @@ export function PanelCancelButton({ label = 'Cancelar', icon = 'fa-xmark', class
 }
 
 /**
- * Botón Guardar unificado para formularios inline de paneles:
- * icono + texto en desktop, solo icono en móvil (vía .mobile-icon-only),
- * con estado busy que muestra busyLabel y deshabilita.
+ * Botón Guardar unificado para formularios: icono + texto en desktop; en
+ * móvil muestra solo el icono (vía .mobile-icon-only) salvo que se pida
+ * `iconOnlyOnMobile={false}` — lo usan los formularios de alta, cuyo botón
+ * siempre se llama "Guardar" y muestra su texto también en móvil.
  */
 export function PanelSaveButton({
   label = 'Guardar',
@@ -68,6 +69,7 @@ export function PanelSaveButton({
   busy = false,
   busyLabel,
   type = 'submit',
+  iconOnlyOnMobile = true,
   className = '',
   ...rest
 }) {
@@ -75,7 +77,7 @@ export function PanelSaveButton({
     <Button
       type={type}
       variant="primary"
-      className={`mobile-icon-only ${className}`.trim()}
+      className={`${iconOnlyOnMobile ? 'mobile-icon-only' : ''} ${className}`.trim()}
       icon={icon}
       label={label}
       busy={busy}

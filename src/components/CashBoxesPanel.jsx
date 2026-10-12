@@ -294,8 +294,8 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                     <div className="form-actions">
                         <PanelSaveButton
                             type="submit"
-                            label="Registrar Movimiento"
-                            icon="fa-plus"
+                            label="Guardar"
+                            iconOnlyOnMobile={false}
                             busy={submitting}
                             busyLabel="Guardando..."
                             disabled={submitting}

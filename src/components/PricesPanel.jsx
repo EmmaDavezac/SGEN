@@ -562,8 +562,8 @@ function PricesPanel({ session, notify, showLoader }) {
                                 />
                                 <PanelSaveButton
                                     type="button"
-                                    label="Crear"
-                                    icon="fa-plus"
+                                    label="Guardar"
+                                    iconOnlyOnMobile={false}
                                     onClick={addCategory}
                                     disabled={!newCategoryName.trim()}
                                 />
@@ -713,8 +713,8 @@ function PricesPanel({ session, notify, showLoader }) {
                                 )}
                                 <PanelSaveButton
                                     type="submit"
-                                    label={editingServiceIndex === -1 ? 'Agregar servicio' : 'Guardar servicio'}
-                                    icon={editingServiceIndex === -1 ? 'fa-plus' : 'fa-floppy-disk'}
+                                    label={editingServiceIndex === -1 ? 'Guardar' : 'Guardar servicio'}
+                                    iconOnlyOnMobile={editingServiceIndex !== -1}
                                 />
                             </div>
                         </form>

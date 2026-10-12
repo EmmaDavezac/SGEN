@@ -1192,7 +1192,8 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
                 <div className="form-actions">
                   <PanelSaveButton
                     type="submit"
-                    label="Guardar Turno"
+                    label="Guardar"
+                    iconOnlyOnMobile={false}
                     busy={savingAppointment}
                     busyLabel="Guardando…"
                   />

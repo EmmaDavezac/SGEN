@@ -538,7 +538,7 @@ function ClientsPanel({ session, notify, showLoader }) {
           </div>
         </div>
         <div className="form-actions">
-          <PanelSaveButton type="submit" busy={creating} busyLabel="Guardando…" />
+          <PanelSaveButton type="submit" busy={creating} busyLabel="Guardando…" iconOnlyOnMobile={false} />
         </div>
       </form> : <>
 

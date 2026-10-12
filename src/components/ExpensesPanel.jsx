@@ -340,7 +340,7 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                     </div>
 
                     <div className="form-actions">
-                        <PanelSaveButton type="submit" busy={submitting} busyLabel="Guardando…" disabled={submitting} />
+                        <PanelSaveButton type="submit" busy={submitting} busyLabel="Guardando…" disabled={submitting} iconOnlyOnMobile={false} />
                     </div>
                 </form>
             </div>}
