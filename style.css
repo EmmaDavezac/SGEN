@@ -1606,6 +1606,21 @@ button:disabled {
     box-shadow: 0 6px 15px rgba(90, 61, 70, 0.1);
 }
 
+/* Estadísticas: mismos colores y bordes que las tarjetas de listado — fondo
+   blanco (sin degradado), borde 2px --barbie-pale, radius-sm y sin sombra.
+   Solo esta sección: Cajas reutiliza .pink-glow para su total y conserva
+   su estilo propio. La cifra mantiene el acento --barbie-dark. */
+#tab-estadisticas .stat-card {
+    border-radius: var(--radius-sm);
+    box-shadow: none;
+}
+
+#tab-estadisticas .stat-card.pink-glow {
+    border-color: var(--barbie-pale);
+    background: var(--white);
+    box-shadow: none;
+}
+
 .stat-icon {
     font-size: 28px;
 }

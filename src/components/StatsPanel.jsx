@@ -405,7 +405,7 @@ const StatsPanel = ({ session }) => {
     ];
 
     return (
-        <section className="panel-stack view-enter">
+        <section id="tab-estadisticas" className="panel-stack view-enter">
             <ConfirmModal
                 open={payDiscardConfirmOpen}
                 title="Descartar cobro"
