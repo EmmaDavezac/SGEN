@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase.js';
 import { ConfirmModal } from './Modal.jsx';
-import { PanelCancelButton, PanelSaveButton } from './Button.jsx';
+import { PanelSaveButton } from './Button.jsx';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { loadExpensesFromDatabase, saveExpenseToDatabase } from '../services.js';
 
@@ -340,7 +340,6 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                     </div>
 
                     <div className="form-actions">
-                        <PanelCancelButton onClick={closeExpenseForm} disabled={submitting} />
                         <PanelSaveButton type="submit" busy={submitting} busyLabel="Guardando…" disabled={submitting} />
                     </div>
                 </form>

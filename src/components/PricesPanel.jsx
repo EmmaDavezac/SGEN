@@ -530,12 +530,20 @@ function PricesPanel({ session, notify, showLoader }) {
                         <strong>Categorías</strong>
                         <button
                             type="button"
-                            className="btn btn-primary btn-sm panel-header-action mobile-icon-only"
-                            onClick={() => setShowNewCategory(true)}
-                            aria-label="Nueva categoría"
+                            className={`btn btn-primary btn-sm panel-header-action mobile-icon-only${showNewCategory ? ' btn-back' : ''}`}
+                            onClick={() => {
+                                if (showNewCategory) {
+                                    setNewCategoryName('');
+                                    setShowNewCategory(false);
+                                } else {
+                                    setShowNewCategory(true);
+                                }
+                            }}
+                            aria-expanded={showNewCategory}
+                            aria-label={showNewCategory ? 'Volver' : 'Nueva categoría'}
                         >
-                            <i className="fa-solid fa-plus" aria-hidden="true"></i>
-                            <span className="mobile-action-label">Nuevo</span>
+                            <i className={`fa-solid ${showNewCategory ? 'fa-arrow-left' : 'fa-plus'}`} aria-hidden="true"></i>
+                            <span className="mobile-action-label">{showNewCategory ? 'Volver' : 'Nuevo'}</span>
                         </button>
                     </div>
 
@@ -559,7 +567,6 @@ function PricesPanel({ session, notify, showLoader }) {
                                     onClick={addCategory}
                                     disabled={!newCategoryName.trim()}
                                 />
-                                <PanelCancelButton onClick={() => { setShowNewCategory(false); setNewCategoryName(''); }} />
                             </div>
                         </div>
                         )}
@@ -665,10 +672,17 @@ function PricesPanel({ session, notify, showLoader }) {
 
                     <div className="catalog-services-header">
                         <h4>Servicios</h4>
-                        <button type="button" className="btn btn-primary btn-sm panel-header-action mobile-icon-only" onClick={() => setEditingServiceIndex(-1)} aria-label="Agregar servicio">
-                            <i className="fa-solid fa-plus" aria-hidden="true"></i>
-                            <span className="mobile-action-label">Agregar servicio</span>
-                        </button>
+                        {editingServiceIndex === -1 ? (
+                            <button type="button" className="btn btn-primary btn-sm panel-header-action mobile-icon-only btn-back" onClick={() => { setEditingServiceIndex(null); setServiceDraft({ name: '', price: '0' }); }} aria-label="Volver">
+                                <i className="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                                <span className="mobile-action-label">Volver</span>
+                            </button>
+                        ) : (
+                            <button type="button" className="btn btn-primary btn-sm panel-header-action mobile-icon-only" onClick={() => setEditingServiceIndex(-1)} aria-label="Agregar servicio">
+                                <i className="fa-solid fa-plus" aria-hidden="true"></i>
+                                <span className="mobile-action-label">Agregar servicio</span>
+                            </button>
+                        )}
                     </div>
 
                     {editingServiceIndex !== null && (
@@ -694,7 +708,9 @@ function PricesPanel({ session, notify, showLoader }) {
                                 />
                             </div>
                             <div className="form-actions">
-                                <PanelCancelButton onClick={() => { setEditingServiceIndex(null); setServiceDraft({ name: '', price: '0' }); }} />
+                                {editingServiceIndex !== -1 && (
+                                    <PanelCancelButton onClick={() => { setEditingServiceIndex(null); setServiceDraft({ name: '', price: '0' }); }} />
+                                )}
                                 <PanelSaveButton
                                     type="submit"
                                     label={editingServiceIndex === -1 ? 'Agregar servicio' : 'Guardar servicio'}

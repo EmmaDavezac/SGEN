@@ -58,7 +58,7 @@ No introducir colores nuevos para un patrón ya cubierto por un token.
 - Para altas que no se usan continuamente, abrir el formulario bajo demanda con `aria-expanded` y `aria-controls`.
 - Al guardar correctamente, limpiar el formulario y cerrar su panel de alta.
 - Los cambios en formularios de edición deben bloquear la salida o pedir confirmación antes de descartarse.
-- En móvil, los pares Guardar/Cancelar ocupan **media fila cada uno** (`.form-actions`, `.detail-form-actions` y `.account-form-actions`).
+- Los formularios de alta no llevan `Cancelar`: la salida hacia atrás es el `Volver` de la cabecera (toggles `Nuevo`/`Volver`). En móvil, el `Guardar` de alta ocupa **toda la fila** (`.form-actions`); en las ediciones, `Guardar` y `Cancelar` ocupan **media fila cada uno** (`.detail-form-actions` y `.account-form-actions`).
 
 ## Modales
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabase.js';
-import Button, { PanelCancelButton, PanelSaveButton } from './Button.jsx';
+import Button, { PanelSaveButton } from './Button.jsx';
 import { ConfirmModal } from './Modal.jsx';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { loadCashboxDataFromDatabase, saveCashMovementToDatabase } from '../services.js';
@@ -292,7 +292,6 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                     </div>
 
                     <div className="form-actions">
-                        <PanelCancelButton onClick={closeMovementForm} disabled={submitting} />
                         <PanelSaveButton
                             type="submit"
                             label="Registrar Movimiento"

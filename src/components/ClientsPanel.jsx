@@ -538,7 +538,6 @@ function ClientsPanel({ session, notify, showLoader }) {
           </div>
         </div>
         <div className="form-actions">
-          <PanelCancelButton onClick={closeRegistrationForm} disabled={creating} />
           <PanelSaveButton type="submit" busy={creating} busyLabel="Guardando…" />
         </div>
       </form> : <>

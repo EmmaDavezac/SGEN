@@ -517,7 +517,7 @@ function UsersPanel({ session, notify, showLoader }) {
         <Button
           type="button"
           className={`btn-sm panel-header-action mobile-icon-only${formOpen ? ' btn-back' : ''}`}
-          onClick={() => setFormOpen((open) => !open)}
+          onClick={() => (formOpen ? closeInviteForm() : setFormOpen(true))}
           aria-expanded={formOpen}
           aria-controls="users-invite-form"
           aria-label={formOpen ? 'Volver' : 'Invitar usuario'}
@@ -553,7 +553,6 @@ function UsersPanel({ session, notify, showLoader }) {
             </div>
           </div>
           <div className="form-actions">
-            <PanelCancelButton disabled={saving} onClick={closeInviteForm} />
             <PanelSaveButton
               type="submit"
               label="Enviar invitación"

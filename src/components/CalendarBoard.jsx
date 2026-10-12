@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getValidSession, supabase } from '../supabase.js';
 import Modal, { ConfirmModal, ModalCancelButton, ModalConfirmButton } from './Modal.jsx';
-import { ListIconButton, PanelCancelButton, PanelSaveButton } from './Button.jsx';
+import { ListIconButton, PanelSaveButton } from './Button.jsx';
 import { cancelAppointmentInDatabase, deleteAppointmentFromDatabase, hasLinkedServiceForTurno, hasSenaForTurno, loadAppointmentsFromDatabase, loadClientsFromDatabase, registerPaymentRecord, saveAppointmentToDatabase, saveClientToDatabase, updateAppointmentInDatabase } from '../services.js';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import VentaDetalleModal from './VentaDetalleModal.jsx';
@@ -1012,9 +1012,21 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
 
           {scheduleOpen && (
             <>
-              <h4>
-                <i className="fa-solid fa-calendar-plus panel-heading-icon"></i>Nuevo Turno
-              </h4>
+              <div className="section-title section-title-with-back">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm panel-header-action btn-back mobile-icon-only"
+                  onClick={closeScheduleForm}
+                  disabled={savingAppointment}
+                  aria-label="Volver a la agenda"
+                >
+                  <i className="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                  <span className="mobile-action-label">Volver</span>
+                </button>
+                <div className="section-title-text">
+                  <h3>Nuevo Turno</h3>
+                </div>
+              </div>
               <form id="schedule-form" className="cute-form panel-form-spaced" onSubmit={submitNewAppointment}>
                 <div className="form-group schedule-client-field">
                   <label htmlFor="schedule-client-name">
@@ -1178,7 +1190,6 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
                 )}
 
                 <div className="form-actions">
-                  <PanelCancelButton onClick={closeScheduleForm} disabled={savingAppointment} />
                   <PanelSaveButton
                     type="submit"
                     label="Guardar Turno"
