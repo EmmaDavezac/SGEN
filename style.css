@@ -4961,6 +4961,19 @@ button:active {
     border-top: 1px solid var(--barbie-light);
 }
 
+/* En móvil, Guardar y Cancelar ocupan media fila cada uno: flex-basis 0
+   reparte el ancho libre en partes iguales y el gap de 10px queda en el
+   medio. min-width: 0 pisa el 154px de .account-form-actions .btn y el
+   44px de .mobile-icon-only para que quepan las dos en pantallas angostas. */
+@media (max-width: 520px) {
+    .form-actions .btn,
+    .detail-form-actions .btn,
+    .account-form-actions .btn {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+}
+
 /* Estado vacío del listado */
 #expenses-list .list-empty-state {
     min-height: 120px;
