@@ -585,6 +585,18 @@ button:disabled {
     font-size: 12px;
 }
 
+/* Pulsación simulada al apretar el Volver con la tecla Esc o con el botón
+   "atrás" del navegador/móvil (src/backNavigation.js). */
+.btn.is-pressed:not(:disabled) {
+    transform: scale(0.97);
+}
+
+.btn-primary.is-pressed:not(:disabled) {
+    background: var(--white);
+    color: var(--barbie-dark);
+    border-color: var(--barbie-pink);
+}
+
 .app-footer {
     display: flex;
     align-items: center;

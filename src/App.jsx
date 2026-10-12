@@ -6,6 +6,7 @@ import Loader from './components/Loader.jsx';
 import Toast from './components/Toast.jsx';
 import { ToastProvider, useToast } from './components/ToastContext.jsx';
 import { pedirAbrirCliente } from './clienteNav.js';
+import { pressVisibleBackButton } from './backNavigation.js';
 import CalendarBoard from './components/CalendarBoard.jsx';
 import RegisterServiceForm from './components/RegisterServiceForm.jsx';
 import HistoryPanel from './components/HistoryPanel.jsx';
@@ -129,8 +130,13 @@ function App() {
     const [activeTab, setActiveTabState] = useState(initialTab);
     const [routeNotFound, setRouteNotFound] = useState(() => !isKnownPath(window.location.pathname));
     const [checkoutAppointment, setCheckoutAppointment] = useState(null);
+    // Pestaña activa "al día" en el mismo tick: la necesita el handler de popstate
+    // (botón atrás del navegador/móvil) apenas se presiona un Volver que además
+    // cambia de pestaña.
+    const activeTabRef = useRef(activeTab);
 
     const setActiveTab = useCallback((tab) => {
+        activeTabRef.current = tab;
         const nextPath = getPathForTab(tab);
         if (window.location.pathname !== nextPath) {
             window.history.pushState({ tab }, '', nextPath);
@@ -227,13 +233,38 @@ function App() {
 
     const isAdmin = session && (session.rol === 'admin' || session.rol === 'superadmin');
     useEffect(() => {
+        activeTabRef.current = activeTab;
+    }, [activeTab]);
+    useEffect(() => {
         const handlePopState = () => {
+            // El botón "atrás" del navegador/móvil también aprieta el Volver de la
+            // pantalla actual (ficha, formularios, Historial, Precios, …). Si se usó
+            // para eso, hay que devolverle a la historia la URL de la pestaña activa:
+            // el "atrás" cerró la subpantalla, no cambió de pestaña.
+            if (pressVisibleBackButton()) {
+                const nextPath = getPathForTab(activeTabRef.current);
+                if (window.location.pathname !== nextPath) {
+                    window.history.pushState({ tab: activeTabRef.current }, '', nextPath);
+                }
+                return;
+            }
             const tab = getTabFromPath(window.location.pathname);
             setRouteNotFound(!tab);
             if (tab) setActiveTabState(tab);
         };
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
+
+    // Tecla Esc: aprieta el botón Volver visible de la pantalla actual. Si hay un
+    // modal (o confirmación) abierto, el Esc le pertenece al propio Modal.
+    useEffect(() => {
+        const handleEscape = (event) => {
+            if (event.key !== 'Escape' || event.defaultPrevented) return;
+            pressVisibleBackButton();
+        };
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
     }, []);
 
     useEffect(() => {

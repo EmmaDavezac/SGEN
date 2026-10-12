@@ -36,7 +36,9 @@ No introducir colores nuevos para un patrón ya cubierto por un token.
 - `.btn.btn-back`: navegación hacia atrás. En todas las pantallas va **primero, a la
   izquierda** de la cabecera (patrón `.section-title-with-back`): el título y su
   subtítulo siguen a su derecha y las acciones restantes, si las hay, quedan al fondo
-  de la fila.
+  de la fila. La tecla **Esc** y el botón **atrás** del navegador/móvil **aprietan**
+  el `Volver` visible de la pantalla; si no hay ninguno, el atrás sigue cambiando de
+  pestaña como siempre (`src/backNavigation.js`).
 - No existen botones `Cerrar` para salir de una vista: toda acción de volver hacia
   atrás se llama **`Volver`** con icono `fa-arrow-left`, incluidos los toggles de los
   paneles (`Nuevo` al cerrar el formulario, `Volver` a la izquierda al abrirlo). El
