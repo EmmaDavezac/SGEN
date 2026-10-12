@@ -191,21 +191,21 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                 }}
                 onCancel={() => setConfirmation(null)}
             />
-            <div className="section-title">
-                <div>
+            <div className={`section-title ${formOpen ? 'section-title-with-back' : 'section-title-with-action'}`}>
+                <div className="section-title-text">
                     <h3>Gestión de Caja</h3>
                     <p>Control de efectivo y medios de pago.</p>
                 </div>
                 <button
                     type="button"
-                    className="btn btn-primary btn-sm panel-header-action mobile-icon-only"
+                    className={`btn btn-primary btn-sm panel-header-action mobile-icon-only${formOpen ? ' btn-back' : ''}`}
                     onClick={toggleMovementForm}
                     aria-expanded={formOpen}
                     aria-controls="cash-movement-form"
-                    aria-label={formOpen ? 'Cerrar movimiento' : 'Nuevo movimiento'}
+                    aria-label={formOpen ? 'Volver' : 'Nuevo movimiento'}
                 >
-                    <i className={`fa-solid ${formOpen ? 'fa-xmark' : 'fa-plus'}`} aria-hidden="true" />
-                    <span className="mobile-action-label">{formOpen ? 'Cerrar' : 'Nuevo'}</span>
+                    <i className={`fa-solid ${formOpen ? 'fa-arrow-left' : 'fa-plus'}`} aria-hidden="true" />
+                    <span className="mobile-action-label">{formOpen ? 'Volver' : 'Nuevo'}</span>
                 </button>
             </div>
 

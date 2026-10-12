@@ -809,6 +809,9 @@ button:disabled {
 
 .section-title-with-back .btn-back {
     flex: 0 0 auto;
+    /* Los toggles de panel mantienen el título primero en el DOM; al pasar a
+       modo Volver, order lo devuelve a la primera posición visual (izquierda). */
+    order: -1;
 }
 
 .section-title-with-back .section-title-text {

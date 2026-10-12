@@ -37,6 +37,10 @@ No introducir colores nuevos para un patrón ya cubierto por un token.
   izquierda** de la cabecera (patrón `.section-title-with-back`): el título y su
   subtítulo siguen a su derecha y las acciones restantes, si las hay, quedan al fondo
   de la fila.
+- No existen botones `Cerrar` para salir de una vista: toda acción de volver hacia
+  atrás se llama **`Volver`** con icono `fa-arrow-left`, incluidos los toggles de los
+  paneles (`Nuevo` al cerrar el formulario, `Volver` a la izquierda al abrirlo). El
+  único `Cerrar` válido de la app es `Cerrar sesión`.
 - `.btn.btn-sm`: acción compacta en encabezados y paneles.
 - Para operaciones asíncronas usar `Button` con `busy`, no texto y `disabled` duplicados.
 - Las confirmaciones deben colocar Cancelar a la izquierda y Confirmar a la derecha, con iconos X y check.

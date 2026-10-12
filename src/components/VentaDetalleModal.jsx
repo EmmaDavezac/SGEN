@@ -326,8 +326,8 @@ function VentaDetalleModal({
                 sizeClass="detail-modal-card"
                 actions={
                     <>
-                        <ModalButton variant="secondary" onClick={onClose}>
-                            Cerrar
+                        <ModalButton variant="secondary" icon="fa-arrow-left" onClick={onClose}>
+                            Volver
                         </ModalButton>
                         {estaPago && (
                             <ModalButton variant="primary" icon="fa-share-nodes" onClick={compartirTicket}>

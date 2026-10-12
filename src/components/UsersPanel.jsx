@@ -394,9 +394,9 @@ function UsersPanel({ session, notify, showLoader }) {
                         icon={roleEditing ? 'fa-lock' : 'fa-unlock'}
                         label={roleEditing ? 'Listo' : 'Cambiar rol'}
                         title={roleEditing
-                          ? 'Cerrar la modificación del rol'
+                          ? 'Volver a la vista de solo lectura'
                           : `Habilitar la modificación del rol de ${viewedUser.nombre}`}
-                        aria-label={roleEditing ? 'Cerrar modificación de rol' : 'Cambiar rol'}
+                        aria-label={roleEditing ? 'Listo' : 'Cambiar rol'}
                         disabled={saving}
                         iconOnlyOnMobile={false}
                         onClick={() => setRoleEditing((current) => !current)}
@@ -509,21 +509,21 @@ function UsersPanel({ session, notify, showLoader }) {
 
       {!viewedUser && (
         <>
-      <div className="section-title section-title-with-action">
-        <div>
+      <div className={`section-title ${formOpen ? 'section-title-with-back' : 'section-title-with-action'}`}>
+        <div className="section-title-text">
           <h3 id="users-title">Usuarios</h3>
           <p>Administrá accesos, roles y estado del equipo.</p>
         </div>
         <Button
           type="button"
-          className="btn-sm panel-header-action mobile-icon-only"
+          className={`btn-sm panel-header-action mobile-icon-only${formOpen ? ' btn-back' : ''}`}
           onClick={() => setFormOpen((open) => !open)}
           aria-expanded={formOpen}
           aria-controls="users-invite-form"
-          aria-label={formOpen ? 'Cerrar invitación' : 'Invitar usuario'}
+          aria-label={formOpen ? 'Volver' : 'Invitar usuario'}
         >
-          <i className={`fa-solid ${formOpen ? 'fa-xmark' : 'fa-plus'}`} aria-hidden="true" />
-          <span className="mobile-action-label">{formOpen ? 'Cerrar' : 'Nuevo'}</span>
+          <i className={`fa-solid ${formOpen ? 'fa-arrow-left' : 'fa-plus'}`} aria-hidden="true" />
+          <span className="mobile-action-label">{formOpen ? 'Volver' : 'Nuevo'}</span>
         </Button>
       </div>
 

@@ -74,7 +74,7 @@ function Modal({
     >
       <div ref={cardRef} className={`modal-card ${showCloseButton ? 'modal-card--with-close' : ''} ${sizeClass}`.trim()} tabIndex="-1">
         {showCloseButton && onClose && (
-          <button type="button" className="modal-close-button" onClick={onClose} aria-label="Cerrar" title="Cerrar">
+          <button type="button" className="modal-close-button" onClick={onClose} aria-label="Volver" title="Volver">
             <i className="fa-solid fa-xmark" aria-hidden="true" />
           </button>
         )}

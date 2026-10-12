@@ -223,21 +223,21 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
 
     return (
         <section id="tab-gastos" className="panel-stack view-enter">
-            <div className="section-title section-title-with-action">
-                <div>
+            <div className={`section-title ${formOpen ? 'section-title-with-back' : 'section-title-with-action'}`}>
+                <div className="section-title-text">
                     <h3>Registro de Gastos</h3>
                     <p>Controla tus egresos diarios para optimizar tu negocio.</p>
                 </div>
                 <button
                     type="button"
-                    className="btn btn-primary btn-sm panel-header-action mobile-icon-only"
+                    className={`btn btn-primary btn-sm panel-header-action mobile-icon-only${formOpen ? ' btn-back' : ''}`}
                     onClick={toggleExpenseForm}
                     aria-expanded={formOpen}
                     aria-controls="expense-registration-form"
-                    aria-label={formOpen ? 'Cerrar registro de gasto' : 'Registrar nuevo gasto'}
+                    aria-label={formOpen ? 'Volver' : 'Registrar nuevo gasto'}
                 >
-                    <i className={`fa-solid ${formOpen ? 'fa-xmark' : 'fa-plus'}`} aria-hidden="true" />
-                    <span className="mobile-action-label">{formOpen ? 'Cerrar' : 'Nuevo'}</span>
+                    <i className={`fa-solid ${formOpen ? 'fa-arrow-left' : 'fa-plus'}`} aria-hidden="true" />
+                    <span className="mobile-action-label">{formOpen ? 'Volver' : 'Nuevo'}</span>
                 </button>
             </div>
 

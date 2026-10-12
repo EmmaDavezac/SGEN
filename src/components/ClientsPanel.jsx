@@ -477,21 +477,21 @@ function ClientsPanel({ session, notify, showLoader }) {
     <div id="tab-clientes" className="view-enter">
       {!detailClient && (
         <>
-      <div className="section-title section-title-with-action">
-        <div>
+      <div className={`section-title ${registrationOpen ? 'section-title-with-back' : 'section-title-with-action'}`}>
+        <div className="section-title-text">
           <h3>Clientes</h3>
           <p>Consultá y agregá las clientas de Evolet Nails.</p>
         </div>
         <button
           type="button"
-          className="btn btn-primary btn-sm panel-header-action mobile-icon-only"
+          className={`btn btn-primary btn-sm panel-header-action mobile-icon-only${registrationOpen ? ' btn-back' : ''}`}
           onClick={toggleRegistrationForm}
           aria-expanded={registrationOpen}
           aria-controls="client-registration-form"
-          aria-label={registrationOpen ? 'Cerrar registro de clienta' : 'Registrar nueva clienta'}
+          aria-label={registrationOpen ? 'Volver' : 'Registrar nueva clienta'}
         >
-          <i className={`fa-solid ${registrationOpen ? 'fa-xmark' : 'fa-plus'}`} aria-hidden="true" />
-          <span className="mobile-action-label">{registrationOpen ? 'Cerrar' : 'Nuevo'}</span>
+          <i className={`fa-solid ${registrationOpen ? 'fa-arrow-left' : 'fa-plus'}`} aria-hidden="true" />
+          <span className="mobile-action-label">{registrationOpen ? 'Volver' : 'Nuevo'}</span>
         </button>
       </div>
 
