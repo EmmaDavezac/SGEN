@@ -299,6 +299,7 @@ function PricesPanel({ session, notify, showLoader }) {
             setPendingChanges(true);
             return false;
         }
+        if (showLoader) showLoader(true, 'Guardando categoría...');
         try {
             const { error } = await supabase
                 .from('categorias_servicio')
@@ -311,6 +312,8 @@ function PricesPanel({ session, notify, showLoader }) {
             notify && notify(err.message || 'No se pudo guardar la categoría.', 'error');
             setPendingChanges(true);
             return false;
+        } finally {
+            if (showLoader) showLoader(false);
         }
     };
 
@@ -329,6 +332,7 @@ function PricesPanel({ session, notify, showLoader }) {
             actualizado_por: session.authId
         }));
         if (!serviceRows.length) return;
+        if (showLoader) showLoader(true, 'Guardando servicios...');
         try {
             const { error } = await supabase
                 .from('precios')
@@ -339,6 +343,8 @@ function PricesPanel({ session, notify, showLoader }) {
             console.error('Error guardando servicios:', err);
             notify && notify(err.message || 'No se pudieron guardar los servicios.', 'error');
             setPendingChanges(true);
+        } finally {
+            if (showLoader) showLoader(false);
         }
     };
 

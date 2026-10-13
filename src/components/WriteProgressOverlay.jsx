@@ -4,8 +4,10 @@ import { STEP_STATUS } from '../progressTask.js';
 /**
  * Pantalla de carga única y reutilizable para toda operación de escritura
  * remota (crear / modificar / eliminar). Cubre toda la interfaz (hereda
- * `.loader-overlay`, z-index 9999) para que no se pueda interactuar mientras
- * dura la operación y evitar errores desde la UI.
+ * `.loader-overlay`, z-index 150000: por encima de `.modal-overlay`, 100000,
+ * para que el progreso se vea incluso con un ConfirmModal todavía abierto)
+ * para que no se pueda interactuar mientras dura la operación y evitar
+ * errores desde la UI.
  *
  * Dos presentaciones:
  *  - `indeterminate` (sin pasos): corazón animado + texto, igual al loader de

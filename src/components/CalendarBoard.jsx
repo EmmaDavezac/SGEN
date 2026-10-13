@@ -963,7 +963,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
 
   // Despacha la acción elegida en la tarjeta. Las reglas de qué se permite
   // están en appointmentActions.js; acá solo se enruta al flujo existente.
-  const handleAppointmentAction = (key, apt) => {
+  const handleAppointmentAction = async (key, apt) => {
     switch (key) {
       case 'consultar':
         setDetailTarget(apt);
@@ -983,14 +983,22 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
       case 'eliminar':
         askDeleteAppointment(apt);
         break;
-      case 'sincronizar':
+      case 'sincronizar': {
         // Un turno cancelado nunca debe volver a aparecer en Calendar: si se
         // reintenta la sincronización, se borra el evento en lugar de recrearlo.
-        syncAppointmentToGoogle(
-          apt,
-          normalizeTurnoEstado(apt.estado) === 'cancelado' ? 'delete' : 'create'
-        );
+        // Toda modificación pasa por el overlay: además del spinner local de la
+        // tarjeta, showLoader bloquea la UI mientras dura el request a la Edge.
+        if (showLoader) showLoader(true, 'Sincronizando con Google Calendar...');
+        try {
+          await syncAppointmentToGoogle(
+            apt,
+            normalizeTurnoEstado(apt.estado) === 'cancelado' ? 'delete' : 'create'
+          );
+        } finally {
+          if (showLoader) showLoader(false);
+        }
         break;
+      }
       default:
         break;
     }

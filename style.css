@@ -142,7 +142,10 @@ button {
     width: 100%;
     height: 100%;
     background-color: rgba(252, 249, 245, 0.9);
-    z-index: 9999;
+    /* Debe quedar SOBRE .modal-overlay (z-index 100000): los ConfirmModal de
+       eliminación permanecen abiertos (busy) mientras corre la operación y,
+       con el overlay debajo, no se vería la animación de progreso. */
+    z-index: 150000;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -300,7 +303,10 @@ button {
     top: calc(15px + env(safe-area-inset-top));
     left: 5%;
     width: 90%;
-    z-index: 10000;
+    /* Por encima del overlay de progreso (150000) y de los modales (100000):
+       los avisos best-effort (p. ej. "no se pudo borrar en Calendar") se
+       disparan mientras el overlay sigue visible. */
+    z-index: 200000;
     pointer-events: none;
 }
 
