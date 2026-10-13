@@ -338,14 +338,14 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
     );
   };
 
-  const syncAppointmentToGoogle = async (appointment) => {
+  const syncAppointmentToGoogle = async (appointment, action = 'create') => {
     if (!supabase || !appointment?.rawId) return;
     setSyncingAppointmentId(appointment.rawId);
     try {
       const authSession = await getValidSession();
       const { data, error } = await supabase.functions.invoke('google-calendar', {
         body: {
-          action: 'create',
+          action,
           appointment: {
             database_id: appointment.rawId,
             id: appointment.id,
@@ -369,12 +369,24 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
       }
       if (!data?.success) throw new Error(data?.message || 'Google Calendar no confirmó la sincronización.');
 
+      // Tras borrar el evento ya no hay eventId que guardar; en create/update
+      // se persiste el que devuelve la Edge (upsert idempotente en el script).
       setAppointments((current) => {
-        const next = current.map((item) => item.rawId === appointment.rawId ? { ...item, eventId: data.eventId } : item);
+        const next = current.map((item) => {
+          if (item.rawId !== appointment.rawId) return item;
+          return action === 'delete'
+            ? { ...item, eventId: null }
+            : { ...item, eventId: data.eventId };
+        });
         try { localStorage.setItem(cacheKeyAppointments, JSON.stringify(next)); } catch { /* ignore */ }
         return next;
       });
-      notify?.('Turno sincronizado con Google Calendar.', 'success');
+      notify?.(
+        action === 'delete'
+          ? 'Evento eliminado de Google Calendar.'
+          : 'Turno sincronizado con Google Calendar.',
+        'success'
+      );
     } catch (error) {
       console.error('Error sincronizando turno con Google Calendar:', error);
       notify?.(error.message || 'No se pudo sincronizar el turno con Google Calendar.', 'error');
@@ -879,7 +891,12 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
         askDeleteAppointment(apt);
         break;
       case 'sincronizar':
-        syncAppointmentToGoogle(apt);
+        // Un turno cancelado nunca debe volver a aparecer en Calendar: si se
+        // reintenta la sincronización, se borra el evento en lugar de recrearlo.
+        syncAppointmentToGoogle(
+          apt,
+          normalizeTurnoEstado(apt.estado) === 'cancelado' ? 'delete' : 'create'
+        );
         break;
       default:
         break;
@@ -944,6 +961,11 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
         return next;
       });
       if (notify) notify('Turno cancelado. Quedó registrado con su motivo.', 'success');
+      // Un turno cancelado no debe seguir ocupando el calendario del salón: se
+      // borra el evento en Google Calendar (best-effort; la app ya quedó
+      // cancelada, así que un fallo de Calendar no revierte nada). Se dispara
+      // sin await para no bloquear el cierre del modal.
+      syncAppointmentToGoogle(cancelTarget, 'delete');
       cancelInitialRef.current = '';
       setCancelOpen(false);
       setCancelTarget(null);

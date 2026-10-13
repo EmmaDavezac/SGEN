@@ -119,19 +119,37 @@ async function persistEventId(appointment: Record<string, any>, eventId: string 
     auth: { persistSession: false, autoRefreshToken: false }
   });
 
-  let query = supabase.from('turnos').update({ event_id: eventId });
-
+  // Determinar la columna y el valor por los que filtrar el UPDATE. Sin un
+  // identificador confiable NO se ejecuta nada (evita un UPDATE masivo accidental).
+  let column: string | null = null;
+  let value: string | null = null;
   if (appointment.database_id) {
-    query.eq('id', appointment.database_id);
+    column = 'id';
+    value = appointment.database_id;
   } else if (appointment.id) {
-    query.eq('id', appointment.id);
+    column = 'id';
+    value = appointment.id;
   } else if (appointment.legacy_id) {
-    query.eq('legacy_id', appointment.legacy_id);
+    column = 'legacy_id';
+    value = appointment.legacy_id;
   } else if (appointment.event_id) {
-    query.eq('event_id', appointment.event_id);
+    column = 'event_id';
+    value = appointment.event_id;
   }
 
-  const { data, error } = await query.select('id').maybeSingle();
+  if (!column || !value) {
+    return { skipped: false, error: new Error('No se pudo identificar el turno para asociar el evento de Calendar.') };
+  }
+
+  // supabase-js es inmutable: cada .eq() devuelve un builder nuevo, así que hay
+  // que reasignar. Un UPDATE sin filtro con service_role bypasea RLS y
+  // sobreescribiría el event_id de todos los turnos.
+  const { data, error } = await supabase
+    .from('turnos')
+    .update({ event_id: eventId })
+    .eq(column, value)
+    .select('id')
+    .maybeSingle();
   if (error) {
     console.warn('No se pudo persistir event_id en Supabase:', error.message);
     return { skipped: false, error };
