@@ -6,7 +6,7 @@ Google Calendar se opera desde el Apps Script existente, ejecutado como la cuent
 
 1. Crea un proyecto nuevo en [Google Apps Script](https://script.google.com/).
 2. Pega el contenido de [`docs/google_calendar_bridge.gs`](../../../docs/google_calendar_bridge.gs) y guarda el proyecto.
-3. En **Configuración del proyecto > Propiedades del script**, configura `CALENDAR_BRIDGE_SECRET` con una clave aleatoria larga. Opcionalmente configura `CALENDAR_ID`; si se omite, usa el calendario principal.
+3. (Opcional) En **Configuración del proyecto > Propiedades del script**, configurá `CALENDAR_BRIDGE_SECRET` con una clave aleatoria larga. **Si lo omitís, el bridge acepta cualquier llamada** (útil para simplificar la configuración; menos seguro). Opcionalmente configurá `CALENDAR_ID`; si se omite, usa el calendario principal.
 4. En **Implementar > Nueva implementación > Aplicación web**, elige ejecutar como tu cuenta y configura el acceso para que la Edge Function pueda llamar al endpoint.
 5. Autoriza los permisos de Calendar con la cuenta cuyo calendario recibirá los turnos; copia la URL `/exec` de la implementación.
 
@@ -18,8 +18,8 @@ El calendario destino se resuelve con prioridad: `calendarId` enviado por la Edg
 
 En **Project Settings > Edge Functions > Secrets** configura:
 
-- `GOOGLE_APPS_SCRIPT_URL`: URL `/exec` de la implementación web.
-- `GOOGLE_APPS_SCRIPT_SECRET`: el mismo valor que `CALENDAR_BRIDGE_SECRET` en Apps Script.
+- `GOOGLE_APPS_SCRIPT_URL`: URL `/exec` de la implementación web. (Requerida.)
+- `GOOGLE_APPS_SCRIPT_SECRET`: (Opcional) el mismo valor que `CALENDAR_BRIDGE_SECRET` en Apps Script. Si lo omitís en ambos lados, la sincronización funciona sin secreto.
 - `GOOGLE_CALENDAR_ID`: ID del calendario destino, por ejemplo `66c3ae6263491d71ff4e1ce61677018ec9d85a12a3bd677a301d927d62ae1b74@group.calendar.google.com`. La Edge lo envía a Apps Script en cada `create/update/delete`.
 
 La función Edge también necesita `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`, ya configurados para el proyecto. `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` y `GOOGLE_CALENDAR_ID` ya no se usan en esta arquitectura.

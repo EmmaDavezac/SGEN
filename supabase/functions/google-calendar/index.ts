@@ -50,7 +50,9 @@ async function withRetry<T>(label: string, callback: () => Promise<T>) {
 
 async function syncWithAppsScript(appointment: Record<string, any>, scriptAction = 'sync_calendar_event') {
   const url = requireEnv('GOOGLE_APPS_SCRIPT_URL', GOOGLE_APPS_SCRIPT_URL);
-  const secret = requireEnv('GOOGLE_APPS_SCRIPT_SECRET', GOOGLE_APPS_SCRIPT_SECRET);
+  // El secreto es opcional: si no está configurado, se envía vacío y el Apps Script
+  // (sin CALENDAR_BRIDGE_SECRET configurado) acepta la llamada igual.
+  const secret = GOOGLE_APPS_SCRIPT_SECRET || '';
   const calendarId = GOOGLE_CALENDAR_ID || appointment.calendar_id || appointment.calendarId || null;
   const response = await fetch(url, {
     method: 'POST',

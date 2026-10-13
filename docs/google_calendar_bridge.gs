@@ -4,7 +4,9 @@ function doPost(e) {
     const expectedSecret = properties.getProperty('CALENDAR_BRIDGE_SECRET');
     const payload = JSON.parse(e && e.postData && e.postData.contents || '{}');
 
-    if (!expectedSecret || payload.secret !== expectedSecret) {
+    // El secreto es OPCIONAL: si no configurás CALENDAR_BRIDGE_SECRET, se acepta
+    // cualquier llamada; si lo configurás, la petición debe traer ese mismo valor.
+    if (expectedSecret && payload.secret !== expectedSecret) {
       return jsonResponse({ success: false, message: 'No autorizado' });
     }
     if (payload.action === 'delete_calendar_event') {
