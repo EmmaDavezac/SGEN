@@ -30,7 +30,7 @@ Antes de este sistema, la operación del salón sufría estos dolores:
 |---|---|
 | 🔐 **Autenticación multi-rol** | Inicio de sesión por email + contraseña (Supabase Auth). Dos perfiles: `admin` (dueña) y `usuaria` (manicurera). |
 | 📅 **Agenda de turnos** | Vista mensual + detalle diario. Agendar, reagendar, cancelar y **registrar seña para reservar**. Integración **opcional bidireccional con Google Calendar** vía Supabase Edge Function (turnos aparecen también en el calendario del salón). |
-| ➕ **Registrar Servicio** | Formulario mobile-first. Categorías predefinidas (Semi, Kapping, Soft Gel, Esculpidas, Remoción, Personalizado), clienta existente o nueva, métodos de pago (Transferencia · Efectivo · Fiado), cálculo automático de seña descontada y vuelto, retiro previo externo. |
+| ➕ **Cobrar / Registrar Servicio** | Formulario mobile-first, accesible al **cobrar un turno** desde la Agenda. Categorías predefinidas (Semi, Kapping, Soft Gel, Esculpidas, Remoción, Personalizado), clienta existente o nueva, métodos de pago (Transferencia · Efectivo · Fiado), cálculo automático de seña descontada y vuelto, retiro previo externo. |
 | 🎟 **Ticket compartible por WhatsApp** | Al registrar se genera un ticket estilizado en `<canvas>` → exporta PNG → usa **Web Share API** con fallback de descarga para enviar por WhatsApp directo a la clienta. |
 | 📜 **Historial de ventas** | Filtros por período · categoría · método de pago. Cobro de fiados pendientes inline. Eliminación lógica de registros reservada solo a admin. |
 | 💳 **Gastos** | Registro y listado de egresos del salón (insumos, alquiler, servicios) con categoría y método. |
@@ -38,7 +38,7 @@ Antes de este sistema, la operación del salón sufría estos dolores:
 | 👩 **Gestión de Clientas** | Alta, edición, activar / desactivar y baja lógica. Ficha individual con historial de turnos y servicios prestados a cada clienta. |
 | 🏷 **Catálogo de Precios** *(solo admin)* | Lista oficial editable de servicios y sus precios. Persistida en PostgreSQL. |
 | 🏦 **Gestión de Cajas** *(solo admin, flag opcional)* | Consolidado en tiempo real de Efectivo vs Mercado Pago + movimientos manuales (depósitos / extracciones) con trazabilidad. |
-| ⚙️ **Ajustes locales** *(solo admin)* | Toggles: habilitar fiado, mostrar/ocultar pestaña Registrar, habilitar módulo Cajas. Guardados en `localStorage` por dispositivo. |
+| ⚙️ **Ajustes locales** *(solo admin)* | Toggles: habilitar fiado, habilitar módulo Cajas. Guardados en `localStorage` por dispositivo. |
 | 👤 **Mi Cuenta** | Edición de perfil propio, actualización de email (con re-verificación) y cambio seguro de contraseña con re-autenticación. |
 | 📱 **Progressive Web App** | Instalable como app nativa en Android e iOS. Modo standalone, 8 tamaños de íconos PWA, maskable, splash screen iOS. Service Worker con precache de assets para uso offline. |
 

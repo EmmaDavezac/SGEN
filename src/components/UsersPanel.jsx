@@ -4,6 +4,7 @@ import Button, { DetailActionButton, ListIconButton, PanelCancelButton, PanelSav
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { ConfirmModal } from './Modal.jsx';
 import DetailWindow from './DetailWindow.jsx';
+import { useFormGuard } from '../formGuard.js';
 
 const EMPTY_FORM = {
   nombre: '',
@@ -34,6 +35,8 @@ function UsersPanel({ session, notify, showLoader }) {
   const [userEditing, setUserEditing] = useState(false);
   const [userForm, setUserForm] = useState({ nombre: '', telefono: '' });
   const [roleEditing, setRoleEditing] = useState(false);
+  // Invitación abierta o ficha de usuario en edición: cambiar de pestaña pide confirmación.
+  useFormGuard(formOpen || userEditing || roleEditing);
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterRole, setFilterRole] = useState('todos');
@@ -321,22 +324,35 @@ function UsersPanel({ session, notify, showLoader }) {
                 </div>
               </div>
             </fieldset>
-            {userEditing && (
+            {/* Acciones del grupo editable, justo debajo de él: al editar,
+                Cancelar/Guardar; si no, el botón Editar que lo habilita. */}
+            {(userEditing || (isSuperadmin && viewedUser.id !== session?.authId)) && (
               <div className="detail-form-actions">
-                <PanelCancelButton
-                  onClick={cancelUserEdit}
-                  disabled={saving}
-                />
-                <PanelSaveButton
-                  type="submit"
-                  busy={saving}
-                  busyLabel="Guardando…"
-                />
+                {userEditing ? (
+                  <>
+                    <PanelCancelButton
+                      onClick={cancelUserEdit}
+                      disabled={saving}
+                    />
+                    <PanelSaveButton
+                      type="submit"
+                      busy={saving}
+                      busyLabel="Guardando…"
+                    />
+                  </>
+                ) : (
+                  <DetailActionButton
+                    icon="fa-pen-to-square"
+                    label="Editar"
+                    aria-label="Editar usuario"
+                    onClick={() => setUserEditing(true)}
+                  />
+                )}
               </div>
             )}
             {/* Email y Creado: solo lectura permanente (no dependen de
-                userEditing), por eso van fuera del fieldset y debajo de
-                Cancelar/Guardar. */}
+                userEditing), por eso van fuera del fieldset y debajo de las
+                acciones del grupo editable. */}
             <div className="detail-fields-stack detail-readonly-fields">
               <div className="form-group">
                 <label htmlFor="detail-user-email">Email</label>
@@ -483,18 +499,6 @@ function UsersPanel({ session, notify, showLoader }) {
                 </div>
               </div>
             )}
-            {/* Acciones de la ventana al fondo, igual que en la ficha de
-                turno/venta: la cabecera queda solo con Volver. */}
-            {isSuperadmin && !userEditing && viewedUser.id !== session?.authId && (
-              <div className="detail-window-footer">
-                <DetailActionButton
-                  icon="fa-pen-to-square"
-                  label="Editar"
-                  aria-label="Editar usuario"
-                  onClick={() => setUserEditing(true)}
-                />
-              </div>
-            )}
         </DetailWindow>
       )}
 
@@ -565,7 +569,7 @@ function UsersPanel({ session, notify, showLoader }) {
 
       {!formOpen && (
         <div className="filters-container">
-          <div className="search-box-container">
+          <div className={`search-box-container${search ? ' has-text' : ''}`}>
             <i className="fa-solid fa-magnifying-glass search-icon" />
             <input
               type="search"
@@ -574,6 +578,17 @@ function UsersPanel({ session, notify, showLoader }) {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
+            {search && (
+              <button
+                type="button"
+                className="search-clear-btn"
+                title="Limpiar búsqueda"
+                aria-label="Limpiar búsqueda"
+                onClick={() => setSearch('')}
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            )}
           </div>
           <button
             type="button"

@@ -1,7 +1,7 @@
 import React from 'react';
 
 function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
-    const { allowFiado, allowRegisterTab, allowCajasTab } = settings;
+    const { allowFiado, allowCajasTab } = settings;
 
     const handleToggle = (key, checked) => {
         if (typeof onChangeSettings === 'function') {
@@ -11,8 +11,6 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
             let msg = '';
             if (key === 'allowFiado') {
                 msg = checked ? 'Cobros pendientes (fiado) habilitados' : 'Cobros pendientes (fiado) deshabilitados';
-            } else if (key === 'allowRegisterTab') {
-                msg = checked ? 'Pestaña Registrar visible' : 'Pestaña Registrar oculta';
             } else if (key === 'allowCajasTab') {
                 msg = checked ? 'Pestaña Cajas habilitada' : 'Pestaña Cajas oculta';
             }
@@ -21,9 +19,9 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
     };
 
     return (
-        <div id="tab-ajustes" className="tab-pane active">
-            <div className="section-title section-title-with-action">
-                <div>
+        <section id="tab-ajustes" className="panel-stack view-enter">
+            <div className="section-title">
+                <div className="section-title-text">
                     <h3>Ajustes</h3>
                     <p>Personalizá las opciones de la aplicación.</p>
                 </div>
@@ -42,21 +40,6 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
                             type="checkbox"
                             checked={!!allowFiado}
                             onChange={(e) => handleToggle('allowFiado', e.target.checked)}
-                        />
-                        <span className="slider"></span>
-                    </label>
-                </div>
-
-                <div className="setting-row">
-                    <span>
-                        <i className="fa-solid fa-circle-plus setting-icon"></i>
-                        Mostrar siempre pestaña Registrar
-                    </span>
-                    <label className="switch-toggle">
-                        <input
-                            type="checkbox"
-                            checked={!!allowRegisterTab}
-                            onChange={(e) => handleToggle('allowRegisterTab', e.target.checked)}
                         />
                         <span className="slider"></span>
                     </label>
@@ -85,7 +68,7 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
                     deberás configurar las preferencias en cada uno.
                 </p>
             </div>
-        </div>
+        </section>
     );
 }
 

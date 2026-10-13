@@ -37,8 +37,9 @@ No introducir colores nuevos para un patrón ya cubierto por un token.
   izquierda** de la cabecera (patrón `.section-title-with-back`): el título y su
   subtítulo siguen a su derecha y las acciones restantes, si las hay, quedan al fondo
   de la fila. La tecla **Esc** y el botón **atrás** del navegador/móvil **aprietan**
-  el `Volver` visible de la pantalla; si no hay ninguno, el atrás sigue cambiando de
-  pestaña como siempre (`src/backNavigation.js`).
+  el `Volver` visible de la pantalla; si no hay ninguno, Esc y atrás llevan a la
+  pestaña principal (Agenda), con la confirmación del guard si hay un formulario
+  abierto (`src/backNavigation.js`, `src/formGuard.js`).
 - No existen botones `Cerrar` para salir de una vista: toda acción de volver hacia
   atrás se llama **`Volver`** con icono `fa-arrow-left`, incluidos los toggles de los
   paneles (`Nuevo` al cerrar el formulario, `Volver` a la izquierda al abrirlo). El
@@ -50,6 +51,9 @@ No introducir colores nuevos para un patrón ya cubierto por un token.
 ## Formularios
 
 - Usar `.cute-form`, `.form-group`, `.input-wrapper` y `.form-row-2`.
+- Cada bloque de formulario vive en una card `.chart-section` con un `h4` (icono
+  `.panel-heading-icon`): Gastos, Cajas, Agenda, Ajustes y Mi cuenta (bloques
+  Perfil y Contraseña) usan ese mismo contenedor.
 - Cada campo debe tener `label` asociado mediante `htmlFor`/`id`.
 - Usar `type`, `inputMode`, `min`, `max` y `required` según corresponda.
 - Todo campo de entrada manual debe avisar en su `label` si es obligatorio u opcional: `<span className="field-required">(obligatorio)</span>` o `<span className="field-optional">(opcional)</span>`.
@@ -58,7 +62,7 @@ No introducir colores nuevos para un patrón ya cubierto por un token.
 - Para altas que no se usan continuamente, abrir el formulario bajo demanda con `aria-expanded` y `aria-controls`.
 - Al guardar correctamente, limpiar el formulario y cerrar su panel de alta.
 - Los cambios en formularios de edición deben bloquear la salida o pedir confirmación antes de descartarse.
-- Los formularios de alta no llevan `Cancelar`: la salida hacia atrás es el `Volver` de la cabecera (toggles `Nuevo`/`Volver`). En móvil, el botón de alta ocupa **toda la fila** (`.form-actions`); en las ediciones, `Guardar` y `Cancelar` ocupan **media fila cada uno** (`.detail-form-actions` y `.account-form-actions`).
+- Los formularios de alta no llevan `Cancelar`: la salida hacia atrás es el `Volver` de la cabecera (toggles `Nuevo`/`Volver`). En móvil, el botón de alta ocupa **toda la fila** (`.form-actions`); en las ediciones, `Guardar` y `Cancelar` ocupan **media fila cada uno** (`.detail-form-actions`, en las fichas y en Mi cuenta).
 - **Todas las altas usan el mismo nombre de botón**: `Guardar` (icono disquete, texto visible también en móvil vía `iconOnlyOnMobile={false}`); el `Volver` sigue siendo solo icono en móvil (`.mobile-icon-only`). Las ediciones conservan su nombre específico (`Guardar cambios`, `Guardar servicio`, …) con comportamiento móvil previo.
 
 ## Modales
@@ -76,7 +80,7 @@ No introducir colores nuevos para un patrón ya cubierto por un token.
 - Todo listado debe contemplar carga, vacío y error.
 - Los estados de negocio deben usar badges o clases semánticas, no estilos inline repetidos.
 - Las barras de progreso pueden conservar `width` inline cuando el valor provenga de datos.
-- **Toda tarjeta de listado comparte el mismo aspecto** (bloque `.expense-card` / `.client-card` / `.history-card` / `.user-card`): fondo blanco, borde 2px `--barbie-pale`, `radius-sm`, **sin sombra**, `padding: 12px` y `gap: 10px`. Ningún contenedor de listado lleva fondo propio: el fondo es el de la página. Las secciones en `.panel-stack` compensan el `margin-top` de búsqueda→listado a `-6px` (`#tab-gastos`, `#tab-historial`, `#tab-usuarios`) para que el total siga siendo 16px. Las KPI de Estadísticas (`#tab-estadisticas .stat-card`) usan esa misma superficie (blanco, borde `--barbie-pale`, `radius-sm`, sin sombra); el degradado `.pink-glow` solo se conserva en Cajas.
+- **Toda tarjeta de listado comparte el mismo aspecto** (bloque `.expense-card` / `.client-card` / `.history-card` / `.user-card`): fondo blanco, borde 2px `--barbie-pale`, `radius-sm`, **sin sombra**, `padding: 12px` y `gap: 10px`. Ningún contenedor de listado lleva fondo propio: el fondo es el de la página. Las secciones en `.panel-stack` compensan el `margin-top` de búsqueda→listado a `-6px` (`#tab-gastos`, `#tab-historial`, `#tab-usuarios`) para que el total siga siendo 16px. Las KPI de Estadísticas (`#tab-estadisticas .stat-card`) usan esa misma superficie (blanco, borde `--barbie-pale`, `radius-sm`, sin sombra); el degradado `.pink-glow` solo se conserva en Cajas. La nota informativa de Ajustes (`#tab-ajustes .card-info-box`) comparte esa misma superficie.
 - **Las acciones de tarjeta van alineadas a la derecha, en todos los listados** (`.card-actions-col`, `.client-actions-col`, `.user-card-actions`, `.appointment-actions-col`): es la posición única del bloque de botones en toda la app.
 - **Una tarjeta con muchas acciones no gana altura con una segunda fila**: en turnos (`.appointment-card--stacked`) las acciones van en su propia columna derecha, y lo que evita que se coma el nombre es pisar el piso de la pista de info con `minmax(160px, 1fr)` (la pista `auto` de acciones toma su max-content —hasta ~600px con seis pastillas— y una `1fr` con mínimo `auto` colapsaba contra ella). En mobile (≤520px, botones solo-icono de 44px) la hora sube sobre el nombre y las acciones se acotan a dos iconos por fila a la derecha: la tarjeta queda de ~88-164px en vez de ~138-188px. Se usa una clase propia en vez de cambiar `.appointment-card` porque Cajas reutiliza esa clase con el monto en la tercera columna.
 

@@ -8,12 +8,16 @@ import {
     DEFAULT_SERVICE_CATEGORIES,
     DEFAULT_SERVICE_CATALOG
 } from '../serviceCatalog.js';
+import { useFormGuard } from '../formGuard.js';
 
 function PricesPanel({ session, notify, showLoader }) {
     const [categories, setCategories] = useState(DEFAULT_SERVICE_CATEGORIES);
     const [catalog, setCatalog] = useState(() => cloneServiceCatalog(DEFAULT_SERVICE_CATALOG));
     const [pendingChanges, setPendingChanges] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    // Modo edición de precios: cambiar de pestaña pide confirmación (mismo
+    // comportamiento que tenía el switchTab del legado).
+    useFormGuard(isEditing);
     const [selectedCategoryKey, setSelectedCategoryKey] = useState(null);
     const [categoryNameDraft, setCategoryNameDraft] = useState('');
     const [isEditingCategoryName, setIsEditingCategoryName] = useState(false);
@@ -24,6 +28,9 @@ function PricesPanel({ session, notify, showLoader }) {
     const [pendingCategoryToggle, setPendingCategoryToggle] = useState(null);
     const [pendingServiceToggle, setPendingServiceToggle] = useState(null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
+    // Borrador de servicio sin guardar pendiente de confirmar antes de descartar.
+    // 'form' cierra solo el formulario; 'categories' vuelve además a la lista.
+    const [serviceDiscard, setServiceDiscard] = useState(null);
     const [loadError, setLoadError] = useState('');
     const [search, setSearch] = useState('');
     const [showFilters, setShowFilters] = useState(false);
@@ -156,13 +163,25 @@ function PricesPanel({ session, notify, showLoader }) {
     };
 
     /* Con guardado inmediato, "sin guardar" = un fallo de sincronización
-       (pendingChanges) o un renombrar abierto y sin aplicar. */
+       (pendingChanges), un renombrar abierto y sin aplicar, o el borrador de un
+       servicio a medio cargar (nuevo o editado) que se perdería al descartar. */
     const appliedRenameName = selectedCategory ? selectedCategory.name : null;
     const pendingRename = isEditingCategoryName
         && appliedRenameName !== null
         && categoryNameDraft.trim() !== ''
         && categoryNameDraft.trim() !== appliedRenameName;
-    const hasUnsavedChanges = pendingChanges || pendingRename;
+    const serviceDraftHasData = editingServiceIndex === -1
+        ? (serviceDraft.name.trim() !== '' || Number(serviceDraft.price) > 0)
+        : editingServiceIndex !== null
+            ? (() => {
+                const original = (catalog[selectedCategoryKey] || [])[editingServiceIndex];
+                return !!original && (
+                    serviceDraft.name.trim() !== original.name
+                    || String(serviceDraft.price) !== String(original.price)
+                );
+            })()
+            : false;
+    const hasUnsavedChanges = pendingChanges || pendingRename || serviceDraftHasData;
 
     /* Aviso nativo del navegador si se cierra la pestaña con cambios sin guardar. */
     useEffect(() => {
@@ -191,6 +210,37 @@ function PricesPanel({ session, notify, showLoader }) {
         await loadCatalog();
         setPendingChanges(false);
         finishEditing();
+    };
+
+    /* Cerrar el formulario de servicio (Volver de la cabecera o Cancelar):
+       si hay borrador a medio cargar, se confirma antes de descartar. */
+    const requestCloseServiceForm = () => {
+        if (!serviceDraftHasData) {
+            setEditingServiceIndex(null);
+            setServiceDraft({ name: '', price: '0' });
+            return;
+        }
+        setServiceDiscard('form');
+    };
+
+    /* Volver de "Modificar categoría" a la lista: si además hay un servicio a
+       medio cargar, ese borrador también pide confirmación. */
+    const requestBackToCategories = () => {
+        if (!serviceDraftHasData) {
+            resetCategorySelection();
+            return;
+        }
+        setServiceDiscard('categories');
+    };
+
+    const confirmServiceDiscard = () => {
+        if (serviceDiscard === 'categories') {
+            resetCategorySelection();
+        } else {
+            setEditingServiceIndex(null);
+            setServiceDraft({ name: '', price: '0' });
+        }
+        setServiceDiscard(null);
     };
 
     const handleEdit = () => {
@@ -447,7 +497,7 @@ function PricesPanel({ session, notify, showLoader }) {
 
             {!selectedCategoryKey && (
                 <div className="filters-container">
-                    <div className="search-box-container">
+                    <div className={`search-box-container${search ? ' has-text' : ''}`}>
                         <i className="fa-solid fa-magnifying-glass search-icon"></i>
                         <input
                             type="search"
@@ -456,6 +506,17 @@ function PricesPanel({ session, notify, showLoader }) {
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
+                        {search && (
+                            <button
+                                type="button"
+                                className="search-clear-btn"
+                                title="Limpiar búsqueda"
+                                aria-label="Limpiar búsqueda"
+                                onClick={() => setSearch('')}
+                            >
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        )}
                     </div>
                     <button
                         type="button"
@@ -619,7 +680,7 @@ function PricesPanel({ session, notify, showLoader }) {
                         <button
                             type="button"
                             className="btn btn-primary btn-sm panel-header-action btn-back mobile-icon-only"
-                            onClick={resetCategorySelection}
+                            onClick={requestBackToCategories}
                             aria-label="Volver a categorías"
                         >
                             <i className="fa-solid fa-arrow-left"></i>
@@ -673,7 +734,7 @@ function PricesPanel({ session, notify, showLoader }) {
                     <div className="catalog-services-header">
                         <h4>Servicios</h4>
                         {editingServiceIndex === -1 ? (
-                            <button type="button" className="btn btn-primary btn-sm panel-header-action mobile-icon-only btn-back" onClick={() => { setEditingServiceIndex(null); setServiceDraft({ name: '', price: '0' }); }} aria-label="Volver">
+                            <button type="button" className="btn btn-primary btn-sm panel-header-action mobile-icon-only btn-back" onClick={requestCloseServiceForm} aria-label="Volver">
                                 <i className="fa-solid fa-arrow-left" aria-hidden="true"></i>
                                 <span className="mobile-action-label">Volver</span>
                             </button>
@@ -709,7 +770,7 @@ function PricesPanel({ session, notify, showLoader }) {
                             </div>
                             <div className="form-actions">
                                 {editingServiceIndex !== -1 && (
-                                    <PanelCancelButton onClick={() => { setEditingServiceIndex(null); setServiceDraft({ name: '', price: '0' }); }} />
+                                    <PanelCancelButton onClick={requestCloseServiceForm} />
                                 )}
                                 <PanelSaveButton
                                     type="submit"
@@ -767,12 +828,23 @@ function PricesPanel({ session, notify, showLoader }) {
             <ConfirmModal
                 open={showExitConfirm}
                 title="Terminar edición"
-                message="Hay cambios sin guardar (un fallo al sincronizar o un renombrar sin aplicar). ¿Descartarlos y salir?"
+                message="Hay cambios sin guardar (un fallo al sincronizar, un renombrar sin aplicar o un servicio a medio cargar). ¿Descartarlos y salir?"
                 confirmText="Descartar cambios"
                 confirmVariant="danger"
                 cancelText="Seguir editando"
                 onConfirm={discardAndExit}
                 onCancel={() => setShowExitConfirm(false)}
+            />
+
+            <ConfirmModal
+                open={Boolean(serviceDiscard)}
+                title="Descartar servicio"
+                message="Hay un servicio a medio cargar que todavía no se guardó. ¿Descartarlo?"
+                confirmText="Descartar"
+                confirmVariant="danger"
+                cancelText="Seguir editando"
+                onConfirm={confirmServiceDiscard}
+                onCancel={() => setServiceDiscard(null)}
             />
 
             <ConfirmModal

@@ -5,7 +5,7 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
   const [menuOpen, setMenuOpen] = useState(false);
   const isAdmin = session && (session.rol === 'admin' || session.rol === 'superadmin');
   const isSuperadmin = session && session.rol === 'superadmin';
-  const { allowRegisterTab = false, allowCajasTab = false } = settings;
+  const { allowCajasTab = false } = settings;
 
   return (
     <section id="app-screen" className="app-screen active">
@@ -79,14 +79,6 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
 
       {/* MENU DE NAVEGACION FLOTANTE INFERIOR */}
       <nav className="app-nav" aria-label="Navegación principal">
-        <button 
-          className={`nav-item ${activeTab === 'registrar' ? 'active' : ''} ${!allowRegisterTab ? 'hidden' : ''}`}
-          onClick={() => setActiveTab('registrar')}
-        >
-          <span className="nav-icon"><i className="fa-solid fa-circle-plus"></i></span>
-          <span className="nav-text">Registrar</span>
-        </button>
-
         <button 
           className={`nav-item ${(activeTab === 'calendario' || activeTab === 'historial') ? 'active' : ''}`}
           onClick={() => setActiveTab('calendario')}

@@ -3,6 +3,7 @@ import { supabase } from '../supabase.js';
 import { ConfirmModal } from './Modal.jsx';
 import { PanelSaveButton } from './Button.jsx';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
+import { useFormGuard } from '../formGuard.js';
 import { loadExpensesFromDatabase, saveExpenseToDatabase } from '../services.js';
 
 const EXPENSE_PERIOD_OPTIONS = [
@@ -62,6 +63,8 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
     const [metodoPago, setMetodoPago] = useState('Efectivo');
     const [submitting, setSubmitting] = useState(false);
     const [formOpen, setFormOpen] = useState(false);
+    // Formulario de egreso abierto: cambiar de pestaña pide confirmación.
+    useFormGuard(formOpen);
     const [confirmation, setConfirmation] = useState(null);
     const confirmBypassRef = useRef(false);
 
@@ -347,7 +350,7 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
 
             {!formOpen && <>
                 <div className="filters-container">
-                    <div className="search-box-container">
+                    <div className={`search-box-container${search ? ' has-text' : ''}`}>
                         <i className="fa-solid fa-magnifying-glass search-icon"></i>
                         <input
                             type="search"
@@ -356,6 +359,17 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
+                        {search && (
+                            <button
+                                type="button"
+                                className="search-clear-btn"
+                                title="Limpiar búsqueda"
+                                aria-label="Limpiar búsqueda"
+                                onClick={() => setSearch('')}
+                            >
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        )}
                     </div>
                     <button
                         type="button"

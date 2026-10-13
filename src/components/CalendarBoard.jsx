@@ -6,6 +6,7 @@ import { cancelAppointmentInDatabase, deleteAppointmentFromDatabase, hasLinkedSe
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import VentaDetalleModal from './VentaDetalleModal.jsx';
 import { estadoBadgeClass, estadoLabel, getAppointmentActions, getVisibleAppointmentActions, normalizeTurnoEstado } from '../appointmentActions.js';
+import { useFormGuard } from '../formGuard.js';
 
 const DAYS_OF_WEEK = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -169,6 +170,8 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
   const [selectedDay, setSelectedDay] = useState(() => new Date());
 
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  // Formulario "nuevo turno" abierto: cambiar de pestaña pide confirmación.
+  useFormGuard(scheduleOpen);
   const [scheduleForm, setScheduleForm] = useState(emptyFormAppointment(selectedDay));
   const [scheduleSuggestions, setScheduleSuggestions] = useState([]);
   const [scheduleQuickPanel, setScheduleQuickPanel] = useState(false);
@@ -1204,7 +1207,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
 
           {!scheduleOpen && (
             <div className="filters-container">
-              <div className="search-box-container">
+              <div className={`search-box-container${daySearch ? ' has-text' : ''}`}>
                 <i className="fa-solid fa-magnifying-glass search-icon"></i>
                 <input
                   type="search"
@@ -1213,6 +1216,17 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
                   value={daySearch}
                   onChange={(e) => setDaySearch(e.target.value)}
                 />
+                {daySearch && (
+                  <button
+                    type="button"
+                    className="search-clear-btn"
+                    title="Limpiar búsqueda"
+                    aria-label="Limpiar búsqueda"
+                    onClick={() => setDaySearch('')}
+                  >
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                )}
               </div>
               <button
                 type="button"
@@ -1281,8 +1295,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
                 <div className="appointment-info-col">
                   <div className="appointment-client-name">{apt.cliente || 'Cliente'}</div>
                   <div className="appointment-service-name">
-                    <i className="fa-solid fa-sparkles appointment-service-icon"></i>
-                    {' '}{estadoTextoLegacy}
+                    {estadoTextoLegacy}
                   </div>
                 </div>
                 <div className="appointment-actions-col calendar-appointment-actions">

@@ -437,7 +437,7 @@ const StatsPanel = ({ session }) => {
             {debtors.length > 0 && (
                 <>
                     <div className="filters-container">
-                        <div className="search-box-container">
+                        <div className={`search-box-container${search ? ' has-text' : ''}`}>
                             <i className="fa-solid fa-magnifying-glass search-icon"></i>
                             <input
                                 type="search"
@@ -446,6 +446,17 @@ const StatsPanel = ({ session }) => {
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                             />
+                            {search && (
+                                <button
+                                    type="button"
+                                    className="search-clear-btn"
+                                    title="Limpiar búsqueda"
+                                    aria-label="Limpiar búsqueda"
+                                    onClick={() => setSearch('')}
+                                >
+                                    <i className="fa-solid fa-xmark"></i>
+                                </button>
+                            )}
                         </div>
                         <button
                             type="button"

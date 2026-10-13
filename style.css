@@ -831,7 +831,6 @@ button:disabled {
     min-width: 0;
 }
 
-.section-title-with-back .account-header-actions,
 .section-title-with-back .detail-window-actions {
     flex: 0 0 auto;
     margin-left: auto;
@@ -871,9 +870,7 @@ button:disabled {
     }
 
     .btn-back,
-    .calendar-header-button,
-    .account-edit-action,
-    .account-small-action {
+    .calendar-header-button {
         min-height: 44px;
     }
 
@@ -930,8 +927,7 @@ button:disabled {
         padding-block: 10px;
     }
 
-    .detail-form-actions .btn,
-.account-form-actions .btn {
+    .detail-form-actions .btn {
         min-height: 48px;
     }
 }
@@ -1736,6 +1732,15 @@ button:disabled {
     line-height: 1.4;
 }
 
+/* Ajustes: la nota informativa comparte la superficie unificada de tarjetas
+   (blanco, borde --barbie-pale, radius-sm, sin sombra) en vez del fondo rosa. */
+#tab-ajustes .card-info-box {
+    background-color: var(--white);
+    border: 2px solid var(--barbie-pale);
+    border-radius: var(--radius-sm);
+    box-shadow: none;
+}
+
 .text-muted {
     color: var(--text-muted);
 }
@@ -2104,7 +2109,51 @@ button:disabled {
 }
 
 .search-box-container .search-input {
+    width: 100%;
     padding-left: 40px !important;
+}
+
+/* Oculta la "X" nativa de los inputs type="search" para usar nuestro propio botón. */
+.search-input::-webkit-search-cancel-button,
+.search-input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* Cuando hay texto, reserva espacio a la derecha para el botón de limpiar. */
+.search-box-container.has-text .search-input {
+    padding-right: 40px !important;
+}
+
+/* Botón para vaciar el campo de búsqueda. */
+.search-clear-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--barbie-pale);
+    color: var(--barbie-dark);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.search-clear-btn:hover,
+.search-clear-btn:active {
+    /* La regla global "button:hover { transform: none !important }" borraría el
+       translateY(-50%) y el botón saltaría fuera del input; lo restauramos aquí
+       (mayor especificidad por la clase, con !important para ganar el conflicto). */
+    transform: translateY(-50%) !important;
+    background: var(--barbie-light);
+    color: var(--barbie-dark);
 }
 
 /* Campo de teléfono de la ficha de cliente: input + botón de WhatsApp en fila. */
@@ -3573,8 +3622,7 @@ button:active {
     min-width: 0;
 }
 
-.client-history-heading,
-.account-form-actions {
+.client-history-heading {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -3590,12 +3638,6 @@ button:active {
     margin-top: 16px;
 }
 
-.account-form-actions {
-    justify-content: flex-end;
-    flex-wrap: wrap;
-    margin-top: 16px;
-}
-
 .account-readonly-form input[readonly],
 .detail-fields:disabled input {
     color: var(--text-color);
@@ -3608,11 +3650,6 @@ button:active {
     margin-top: 22px;
     padding-top: 14px;
     border-top: 1px solid var(--barbie-pale);
-}
-
-.account-form-actions .btn {
-    min-width: 154px;
-    min-height: 42px;
 }
 
 .checkout-sena-banner {
@@ -4185,6 +4222,10 @@ button:active {
     margin-top: 10px;
 }
 
+.cash-helper-text--left {
+    text-align: left;
+}
+
 .pay-btn-hidden {
     display: none;
 }
@@ -4268,11 +4309,6 @@ button:active {
     color: var(--barbie-dark);
     font-size: 11px;
     font-weight: 700;
-}
-
-.appointment-service-icon {
-    color: var(--barbie-pink);
-    font-size: 9px;
 }
 
 .calendar-card-spaced {
@@ -4438,50 +4474,12 @@ button:active {
     }
 }
 
-.account-header-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 8px;
-}
-
-.account-edit-action {
-    width: auto;
-    padding: 8px 16px;
-    white-space: nowrap;
-    font-size: 13px;
-}
-
-.account-small-action {
-    width: auto;
-    height: 32px;
-    padding: 6px 12px;
-    font-size: 12px;
-}
-
-.account-profile-form {
-    margin-bottom: 15px;
-}
-
-.account-password-trigger {
-    margin-bottom: 25px;
-}
-
-.account-password-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 15px;
-    padding-bottom: 0;
-    border-bottom: 0;
-}
-
-.account-password-header h4 {
-    margin: 0;
-    color: var(--barbie-pink);
-    font-family: 'Comfortaa', sans-serif;
-    font-size: 16px;
+/* Mi cuenta: los bloques son cards (.chart-section) como en el resto de los
+   formularios, así que los márgenes heredados de las clases account-* sobran
+   dentro de ellas. La separación entre cards la aporta el gap de .panel-stack. */
+#tab-cuenta .account-profile-form,
+#tab-cuenta .account-password-trigger {
+    margin-bottom: 0;
 }
 
 .password-field-group {
@@ -5012,12 +5010,11 @@ button:active {
 /* En móvil, las acciones se estiran para aprovechar el ancho: los
    formularios de alta tienen un solo Guardar y ocupan toda la fila; en las
    ediciones (Guardar + Cancelar), media fila cada uno. flex-basis 0 reparte
-   el ancho libre en partes iguales; min-width: 0 pisa el 154px de
-   .account-form-actions .btn y el 44px de .mobile-icon-only. */
+   el ancho libre en partes iguales; min-width: 0 pisa el 44px de
+   .mobile-icon-only. */
 @media (max-width: 520px) {
     .form-actions .btn,
-    .detail-form-actions .btn,
-    .account-form-actions .btn {
+    .detail-form-actions .btn {
         flex: 1 1 0;
         min-width: 0;
     }

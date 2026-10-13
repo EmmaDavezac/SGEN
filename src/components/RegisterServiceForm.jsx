@@ -4,6 +4,7 @@ import { finalizeRegisteredService, registerServiceDirectly, saveExpenseToDataba
 import { cloneServiceCatalog, DEFAULT_SERVICE_CATEGORIES, DEFAULT_SERVICE_CATALOG } from '../serviceCatalog.js';
 import Button, { DetailActionButton } from './Button.jsx';
 import Modal, { ConfirmModal, ModalCancelButton, ModalConfirmButton } from './Modal.jsx';
+import { useFormGuard } from '../formGuard.js';
 
 function hasSuspiciousPrice(rawValue) {
     const num = Number(rawValue);
@@ -381,15 +382,20 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         setCashAmountGivenNum(0);
     };
 
+    // Mismo criterio que el botón Volver: si hay datos cargados, salir los
+    // descarta. El guardia avisa a App para pedir confirmación también cuando
+    // se cambia de pestaña desde la navegación inferior.
+    const hasUnsavedChanges = Boolean(
+        clientName.trim() ||
+        sena ||
+        paymentMethod !== 'Transferencia' ||
+        hasExternalRemoval ||
+        selectedRemoval
+    );
+    useFormGuard(hasUnsavedChanges);
+
     const handleRegisterBack = () => {
-        const hasChanges = Boolean(
-            clientName.trim() ||
-            sena ||
-            paymentMethod !== 'Transferencia' ||
-            hasExternalRemoval ||
-            selectedRemoval
-        );
-        if (!hasChanges) {
+        if (!hasUnsavedChanges) {
             onBack?.();
             return;
         }

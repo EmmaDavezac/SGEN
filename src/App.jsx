@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { signInWithSupabase, supabase } from './supabase.js';
 import AppLayout from './components/AppLayout.jsx';
-import Button from './components/Button.jsx';
+import Button, { DetailActionButton, PanelCancelButton, PanelSaveButton } from './components/Button.jsx';
 import Loader from './components/Loader.jsx';
 import Toast from './components/Toast.jsx';
 import { ToastProvider, useToast } from './components/ToastContext.jsx';
 import { pedirAbrirCliente } from './clienteNav.js';
 import { pressVisibleBackButton } from './backNavigation.js';
+import { subscribeToFormGuard, useFormGuard } from './formGuard.js';
 import CalendarBoard from './components/CalendarBoard.jsx';
 import RegisterServiceForm from './components/RegisterServiceForm.jsx';
 import HistoryPanel from './components/HistoryPanel.jsx';
@@ -33,7 +34,6 @@ const SETTINGS_KEY = 'evolet_settings_v4';
 
 const TABS_BASE = ['calendario', 'historial', 'clientes', 'gastos', 'estadisticas', 'cuenta'];
 const TABS_ADMIN = ['precios', 'ajustes', 'usuarios'];
-const TABS_ADMIN_CON_SETTING = ['cajas', 'registrar'];
 const DEFAULT_TAB = 'calendario';
 
 function RouteNotFound({ onGoHome }) {
@@ -58,10 +58,13 @@ function RouteNotFound({ onGoHome }) {
     );
 }
 
-function isValidTab(tab, isAdmin, settings = {}) {
+function isValidTab(tab, isAdmin, settings = {}, allowCheckout = false) {
     if (TABS_BASE.includes(tab)) return true;
     if (isAdmin && TABS_ADMIN.includes(tab)) return true;
-    if (isAdmin && settings.allowRegisterTab && tab === 'registrar') return true;
+    // "Registrar" no es una pestaña de la navegación: solo es alcanzable al
+    // cobrar un turno, y mientras dure ese checkout (allowCheckout) la pantalla
+    // se considera válida. Al terminar, la URL de /registrar vuelve a Agenda.
+    if (isAdmin && allowCheckout && tab === 'registrar') return true;
     if (isAdmin && settings.allowCajasTab && tab === 'cajas') return true;
     return false;
 }
@@ -82,21 +85,28 @@ function isPasswordRecoveryRedirect() {
     return hashParams.get('type') === 'recovery' || queryParams.get('type') === 'recovery';
 }
 
+function defaultSettings() {
+    return {
+        allowFiado: true,
+        allowCajasTab: false,
+    };
+}
+
 function readStoredSettings() {
     try {
         const raw = localStorage.getItem(SETTINGS_KEY);
-        return raw ? JSON.parse(raw) : {
-            allowFiado: true,
-            allowRegisterTab: false,
-            allowCajasTab: false,
+        if (!raw) return defaultSettings();
+        // Se normaliza a las claves vigentes: así cualquier ajuste viejo
+        // persistido (p. ej. la eliminada `allowRegisterTab`) se descarta en vez
+        // de quedar como dato basura compartido entre usuarios.
+        const parsed = JSON.parse(raw) || {};
+        return {
+            allowFiado: parsed.allowFiado !== undefined ? !!parsed.allowFiado : true,
+            allowCajasTab: !!parsed.allowCajasTab,
         };
     } catch (error) {
         console.warn('No se pudieron leer los ajustes guardados:', error);
-        return {
-            allowFiado: true,
-            allowRegisterTab: false,
-            allowCajasTab: false,
-        };
+        return defaultSettings();
     }
 }
 
@@ -118,6 +128,8 @@ function App() {
     const [loading, setLoading] = useState(false);
     const [loaderText, setLoaderText] = useState('Verificando credenciales...');
     const [confirmation, setConfirmation] = useState(null);
+    // true cuando algún panel tiene un formulario de creación/edición abierto.
+    const [formGuardActive, setFormGuardActive] = useState(false);
     const toastNotifyRef = useRef(null);
 
     const initialSession = readStoredSession();
@@ -145,6 +157,26 @@ function App() {
         setActiveTabState(tab);
     }, []);
 
+    // Cambio de pestaña "protegido": si algún panel tiene un formulario abierto,
+    // pide confirmación antes de cambiar (el cambio desmonta el panel y perdería
+    // los datos ingresados). Es la misma red de seguridad que ya tienen los
+    // botones `Volver` con sus confirmaciones de descarte.
+    const requestTabChange = useCallback((tab) => {
+        if (tab === activeTabRef.current) return;
+        if (formGuardActive) {
+            setConfirmation({
+                title: 'Cambiar de pestaña',
+                message: 'Hay datos sin guardar en el formulario actual. ¿Querés salir igual y cambiar de pestaña?',
+                onConfirm: () => setActiveTab(tab),
+            });
+            return;
+        }
+        setActiveTab(tab);
+    }, [formGuardActive, setActiveTab]);
+
+    // Suscripción al guardia global de formularios (ver src/formGuard.js).
+    useEffect(() => subscribeToFormGuard(setFormGuardActive), []);
+
     // "Consultar ficha de la clienta" desde una venta: lleva a Clientes y le pide abrir
     // la ficha. ClientsPanel escucha el evento, así que tiene que estar montado
     // cuando llega (por eso se dispara después de cambiar de pestaña).
@@ -171,6 +203,24 @@ function App() {
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    // "Mi cuenta" también es un formulario: mientras se edite el perfil o la
+    // contraseña, el guardia pide confirmación antes de cambiar de pestaña.
+    useFormGuard(profileEditing || passwordEditing);
+
+    // Al dejar la pestaña se descarta la edición de perfil (el usuario ya
+    // confirmó que podía perder los datos): así el guardia no queda activo en
+    // pantallas donde el formulario ya no se ve.
+    useEffect(() => {
+        if (activeTab === 'cuenta') return;
+        setProfileEditing(false);
+        setPasswordEditing(false);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setProfileName(session?.nombre || '');
+        setProfileEmail(session?.email || '');
+    }, [activeTab, session]);
 
     // Rate limit del ingreso: se renueva en pantalla cada segundo mientras dure el bloqueo.
     const [loginRate, setLoginRate] = useState(() => readLoginRateState());
@@ -237,41 +287,74 @@ function App() {
     }, [activeTab]);
     useEffect(() => {
         const handlePopState = () => {
+            const currentTab = activeTabRef.current;
+            const currentPath = getPathForTab(currentTab);
+
+            // Con un modal (o confirmación) abierto, el "atrás" no navega: la
+            // decisión le pertenece al modal. Solo reafirmamos la URL activa.
+            if (document.querySelector('.modal-overlay')) {
+                if (window.location.pathname !== currentPath) {
+                    window.history.pushState({ tab: currentTab }, '', currentPath);
+                }
+                return;
+            }
+
             // El botón "atrás" del navegador/móvil también aprieta el Volver de la
             // pantalla actual (ficha, formularios, Historial, Precios, …). Si se usó
             // para eso, hay que devolverle a la historia la URL de la pestaña activa:
             // el "atrás" cerró la subpantalla, no cambió de pestaña.
             if (pressVisibleBackButton()) {
-                const nextPath = getPathForTab(activeTabRef.current);
-                if (window.location.pathname !== nextPath) {
-                    window.history.pushState({ tab: activeTabRef.current }, '', nextPath);
+                if (window.location.pathname !== currentPath) {
+                    window.history.pushState({ tab: currentTab }, '', currentPath);
                 }
                 return;
             }
-            const tab = getTabFromPath(window.location.pathname);
-            setRouteNotFound(!tab);
-            if (tab) setActiveTabState(tab);
+
+            // Sin subpantalla abierta, el "atrás" lleva a la pestaña principal
+            // (Agenda), pasando por el mismo guard que el clic en la navegación.
+            if (currentTab !== DEFAULT_TAB) {
+                requestTabChange(DEFAULT_TAB);
+                // Si el guard pidió confirmación y el usuario cancela, la URL
+                // vuelve a la de la pestaña activa; si confirma, setActiveTab
+                // empuja la de Agenda.
+                const activePath = getPathForTab(activeTabRef.current);
+                if (window.location.pathname !== activePath) {
+                    window.history.pushState({ tab: activeTabRef.current }, '', activePath);
+                }
+                return;
+            }
+
+            // Ya en Agenda: si el pop cayó en una entrada vieja de otra pestaña,
+            // reafirmamos la de Agenda para que el historial drene; si la URL ya
+            // es la de Agenda, el back sigue su curso normal (salir de la app).
+            if (window.location.pathname !== currentPath) {
+                window.history.replaceState({ tab: DEFAULT_TAB }, '', currentPath);
+            }
         };
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, []);
+    }, [requestTabChange]);
 
-    // Tecla Esc: aprieta el botón Volver visible de la pantalla actual. Si hay un
-    // modal (o confirmación) abierto, el Esc le pertenece al propio Modal.
+    // Tecla Esc: aprieta el botón Volver visible de la pantalla actual; si no hay
+    // ninguno, lleva a la pestaña principal (Agenda). Si hay un modal (o
+    // confirmación) abierto, el Esc le pertenece al propio Modal.
     useEffect(() => {
         const handleEscape = (event) => {
             if (event.key !== 'Escape' || event.defaultPrevented) return;
-            pressVisibleBackButton();
+            if (document.querySelector('.modal-overlay')) return;
+            if (pressVisibleBackButton()) return;
+            if (activeTabRef.current !== DEFAULT_TAB) {
+                requestTabChange(DEFAULT_TAB);
+            }
         };
         window.addEventListener('keydown', handleEscape);
         return () => window.removeEventListener('keydown', handleEscape);
-    }, []);
+    }, [requestTabChange]);
 
     useEffect(() => {
-        const tabSettings = checkoutAppointment
-            ? { ...settings, allowRegisterTab: true }
-            : settings;
-        if (!isValidTab(activeTab, isAdmin, tabSettings)) {
+        // Registrar sigue siendo alcanzable mientras dura el cobro de un turno
+        // (checkoutAppointment), ya no por un ajuste persistido.
+        if (!isValidTab(activeTab, isAdmin, settings, !!checkoutAppointment)) {
             setActiveTabState(DEFAULT_TAB);
         }
     }, [activeTab, isAdmin, settings, checkoutAppointment]);
@@ -394,7 +477,8 @@ function App() {
                 setSession(null);
                 setEmail('');
                 setPassword('');
-                setActiveTab('registrar');
+                setCheckoutAppointment(null);
+                setActiveTab(DEFAULT_TAB);
                 notify('Sesión cerrada con éxito.', 'info');
             }
         });
@@ -711,7 +795,7 @@ function App() {
                     session={session}
                     onLogout={handleLogout}
                     activeTab={activeTab}
-                    setActiveTab={setActiveTab}
+                    setActiveTab={requestTabChange}
                     settings={settings}
                 >
                     {activeTab === 'registrar' && (
@@ -816,11 +900,11 @@ function App() {
                     )}
 
                     {activeTab === 'cuenta' && (
-                        <div id="tab-cuenta" className="tab-pane active">
+                        <section id="tab-cuenta" className="panel-stack view-enter">
                             <div className="section-title section-title-with-back">
                                 <button
                                     type="button"
-                                    onClick={() => setActiveTab('calendario')}
+                                    onClick={() => requestTabChange('calendario')}
                                     className="btn btn-primary btn-sm panel-header-action btn-back mobile-icon-only"
                                     aria-label="Volver al calendario"
                                 >
@@ -831,45 +915,10 @@ function App() {
                                     <h3>Mi cuenta</h3>
                                     <p>Actualizá tus datos de perfil.</p>
                                 </div>
-                                <div className="account-header-actions">
-                                    {!profileEditing ? (
-                                        <button 
-                                            type="button" 
-                                            id="account-edit-btn" 
-                                            className="btn btn-secondary btn-sm account-edit-action"
-                                            onClick={() => setProfileEditing(true)}
-                                            disabled={passwordEditing}
-                                        >
-                                            <i className="fa-solid fa-pen-to-square"></i> Editar
-                                        </button>
-                                    ) : (
-                                        <div id="account-actions-container" className="account-form-actions">
-                                        <button 
-                                            type="button" 
-                                            id="account-cancel-btn" 
-                                            className="btn btn-secondary btn-sm account-small-action"
-                                            onClick={() => {
-                                                setProfileEditing(false);
-                                                setProfileName(session.nombre || '');
-                                                setProfileEmail(session.email || '');
-                                            }}
-                                        >
-                                            <i className="fa-solid fa-xmark"></i> Cancelar
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            id="account-save-btn" 
-                                            className="btn btn-primary btn-sm account-small-action"
-                                            onClick={handleProfileSave}
-                                        >
-                                            <i className="fa-solid fa-floppy-disk"></i> Guardar
-                                        </button>
-                                        </div>
-                                    )}
-                                </div>
                             </div>
 
-                            <form id="account-form" className="cute-form account-readonly-form account-profile-form" onSubmit={handleProfileSave}>
+                            <form id="account-form" className="cute-form account-readonly-form account-profile-form chart-section" onSubmit={handleProfileSave}>
+                                <h4><i className="fa-solid fa-user panel-heading-icon" aria-hidden="true"></i>Perfil</h4>
                                 <div className="form-group">
                                     <label htmlFor="account-name">Nombre <span className="field-required">(obligatorio)</span></label>
                                     <div className="input-wrapper">
@@ -901,45 +950,49 @@ function App() {
                                         />
                                     </div>
                                 </div>
+                                {/* Acciones del grupo editable, justo debajo de él:
+                                    al editar, Cancelar/Guardar; si no, el botón
+                                    Editar que lo habilita — igual que las fichas. */}
+                                <div className="detail-form-actions">
+                                    {profileEditing ? (
+                                        <>
+                                            <PanelCancelButton
+                                                onClick={() => {
+                                                    setProfileEditing(false);
+                                                    setProfileName(session.nombre || '');
+                                                    setProfileEmail(session.email || '');
+                                                }}
+                                            />
+                                            <PanelSaveButton type="submit" />
+                                        </>
+                                    ) : (
+                                        <DetailActionButton
+                                            icon="fa-pen-to-square"
+                                            label="Editar"
+                                            aria-label="Editar perfil"
+                                            onClick={() => setProfileEditing(true)}
+                                            disabled={passwordEditing}
+                                        />
+                                    )}
+                                </div>
                             </form>
 
                             {!passwordEditing ? (
-                                <button 
-                                    type="button" 
-                                    id="show-change-password-btn" 
-                                    className="btn btn-secondary btn-block account-password-trigger"
-                                    onClick={() => setPasswordEditing(true)}
-                                    disabled={profileEditing}
-                                >
-                                    <i className="fa-solid fa-key"></i> Actualizar contraseña
-                                </button>
+                                <div className="chart-section">
+                                    <h4><i className="fa-solid fa-lock panel-heading-icon" aria-hidden="true"></i>Contraseña</h4>
+                                    <button 
+                                        type="button" 
+                                        id="show-change-password-btn" 
+                                        className="btn btn-secondary btn-block account-password-trigger"
+                                        onClick={() => setPasswordEditing(true)}
+                                        disabled={profileEditing}
+                                    >
+                                        <i className="fa-solid fa-key"></i> Actualizar contraseña
+                                    </button>
+                                </div>
                             ) : (
-                                <form id="account-password-form" className="cute-form account-security-section" onSubmit={handlePasswordSave}>
-                                    <div className="section-title account-password-header">
-                                        <h4>Cambiar contraseña</h4>
-                                        <div id="account-password-actions-container" className="account-form-actions">
-                                            <button 
-                                                type="button" 
-                                                id="account-password-cancel-btn" 
-                                                className="btn btn-secondary btn-sm account-small-action"
-                                                onClick={() => {
-                                                    setPasswordEditing(false);
-                                                    setCurrentPassword('');
-                                                    setNewPassword('');
-                                                    setConfirmPassword('');
-                                                }}
-                                            >
-                                                <i className="fa-solid fa-xmark"></i> Cancelar
-                                            </button>
-                                            <button 
-                                                type="submit" 
-                                                id="account-password-save-btn" 
-                                                className="btn btn-primary btn-sm account-small-action"
-                                            >
-                                                <i className="fa-solid fa-floppy-disk"></i> Guardar
-                                            </button>
-                                        </div>
-                                    </div>
+                                <form id="account-password-form" className="cute-form account-security-section chart-section" onSubmit={handlePasswordSave}>
+                                    <h4><i className="fa-solid fa-lock panel-heading-icon" aria-hidden="true"></i>Cambiar contraseña</h4>
 
                                     <div className="form-group password-field-group">
                                         <label htmlFor="account-current-password">Contraseña actual <span className="field-required">(obligatorio)</span></label>
@@ -1012,12 +1065,23 @@ function App() {
                                             </button>
                                         </div>
                                     </div>
+                                    <div className="detail-form-actions">
+                                        <PanelCancelButton
+                                            onClick={() => {
+                                                setPasswordEditing(false);
+                                                setCurrentPassword('');
+                                                setNewPassword('');
+                                                setConfirmPassword('');
+                                            }}
+                                        />
+                                        <PanelSaveButton type="submit" />
+                                    </div>
                                 </form>
                             )}
-                        </div>
+                        </section>
                     )}
 
-                    {!isValidTab(activeTab, isAdmin, checkoutAppointment ? { ...settings, allowRegisterTab: true } : settings) && (
+                    {!isValidTab(activeTab, isAdmin, settings, !!checkoutAppointment) && (
                         <div className="route-not-found-inline">
                             <div className="route-not-found-inline-icon">
                                 <i className="fa-solid fa-magnifying-glass"></i>

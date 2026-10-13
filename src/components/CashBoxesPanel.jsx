@@ -3,6 +3,7 @@ import { supabase } from '../supabase.js';
 import Button, { PanelSaveButton } from './Button.jsx';
 import { ConfirmModal } from './Modal.jsx';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
+import { useFormGuard } from '../formGuard.js';
 import { loadCashboxDataFromDatabase, saveCashMovementToDatabase } from '../services.js';
 
 function todayISO() {
@@ -20,6 +21,8 @@ function CashBoxesPanel({ session, notify, showLoader }) {
     const [concepto, setConcepto] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [formOpen, setFormOpen] = useState(false);
+    // Formulario de movimiento abierto: cambiar de pestaña pide confirmación.
+    useFormGuard(formOpen);
     const [confirmation, setConfirmation] = useState(null);
     const [search, setSearch] = useState('');
     const [showFilters, setShowFilters] = useState(false);
@@ -215,14 +218,17 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                         <i className="fa-solid fa-piggy-bank cash-pink-icon"></i>
                     </div>
                     <div className="stat-info">
-                        <span className="stat-label">Caja Total</span>
+                        <span className="stat-label">Dinero total</span>
                         <h2>${Number(total).toLocaleString("es-AR")}</h2>
                         <span className="stat-label cash-breakdown-label">
                             <i className="fa-solid fa-money-bill-wave cash-cash-icon"></i>
                             Efectivo: ${Number(totalEfectivo).toLocaleString("es-AR")}
                             <span className="cash-breakdown-separator">|</span>
                             <i className="fa-solid fa-mobile-screen-button cash-transfer-icon"></i>
-                            MP: ${Number(totalMP).toLocaleString("es-AR")}
+                            Mercado Pago: ${Number(totalMP).toLocaleString("es-AR")}
+                        </span>
+                        <span className="cash-helper-text cash-helper-text--spaced">
+                            Es la suma de tu plata en efectivo y en Mercado Pago, ya descontando los gastos.
                         </span>
                     </div>
                 </div>
@@ -240,10 +246,13 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                                     value={tipo}
                                     onChange={(e) => setTipo(e.target.value)}
                                 >
-                                    <option value="deposito">Depósito (Efectivo → MP)</option>
-                                    <option value="retiro">Extracción (MP → Efectivo)</option>
+                                    <option value="deposito">Depósito (Efectivo → Mercado Pago)</option>
+                                    <option value="retiro">Extracción (Mercado Pago → Efectivo)</option>
                                 </select>
                             </div>
+                            <p className="cash-helper-text cash-helper-text--left">
+                                Usá <strong>Depósito</strong> cuando pasás plata del efectivo a Mercado Pago, y <strong>Extracción</strong> cuando la retirás de Mercado Pago al efectivo.
+                            </p>
                         </div>
                         <div className="form-group">
                             <label>Fecha <span className="field-required">(obligatorio)</span></label>
@@ -306,7 +315,7 @@ function CashBoxesPanel({ session, notify, showLoader }) {
 
             {!formOpen && (
                 <div className="filters-container">
-                    <div className="search-box-container">
+                    <div className={`search-box-container${search ? ' has-text' : ''}`}>
                         <i className="fa-solid fa-magnifying-glass search-icon"></i>
                         <input
                             type="search"
@@ -315,6 +324,17 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
+                        {search && (
+                            <button
+                                type="button"
+                                className="search-clear-btn"
+                                title="Limpiar búsqueda"
+                                aria-label="Limpiar búsqueda"
+                                onClick={() => setSearch('')}
+                            >
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        )}
                     </div>
                     <button
                         type="button"
@@ -372,12 +392,14 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                                     </div>
                                     <div className="appointment-info-col">
                                         <div className="appointment-client-name">
-                                            {isDeposito ? 'Depósito a MP' : 'Extracción de MP'}
+                                            {isDeposito ? 'Depósito a Mercado Pago' : 'Extracción de Mercado Pago'}
                                         </div>
                                         <div className="appointment-service-name">
                                             {m.concepto || 'Sin concepto'}
                                             <span className="cash-movement-separator">·</span>
-                                            <span className="cash-movement-route">{m.origen} → {m.destino}</span>
+                                            <span className="cash-movement-route">
+                                                {isDeposito ? 'Efectivo' : 'Mercado Pago'} → {isDeposito ? 'Mercado Pago' : 'Efectivo'}
+                                            </span>
                                         </div>
                                     </div>
                                     <div className="card-amount-box">

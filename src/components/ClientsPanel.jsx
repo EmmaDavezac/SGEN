@@ -8,6 +8,7 @@ import { DetailActionButton, ListIconButton, PanelCancelButton, PanelSaveButton 
 import { deleteClientFromDatabase, loadAppointmentsFromDatabase, loadClientsFromDatabase, saveClientToDatabase, updateClientInDatabase } from '../services.js';
 import { estadoBadgeClass, estadoLabel } from '../appointmentActions.js';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
+import { useFormGuard } from '../formGuard.js';
 
 function normalizeClientRecord(client) {
   if (!client || typeof client !== 'object') return null;
@@ -113,6 +114,8 @@ function ClientsPanel({ session, notify, showLoader }) {
   const [detailHistory, setDetailHistory] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailSaving, setDetailSaving] = useState(false);
+  // Formulario de alta o ficha en edición: cambiar de pestaña pide confirmación.
+  useFormGuard(registrationOpen || detailEditing);
   const [selectedHistoryService, setSelectedHistoryService] = useState(null);
 
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -543,7 +546,7 @@ function ClientsPanel({ session, notify, showLoader }) {
       </form> : <>
 
       <div className="filters-container">
-        <div className="search-box-container">
+        <div className={`search-box-container${searchText ? ' has-text' : ''}`}>
           <i className="fa-solid fa-magnifying-glass search-icon" />
           <input
             type="search"
@@ -552,6 +555,17 @@ function ClientsPanel({ session, notify, showLoader }) {
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
+          {searchText && (
+            <button
+              type="button"
+              className="search-clear-btn"
+              title="Limpiar búsqueda"
+              aria-label="Limpiar búsqueda"
+              onClick={() => setSearchText('')}
+            >
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          )}
         </div>
         <button
           type="button"
@@ -726,24 +740,37 @@ function ClientsPanel({ session, notify, showLoader }) {
                   </div>
                 </div>
               </fieldset>
-              <div className="detail-form-actions">
-                {detailEditing && (
-                  <>
-                    <PanelCancelButton
-                      onClick={cancelDetailEdit}
-                      disabled={detailSaving}
-                    />
-                    <PanelSaveButton
-                      type="submit"
-                      busy={detailSaving}
-                      busyLabel="Guardando…"
-                    />
-                  </>
-                )}
-              </div>
+              {/* Acciones del grupo editable, justo debajo de él: al editar,
+                  Cancelar/Guardar; si no, el botón Editar que lo habilita. */}
+              {(detailEditing || isAdmin) && (
+                <div className="detail-form-actions">
+                  {detailEditing ? (
+                    <>
+                      <PanelCancelButton
+                        onClick={cancelDetailEdit}
+                        disabled={detailSaving}
+                      />
+                      <PanelSaveButton
+                        type="submit"
+                        busy={detailSaving}
+                        busyLabel="Guardando…"
+                      />
+                    </>
+                  ) : (
+                    isAdmin && (
+                      <DetailActionButton
+                        icon="fa-pen-to-square"
+                        label="Editar"
+                        aria-label="Editar clienta"
+                        onClick={() => setDetailEditing(true)}
+                      />
+                    )
+                  )}
+                </div>
+              )}
               {/* Email y Creado: solo lectura permanente (no dependen de
-                  detailEditing), por eso van fuera del fieldset y debajo de
-                  Cancelar/Guardar — mismo patrón que la ficha de usuario. */}
+                  detailEditing), por eso van fuera del fieldset y debajo de las
+                  acciones del grupo editable — mismo patrón que la ficha de usuario. */}
               <div className="detail-fields-stack detail-readonly-fields">
                 <div className="form-group">
                   <label htmlFor="detail-client-email">Email</label>
@@ -897,18 +924,6 @@ function ClientsPanel({ session, notify, showLoader }) {
                 </div>
               ))}
             </div>
-            {/* Acciones de la ventana al fondo, igual que en la ficha de
-                turno/venta: la cabecera queda solo con Volver. */}
-            {isAdmin && !detailEditing && (
-              <div className="detail-window-footer">
-                <DetailActionButton
-                  icon="fa-pen-to-square"
-                  label="Editar"
-                  aria-label="Editar clienta"
-                  onClick={() => setDetailEditing(true)}
-                />
-              </div>
-            )}
         </DetailWindow>
       )}
 
