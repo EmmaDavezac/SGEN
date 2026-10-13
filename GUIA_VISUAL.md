@@ -74,6 +74,18 @@ No introducir colores nuevos para un patrón ya cubierto por un token.
 - Al abrirse, el modal enfoca el primer control interactivo y mantiene el foco dentro de sus límites.
 - Al cerrarse, el foco vuelve al control que abrió el modal.
 
+## Escrituras con overlay de progreso
+
+Toda operación de escritura remota (Supabase o Google Calendar) debe pasar por el overlay bloqueante unificado, para que la persona vea siempre en qué paso va y no pueda reenviar el formulario mientras el request está en curso.
+
+- **Multi-paso → `runTask({ title, steps })`** (prop que `App.jsx` pasa a los paneles). Cada step es `{ label, run }`; `runTask` muestra el overlay, marca cada paso (pendiente / girando / check / ✗) y re-lanza el error al caller para que su `catch` muestre el toast original. La referencia es `src/progressTask.js` (`createSteps`, `runSteps`) y el componente `src/components/WriteProgressOverlay.jsx` (bloque `.write-progress-*` en `style.css`).
+- **Un solo paso → `showLoader(true, 'texto…')` / `showLoader(false)`** envolviendo el `await`, siempre con el `setSaving*` local en `finally` como guard de botones.
+- El overlay es **solo visual**: nunca descarta datos ni toca el estado de los formularios; si el paso falla, la información cargada se conserva.
+- Los pasos best-effort (por ejemplo sincronizar con Google Calendar después de guardar en la base) se envuelven en `try/catch` **dentro** del step, para que un error de red no aborte un task que ya cumplió su objetivo principal; el fallo se avisa por toast sin revertir lo guardado.
+- Un step puede relanzar `Error` con un mensaje custom (permisos RLS, foreign key, registro inexistente): el `catch` externo lo muestra tal cual.
+- No debe existir ningún `setSavingX` como única protección de una escritura remota: o bien abre el overlay (`runTask`), o bien lo acompaña `showLoader`.
+- `CalendarBoard.syncAppointmentToGoogle` invocado desde la tarjeta (`sincronizar`) mantiene su propio feedback local (`syncingAppointmentId`, icono girando) y no usa overlay.
+
 ## Listados y estados
 
 - Usar tarjetas y listados existentes antes de inventar una nueva variante.

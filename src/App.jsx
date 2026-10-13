@@ -2,7 +2,8 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { signInWithSupabase, supabase } from './supabase.js';
 import AppLayout from './components/AppLayout.jsx';
 import Button, { DetailActionButton, PanelCancelButton, PanelSaveButton } from './components/Button.jsx';
-import Loader from './components/Loader.jsx';
+import WriteProgressOverlay from './components/WriteProgressOverlay.jsx';
+import { runSteps, createSteps } from './progressTask.js';
 import Toast from './components/Toast.jsx';
 import { ToastProvider, useToast } from './components/ToastContext.jsx';
 import { pedirAbrirCliente } from './clienteNav.js';
@@ -125,8 +126,13 @@ function App() {
     const [session, setSession] = useState(() => readStoredSession());
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [loaderText, setLoaderText] = useState('Verificando credenciales...');
+    // Tarea de escritura en curso para la pantalla de progreso unificada.
+    // null = nada en curso; { title, steps } = overlay visible.
+    // steps: null/[]  => modo indeterminado (corazón + texto)
+    // steps: [...]    => modo por-pasos (checklist con el estado real)
+    const [task, setTask] = useState(null);
+    // Derivado para no romper los `busy={loading}` de los botones existentes.
+    const loading = !!task;
     const [confirmation, setConfirmation] = useState(null);
     // true cuando algún panel tiene un formulario de creación/edición abierto.
     const [formGuardActive, setFormGuardActive] = useState(false);
@@ -367,9 +373,32 @@ function App() {
         console.warn('notify llamado sin ToastProvider montado:', message);
     }, []);
 
+    // Modo indeterminado: una sola operación sin pasos que mostrar (login,
+    // recuperación, perfil, contraseña). Muestra el corazón + texto, igual que
+    // el loader original.
     const showLoader = useCallback((show, text = 'Cargando...') => {
-        setLoading(!!show);
-        setLoaderText(text);
+        setTask(show ? { title: text, steps: null } : null);
+    }, []);
+
+    // Modo por-pasos: ejecuta una lista de pasos reales mostrando el avance.
+    // Si un paso falla, lo marca en rojo un instante y RE-LANZA el error para
+    // que el llamador muestre su aviso actual; la info del formulario se
+    // conserva (el overlay es solo visual y no toca el estado de los datos).
+    const runTask = useCallback(async ({ title, steps }) => {
+        setTask({ title, steps: createSteps(steps) });
+        try {
+            const result = await runSteps(steps, (updatedSteps) => {
+                setTask((prev) => (prev ? { ...prev, steps: updatedSteps } : prev));
+            });
+            return result;
+        } catch (error) {
+            // Deja ver el paso en rojo ~900ms antes de cerrar, para que se
+            // entienda qué falló.
+            await new Promise((resolve) => setTimeout(resolve, 900));
+            throw error;
+        } finally {
+            setTask(null);
+        }
     }, []);
 
     const handleLogin = async (event) => {
@@ -390,8 +419,7 @@ function App() {
             return;
         }
 
-        setLoaderText('Verificando credenciales...');
-        setLoading(true);
+        showLoader(true, 'Verificando credenciales...');
 
         try {
             const user = await signInWithSupabase(cleanEmail, cleanPassword);
@@ -412,7 +440,7 @@ function App() {
             console.error('Error en login React:', error);
             notify('No se pudo iniciar sesión. Verificá tus credenciales o la conexión.', 'error');
         } finally {
-            setLoading(false);
+            showLoader(false);
         }
     };
 
@@ -424,8 +452,7 @@ function App() {
             return;
         }
 
-        setLoaderText('Enviando enlace de recuperación...');
-        setLoading(true);
+        showLoader(true, 'Enviando enlace de recuperación...');
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
                 redirectTo: new URL('/?type=recovery', window.location.origin).toString(),
@@ -436,7 +463,7 @@ function App() {
             console.error('Error solicitando recuperación de contraseña:', error);
             notify('No se pudo enviar el enlace de recuperación. Intentá nuevamente.', 'error');
         } finally {
-            setLoading(false);
+            showLoader(false);
         }
     };
 
@@ -451,8 +478,7 @@ function App() {
             return;
         }
 
-        setLoaderText('Actualizando contraseña...');
-        setLoading(true);
+        showLoader(true, 'Actualizando contraseña...');
         try {
             const { error } = await supabase.auth.updateUser({ password: resetPassword });
             if (error) throw error;
@@ -465,7 +491,7 @@ function App() {
             console.error('Error actualizando contraseña recuperada:', error);
             notify(error.message || 'No se pudo actualizar la contraseña.', 'error');
         } finally {
-            setLoading(false);
+            showLoader(false);
         }
     };
 
@@ -526,8 +552,7 @@ function App() {
 
     const handleProfileSaveConfirmed = async ({ name, mail, currentEmail, emailChanged }) => {
 
-        setLoaderText('Actualizando tus datos...');
-        setLoading(true);
+        showLoader(true, 'Actualizando tus datos...');
 
         try {
             const { error: profileError } = await supabase
@@ -564,7 +589,7 @@ function App() {
             console.error("Error al actualizar datos de cuenta React:", error);
             notify(error.message || "No se pudieron actualizar tus datos.", "error");
         } finally {
-            setLoading(false);
+            showLoader(false);
         }
     };
 
@@ -597,8 +622,7 @@ function App() {
 
     const handlePasswordSaveConfirmed = async ({ currentPassword, newPassword }) => {
 
-        setLoaderText('Cambiando contraseña...');
-        setLoading(true);
+        showLoader(true, 'Cambiando contraseña...');
 
         try {
             const currentEmail = (session.email || "").trim().toLowerCase();
@@ -622,7 +646,7 @@ function App() {
             console.error("Error al cambiar la contraseña React:", error);
             notify(error.message || "No se pudo cambiar la contraseña.", "error");
         } finally {
-            setLoading(false);
+            showLoader(false);
         }
     };
 
@@ -644,7 +668,7 @@ function App() {
                 <ToastBridge notifyRef={toastNotifyRef} />
                 <Toast />
             </ToastProvider>
-            <Loader show={loading} text={loaderText} />
+            <WriteProgressOverlay task={task} />
 
             {routeNotFound ? (
                 <RouteNotFound onGoHome={() => setActiveTab(DEFAULT_TAB)} />
@@ -809,6 +833,7 @@ function App() {
                             settings={settings}
                             notify={notify}
                             showLoader={showLoader}
+                            runTask={runTask}
                             onRegisterSuccess={() => {
                                 setCheckoutAppointment(null);
                                 setActiveTab('calendario');
@@ -821,6 +846,7 @@ function App() {
                             session={session}
                             notify={notify}
                             showLoader={showLoader}
+                            runTask={runTask}
                             onBack={() => setActiveTab('calendario')}
                             onVerCliente={verCliente}
                         />
@@ -831,6 +857,7 @@ function App() {
                             session={session}
                             notify={notify}
                             showLoader={showLoader}
+                            runTask={runTask}
                             onGoHistory={() => setActiveTab('historial')}
                             onVerCliente={verCliente}
                             onCheckoutFromAppointment={(apt) => {
@@ -846,6 +873,7 @@ function App() {
                             session={session}
                             notify={notify}
                             showLoader={showLoader}
+                            runTask={runTask}
                         />
                     )}
 
@@ -854,6 +882,7 @@ function App() {
                             session={session}
                             notify={notify}
                             showLoader={showLoader}
+                            runTask={runTask}
                         />
                     )}
 
@@ -862,6 +891,7 @@ function App() {
                             session={session}
                             notify={notify}
                             showLoader={showLoader}
+                            runTask={runTask}
                         />
                     )}
 
@@ -871,6 +901,7 @@ function App() {
                                 session={session}
                                 notify={notify}
                                 showLoader={showLoader}
+                                runTask={runTask}
                             />
                         </div>
                     )}
@@ -880,6 +911,7 @@ function App() {
                             session={session}
                             notify={notify}
                             showLoader={showLoader}
+                            runTask={runTask}
                         />
                     )}
 
@@ -896,6 +928,7 @@ function App() {
                             session={session}
                             notify={notify}
                             showLoader={showLoader}
+                            runTask={runTask}
                         />
                     )}
 

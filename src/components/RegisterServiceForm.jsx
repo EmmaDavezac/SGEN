@@ -12,7 +12,7 @@ function hasSuspiciousPrice(rawValue) {
     return num > 0 && num < 1000;
 }
 
-function RegisterServiceForm({ session, onBack, initialAppointment = null, onRegisterSuccess, allowFiado = true, notify, showLoader }) {
+function RegisterServiceForm({ session, onBack, initialAppointment = null, onRegisterSuccess, allowFiado = true, notify, showLoader, runTask }) {
     const [clients, setClients] = useState([]);
     const [clientName, setClientName] = useState('');
     const [categories, setCategories] = useState(DEFAULT_SERVICE_CATEGORIES);
@@ -295,6 +295,10 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         const neto = Math.max(0, Number(pendingSubmitData.precio) - senaNum);
         const vueltoNum = pendingSubmitData.metodoPago === 'Efectivo' ? cashVuelto : 0;
         const vueltoReturn = vueltoNum > 0 ? (vueltoReturnMethod || 'Efectivo') : null;
+        // Flags compartidos entre los pasos del overlay y el toast final.
+        let lastResp = null;
+        let turnoFinalizado = false;
+        let vueltoOk = false;
 
         const transaction = {
             id: `service_${Date.now()}_${Math.random().toString(16).slice(2)}`,
@@ -312,43 +316,71 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         };
 
         try {
-            const resp = await registerServiceDirectly(transaction);
-            if (!resp || !resp.success) {
-                if (notify) notify('No se pudo registrar el servicio en la base de datos.', 'error');
-                return;
-            }
+            await runTask({
+                title: 'Registrando servicio',
+                steps: [
+                    {
+                        label: 'Guardando el servicio',
+                        run: async () => {
+                            const resp = await registerServiceDirectly(transaction);
+                            if (!resp || !resp.success) {
+                                throw new Error('No se pudo registrar el servicio en la base de datos.');
+                            }
+                            lastResp = resp;
+                        }
+                    },
+                    {
+                        label: 'Actualizando el turno',
+                        run: async () => {
+                            const appointmentDatabaseId = initialAppointment?.rawId;
+                            const appointmentLegacyId = initialAppointment?.legacy_id || (!appointmentDatabaseId ? initialAppointment?.id : null);
+                            if ((appointmentDatabaseId || appointmentLegacyId) && session?.authId) {
+                                await finalizeRegisteredService({
+                                    turnoId: appointmentDatabaseId,
+                                    turnoLegacyId: appointmentLegacyId,
+                                    precio: pendingSubmitData.precio,
+                                    serviceId: lastResp?.service?.rawId || null,
+                                    paymentAmount: pendingSubmitData.metodoPago === 'Fiado' ? 0 : neto,
+                                    paymentMethod: pendingSubmitData.metodoPago,
+                                    usuarioId: session.authId
+                                });
+                                turnoFinalizado = true;
+                            }
+                        }
+                    },
+                    {
+                        // Best-effort: el servicio y turno ya quedaron guardados;
+                        // si falla el egreso de vuelto solo se avisa, no se aborta.
+                        label: 'Registrando el vuelto',
+                        run: async () => {
+                            if (vueltoNum > 0 && vueltoReturn && vueltoReturn !== 'Efectivo' && supabase && session?.authId) {
+                                try {
+                                    await saveExpenseToDatabase({
+                                        legacy_id: `exp_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+                                        usuario_id: session.authId,
+                                        fecha: new Date().toISOString(),
+                                        concepto: `Vuelto - ${pendingSubmitData.cliente} - ${pendingSubmitData.servicio}`,
+                                        monto: vueltoNum,
+                                        metodo_pago: vueltoReturn.toLowerCase(),
+                                        categoria: 'Vuelto'
+                                    });
+                                    vueltoOk = true;
+                                } catch (gErr) {
+                                    console.warn('No se pudo registrar el egreso de vuelto en gastos:', gErr);
+                                }
+                            }
+                        }
+                    }
+                ]
+            });
 
-            const appointmentDatabaseId = initialAppointment?.rawId;
-            const appointmentLegacyId = initialAppointment?.legacy_id || (!appointmentDatabaseId ? initialAppointment?.id : null);
-            if ((appointmentDatabaseId || appointmentLegacyId) && session?.authId) {
-                await finalizeRegisteredService({
-                    turnoId: appointmentDatabaseId,
-                    turnoLegacyId: appointmentLegacyId,
-                    precio: pendingSubmitData.precio,
-                    serviceId: resp.service?.rawId || null,
-                    paymentAmount: pendingSubmitData.metodoPago === 'Fiado' ? 0 : neto,
-                    paymentMethod: pendingSubmitData.metodoPago,
-                    usuarioId: session.authId
-                });
+            if (turnoFinalizado) {
                 if (notify) notify('Turno actualizado a completado.', 'success');
             }
-
-            if (vueltoNum > 0 && vueltoReturn && vueltoReturn !== 'Efectivo' && supabase && session?.authId) {
-                try {
-                    await saveExpenseToDatabase({
-                        legacy_id: `exp_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-                        usuario_id: session.authId,
-                        fecha: new Date().toISOString(),
-                        concepto: `Vuelto - ${pendingSubmitData.cliente} - ${pendingSubmitData.servicio}`,
-                        monto: vueltoNum,
-                        metodo_pago: vueltoReturn.toLowerCase(),
-                        categoria: 'Vuelto'
-                    });
-                    if (notify) notify('Vuelto registrado correctamente.', 'success');
-                } catch (gErr) {
-                    console.warn('No se pudo registrar el egreso de vuelto en gastos:', gErr);
-                    if (notify) notify('Se registró el servicio, pero falló el vuelto.', 'warning');
-                }
+            if (vueltoOk) {
+                if (notify) notify('Vuelto registrado correctamente.', 'success');
+            } else if (vueltoNum > 0 && vueltoReturn && vueltoReturn !== 'Efectivo') {
+                if (notify) notify('Se registró el servicio, pero falló el vuelto.', 'warning');
             }
 
             setClientName('');

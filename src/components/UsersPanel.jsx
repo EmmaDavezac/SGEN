@@ -148,6 +148,7 @@ function UsersPanel({ session, notify, showLoader }) {
 
   const sendInvite = async (payload) => {
     setSaving(true);
+    if (showLoader) showLoader(true, 'Enviando invitación...');
     try {
       const result = await invokeAdminFunction('invite-user', payload);
       notify?.('Invitación enviada correctamente.', 'success');
@@ -161,11 +162,13 @@ function UsersPanel({ session, notify, showLoader }) {
       throw error;
     } finally {
       setSaving(false);
+      if (showLoader) showLoader(false);
     }
   };
 
   const manageUser = async (action, user, extra = {}) => {
     setSaving(true);
+    if (showLoader) showLoader(true, 'Actualizando usuario...');
     try {
       const result = await invokeAdminFunction('manage-user', { accion: action, id: user.id, ...extra });
       notify?.(result.message || successMessage(action), 'success');
@@ -177,6 +180,7 @@ function UsersPanel({ session, notify, showLoader }) {
       throw error;
     } finally {
       setSaving(false);
+      if (showLoader) showLoader(false);
     }
   };
 

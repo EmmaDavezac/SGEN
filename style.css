@@ -194,6 +194,106 @@ button {
     font-size: 14px;
 }
 
+/* =========================================================================
+   Pantalla de progreso de escritura (crear / modificar / eliminar).
+   Cubre toda la UI (hereda .loader-overlay) y muestra el avance real de cada
+   paso. Es puramente informativa: no bloquea ni descarta datos del formulario.
+   ========================================================================= */
+.write-progress-overlay {
+    padding: 24px;
+}
+
+.write-progress-card {
+    background: #ffffff;
+    border: 2px solid var(--barbie-pale);
+    border-radius: 18px;
+    box-shadow: none;
+    padding: 28px 32px;
+    max-width: 360px;
+    width: 100%;
+    text-align: center;
+}
+
+.write-progress-card .heart-spinner {
+    font-size: 44px;
+}
+
+.write-progress-title {
+    margin: 14px 0 18px;
+    font-family: 'Comfortaa', sans-serif;
+    font-weight: 700;
+    color: var(--barbie-dark);
+    font-size: 17px;
+}
+
+.write-progress-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.write-progress-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    color: var(--text-color);
+    transition: opacity 0.2s ease;
+}
+
+.write-progress-step-icon {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.write-progress-step.is-pending {
+    opacity: 0.45;
+}
+
+.write-progress-step.is-pending .write-progress-step-icon {
+    color: var(--text-color);
+}
+
+.write-progress-step.is-running {
+    font-weight: 600;
+    color: var(--barbie-dark);
+}
+
+.write-progress-step.is-running .write-progress-step-icon {
+    color: var(--barbie-pink);
+}
+
+.write-progress-step.is-done .write-progress-step-icon {
+    color: #2e9e5b;
+}
+
+.write-progress-step.is-error .write-progress-step-icon {
+    color: #d64545;
+}
+
+.write-progress-step.is-error .write-progress-step-label {
+    color: #d64545;
+    font-weight: 600;
+}
+
+.write-progress-note {
+    margin: 20px 0 0;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    color: var(--text-color);
+    opacity: 0.75;
+}
+
 /* Notificaciones Toast */
 .toast-container {
     position: fixed;

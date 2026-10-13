@@ -259,7 +259,13 @@ function ClientsPanel({ session, notify, showLoader }) {
         return;
       }
       confirmBypassRef.current = false;
-      const data = await saveClientToDatabase(payload);
+      if (showLoader) showLoader(true, 'Guardando clienta...');
+      let data;
+      try {
+        data = await saveClientToDatabase(payload);
+      } finally {
+        if (showLoader) showLoader(false);
+      }
       const record = normalizeClientRecord(data);
       setClients(prev => {
         const next = [...prev.filter(c => c.id !== record.id), record];
@@ -358,6 +364,7 @@ function ClientsPanel({ session, notify, showLoader }) {
     }
     confirmBypassRef.current = false;
     setDetailSaving(true);
+    if (showLoader) showLoader(true, 'Guardando cambios...');
     try {
       const updates = {
         nombre,
@@ -381,6 +388,7 @@ function ClientsPanel({ session, notify, showLoader }) {
       if (notify) notify(error.message || 'No se pudieron guardar los cambios.', 'error');
     } finally {
       setDetailSaving(false);
+      if (showLoader) showLoader(false);
     }
   };
 
@@ -424,6 +432,7 @@ function ClientsPanel({ session, notify, showLoader }) {
   const confirmDeleteClient = async () => {
     if (!deleteConfirm || !supabase || !session?.authId) return;
     setDeleting(true);
+    if (showLoader) showLoader(true, 'Eliminando clienta...');
     try {
       await deleteClientFromDatabase(deleteConfirm.id);
       setClients(prev => {
@@ -441,6 +450,7 @@ function ClientsPanel({ session, notify, showLoader }) {
       if (notify) notify(error.message || 'No se pudo eliminar la clienta. Quizá tenga turnos o pagos asociados.', 'error');
     } finally {
       setDeleting(false);
+      if (showLoader) showLoader(false);
     }
   };
 
@@ -455,6 +465,7 @@ function ClientsPanel({ session, notify, showLoader }) {
   const confirmToggleStatus = async () => {
     if (!statusToggleConfirm || !supabase || !session?.authId) return;
     setTogglingStatus(true);
+    if (showLoader) showLoader(true, 'Actualizando estado...');
     try {
       const nextActivo = statusToggleConfirm.activo !== true;
       await updateClientInDatabase(statusToggleConfirm.id, { activo: nextActivo });
@@ -473,6 +484,7 @@ function ClientsPanel({ session, notify, showLoader }) {
       if (notify) notify(error.message || 'No se pudo actualizar el estado.', 'error');
     } finally {
       setTogglingStatus(false);
+      if (showLoader) showLoader(false);
     }
   };
 

@@ -150,7 +150,7 @@ function emptyFormAppointment(selectedDay) {
   };
 }
 
-function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment, onGoHistory, onVerCliente = null }) {
+function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromAppointment, onGoHistory, onVerCliente = null }) {
   const email = session?.email || '';
   const cacheKeyAppointments = `evolet_appointments_v4_${email}`;
   const cacheKeyClients = `evolet_clients_v4_${email}`;
@@ -432,6 +432,7 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
       return null;
     }
     confirmBypassRef.current = false;
+    if (showLoader) showLoader(true, 'Registrando clienta...');
     try {
       const data = await saveClientToDatabase({
           nombre,
@@ -455,6 +456,8 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
       console.error('Error creando clienta rápida:', error);
       if (notify) notify(error.message || 'No se pudo registrar la clienta.', 'error');
       return null;
+    } finally {
+      if (showLoader) showLoader(false);
     }
   };
 
@@ -499,69 +502,91 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
     }
     confirmBypassRef.current = false;
     setSavingAppointment(true);
+    let clienteId;
+    let newApt;
+    let calendarSyncError = null;
     try {
-      const clienteId = await resolveClientId();
-      if (!clienteId) throw new Error('No se pudo asociar la clienta al turno.');
+      await runTask({
+        title: 'Agendando turno',
+        steps: [
+          {
+            label: 'Asociando la clienta',
+            run: async () => {
+              clienteId = await resolveClientId();
+              if (!clienteId) throw new Error('No se pudo asociar la clienta al turno.');
+            }
+          },
+          {
+            label: 'Guardando el turno',
+            run: async () => {
+              const horaInicio = new Date(`${scheduleForm.fecha}T${scheduleForm.horaInicio}:00`);
+              const horaFin = new Date(horaInicio.getTime() + 60 * 60 * 1000);
+              const senaAmountFinal = 0;
+              const data = await saveAppointmentToDatabase({
+                cliente_id: clienteId,
+                usuario_id: session.authId,
+                fecha: scheduleForm.fecha,
+                hora_inicio: horaInicio.toISOString(),
+                hora_fin: horaFin.toISOString(),
+                servicio: 'Turno',
+                precio: 0,
+                estado: 'provisional'
+              });
 
-      const horaInicio = new Date(`${scheduleForm.fecha}T${scheduleForm.horaInicio}:00`);
-      const horaFin = new Date(horaInicio.getTime() + 60 * 60 * 1000);
-      const senaAmountFinal = 0;
-      const data = await saveAppointmentToDatabase({
-          cliente_id: clienteId,
-          usuario_id: session.authId,
-          fecha: scheduleForm.fecha,
-          hora_inicio: horaInicio.toISOString(),
-          hora_fin: horaFin.toISOString(),
-          servicio: 'Turno',
-          precio: 0,
-          estado: 'provisional'
-      });
+              if (senaAmountFinal > 0) {
+                await registerPaymentRecord({
+                  turnoId: data.id,
+                  usuarioId: session.authId,
+                  amount: senaAmountFinal,
+                  paymentMethod: scheduleForm.senaPayment,
+                  type: 'sena'
+                });
+              }
 
-      const clienteNombre = (clients.find(c => c.id === clienteId)?.nombre) || clientName;
-      let newApt = { ...normalizeAppointmentRecord(data, clienteNombre), sena: senaAmountFinal };
-
-      if (senaAmountFinal > 0) {
-        await registerPaymentRecord({
-          turnoId: data.id,
-          usuarioId: session.authId,
-          amount: senaAmountFinal,
-          paymentMethod: scheduleForm.senaPayment,
-          type: 'sena'
-        });
-      }
-
-      let calendarSyncError = null;
-      try {
-        const { data: calendarResult, error: calendarError } = await supabase.functions.invoke('google-calendar', {
-          body: {
-            action: 'create',
-            appointment: {
-              id: newApt.id,
-              database_id: newApt.rawId,
-              legacy_id: newApt.legacy_id,
-              cliente: newApt.cliente,
-              fecha: newApt.fecha,
-              hora_inicio: newApt.horaInicio,
-              hora_fin: newApt.horaFin,
-              servicio: newApt.servicio,
-              estado: newApt.estado,
-              precio: newApt.precio,
-              event_id: newApt.eventId
+              const clienteNombre = (clients.find(c => c.id === clienteId)?.nombre) || clientName;
+              newApt = { ...normalizeAppointmentRecord(data, clienteNombre), sena: senaAmountFinal };
+            }
+          },
+          {
+            // Best-effort: el turno ya quedó guardado, así que un fallo de
+            // Calendar no debe abortar. Se captura acá y se avisa al final.
+            label: 'Sincronizando con Google Calendar',
+            run: async () => {
+              try {
+                const { data: calendarResult, error: calendarError } = await supabase.functions.invoke('google-calendar', {
+                  body: {
+                    action: 'create',
+                    appointment: {
+                      id: newApt.id,
+                      database_id: newApt.rawId,
+                      legacy_id: newApt.legacy_id,
+                      cliente: newApt.cliente,
+                      fecha: newApt.fecha,
+                      hora_inicio: newApt.horaInicio,
+                      hora_fin: newApt.horaFin,
+                      servicio: newApt.servicio,
+                      estado: newApt.estado,
+                      precio: newApt.precio,
+                      event_id: newApt.eventId
+                    }
+                  }
+                });
+                if (calendarError) {
+                  const details = await calendarError.context?.json?.().catch(() => null);
+                  throw new Error(details?.message || calendarError.message);
+                }
+                if (!calendarResult?.success) {
+                  throw new Error(calendarResult?.message || 'Google Calendar no confirmó la sincronización.');
+                }
+                newApt = { ...newApt, eventId: calendarResult.eventId || null };
+              } catch (gcErr) {
+                console.warn('Google Calendar sync falló (create):', gcErr);
+                calendarSyncError = gcErr;
+              }
             }
           }
-        });
-        if (calendarError) {
-          const details = await calendarError.context?.json?.().catch(() => null);
-          throw new Error(details?.message || calendarError.message);
-        }
-        if (!calendarResult?.success) {
-          throw new Error(calendarResult?.message || 'Google Calendar no confirmó la sincronización.');
-        }
-        newApt = { ...newApt, eventId: calendarResult.eventId || null };
-      } catch (gcErr) {
-        console.warn('Google Calendar sync falló (create):', gcErr);
-        calendarSyncError = gcErr;
-      }
+        ]
+      });
 
       setAppointments(prev => {
         const next = [...prev, newApt].sort((a, b) => new Date(a.horaInicio) - new Date(b.horaInicio));
@@ -625,18 +650,32 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
     confirmBypassRef.current = false;
     setSavingSena(true);
     try {
-      const updates = {
-        estado: 'reservado',
-        precio: amount
-      };
-      await updateAppointmentInDatabase({ id: senaTarget.rawId, updates });
-
-      await registerPaymentRecord({
-        turnoId: senaTarget.rawId,
-        usuarioId: session.authId,
-        amount,
-        paymentMethod: senaPayment,
-        type: 'sena'
+      await runTask({
+        title: 'Reservando turno',
+        steps: [
+          {
+            label: 'Marcando el turno como reservado',
+            run: async () => {
+              const updates = {
+                estado: 'reservado',
+                precio: amount
+              };
+              await updateAppointmentInDatabase({ id: senaTarget.rawId, updates });
+            }
+          },
+          {
+            label: 'Registrando la seña',
+            run: async () => {
+              await registerPaymentRecord({
+                turnoId: senaTarget.rawId,
+                usuarioId: session.authId,
+                amount,
+                paymentMethod: senaPayment,
+                type: 'sena'
+              });
+            }
+          }
+        ]
       });
 
       setAppointments(prev => {
@@ -712,46 +751,62 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
       const inicio = new Date(`${rescheduleDate}T${rescheduleTime}:00`);
       const durMs = new Date(rescheduleTarget.horaFin) - new Date(rescheduleTarget.horaInicio);
       const fin = new Date(inicio.getTime() + (durMs > 0 ? durMs : 60 * 60 * 1000));
-      await updateAppointmentInDatabase({
-        id: databaseId,
-        legacyId,
-        updates: {
-          fecha: rescheduleDate,
-          hora_inicio: inicio.toISOString(),
-          hora_fin: fin.toISOString()
-        }
-      });
 
-      // Con seña solo se puede reagendar: mover también el evento en Google Calendar.
-      try {
-        const authSession = await getValidSession();
-        if (authSession?.access_token) {
-          const { data: calendarResult, error: calendarError } = await supabase.functions.invoke('google-calendar', {
-            body: {
-              action: 'update',
-              appointment: {
-                database_id: databaseId,
-                event_id: rescheduleTarget.eventId || null,
-                fecha: rescheduleDate,
-                hora_inicio: inicio.toISOString(),
-                hora_fin: fin.toISOString(),
-                cliente: rescheduleTarget.cliente,
-                servicio: rescheduleTarget.servicio,
-                precio: rescheduleTarget.precio,
-                estado: rescheduleTarget.estado
+      await runTask({
+        title: 'Reagendando turno',
+        steps: [
+          {
+            label: 'Guardando la nueva fecha',
+            run: async () => {
+              await updateAppointmentInDatabase({
+                id: databaseId,
+                legacyId,
+                updates: {
+                  fecha: rescheduleDate,
+                  hora_inicio: inicio.toISOString(),
+                  hora_fin: fin.toISOString()
+                }
+              });
+            }
+          },
+          {
+            // Best-effort: el turno ya se movió en la app, así que un fallo de
+            // Calendar solo advierte y no aborta.
+            label: 'Moviendo en Google Calendar',
+            run: async () => {
+              try {
+                const authSession = await getValidSession();
+                if (authSession?.access_token) {
+                  const { data: calendarResult, error: calendarError } = await supabase.functions.invoke('google-calendar', {
+                    body: {
+                      action: 'update',
+                      appointment: {
+                        database_id: databaseId,
+                        event_id: rescheduleTarget.eventId || null,
+                        fecha: rescheduleDate,
+                        hora_inicio: inicio.toISOString(),
+                        hora_fin: fin.toISOString(),
+                        cliente: rescheduleTarget.cliente,
+                        servicio: rescheduleTarget.servicio,
+                        precio: rescheduleTarget.precio,
+                        estado: rescheduleTarget.estado
+                      }
+                    }
+                  });
+                  if (calendarError) throw calendarError;
+                  if (calendarResult && calendarResult.success === false && !calendarResult.warning) throw new Error(calendarResult.message);
+                  if (calendarResult?.eventId && databaseId) {
+                    try { await updateAppointmentInDatabase({ id: databaseId, updates: { event_id: calendarResult.eventId } }); } catch { /* ignore */ }
+                  }
+                }
+              } catch (gcErr) {
+                console.warn('Google Calendar update falló (reschedule):', gcErr);
+                if (notify) notify(`Turno reagendado en app, pero no se movió en Google Calendar: ${gcErr.message || 'revisá conexión'}`, 'warning');
               }
             }
-          });
-          if (calendarError) throw calendarError;
-          if (calendarResult && calendarResult.success === false && !calendarResult.warning) throw new Error(calendarResult.message);
-          if (calendarResult?.eventId && databaseId) {
-            try { await updateAppointmentInDatabase({ id: databaseId, updates: { event_id: calendarResult.eventId } }); } catch { /* ignore */ }
           }
-        }
-      } catch (gcErr) {
-        console.warn('Google Calendar update falló (reschedule):', gcErr);
-        if (notify) notify(`Turno reagendado en app, pero no se movió en Google Calendar: ${gcErr.message || 'revisá conexión'}`, 'warning');
-      }
+        ]
+      });
 
       setAppointments(prev => {
         const next = prev.map(a =>
@@ -814,16 +869,80 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
     // 1) Borrado total en Supabase primero (solo provisional/reservado sin seña).
     // Si la manicurista es dueña o es admin, RLS lo autoriza.
     try {
-      await deleteAppointmentFromDatabase(databaseId);
+      await runTask({
+        title: 'Eliminando turno',
+        steps: [
+          {
+            label: 'Eliminando el turno',
+            run: async () => {
+              try {
+                await deleteAppointmentFromDatabase(databaseId);
+              } catch (error) {
+                const lower = (error.message || '').toLowerCase();
+                const msg = lower.includes('foreign key')
+                  ? 'No se puede eliminar: tiene seña o servicio asociado. Reagendalo.'
+                  : lower.includes('row-level security') || lower.includes('permission') || lower.includes('no se encontró el turno')
+                    ? 'No tenés permiso para eliminar este turno (solo la dueña o una admin). Pedile a una admin que lo elimine.'
+                    : (error.message || 'No se pudo eliminar el turno.');
+                // Re-lanza con el mensaje customizado: runTask marca el paso en
+                // rojo y este catch lo muestra tal cual.
+                throw new Error(msg);
+              }
+            }
+          },
+          {
+            // 2) Borrar el evento en Google Calendar (best-effort). El turno ya
+            // no está en la app, así que cualquier fallo acá (error devuelto o
+            // throw de red) solo advierte y nunca aborta ni revierte.
+            label: 'Borrando de Google Calendar',
+            run: async () => {
+              try {
+                const authSession = await getValidSession();
+                if (!authSession?.access_token) {
+                  if (notify) notify('Turno eliminado definitivamente.', 'success');
+                  return;
+                }
+                const { data: calendarResult, error: calendarError } = await supabase.functions.invoke('google-calendar', {
+                  body: {
+                    action: 'delete',
+                    appointment: {
+                      database_id: databaseId,
+                      event_id: target.eventId || null
+                    }
+                  },
+                  headers: { Authorization: `Bearer ${authSession.access_token}` }
+                });
+                // supabase-js envuelve el fallo HTTP en `error` y deja el cuerpo real
+                // de la Edge en `error.context`; `error.message` es genérico. Leemos
+                // el cuerpo para mostrar el motivo verdadero en vez de un código opaco.
+                let edgeMessage = null;
+                if (calendarError) {
+                  let body = null;
+                  try { body = await calendarError.context?.json?.(); } catch { /* cuerpo no-JSON */ }
+                  console.error('Edge google-calendar (delete) respondió con error:', {
+                    status: calendarError.context?.status,
+                    supabaseMessage: calendarError.message,
+                    edgeMessage: body?.message
+                  });
+                  edgeMessage = body?.message || calendarError.message || 'la Edge respondió con error.';
+                } else if (calendarResult && calendarResult.success === false) {
+                  edgeMessage = calendarResult.message || 'Google Calendar no confirmó el borrado.';
+                }
+                if (notify) {
+                  if (edgeMessage) notify(`Turno eliminado de la app. No se pudo borrar en Google Calendar: ${edgeMessage}`, 'warning');
+                  else notify('Turno eliminado definitivamente y borrado de Google Calendar.', 'success');
+                }
+              } catch (gcErr) {
+                console.error('Google Calendar delete falló:', gcErr);
+                if (notify) notify(`Turno eliminado de la app. No se pudo borrar en Google Calendar: ${gcErr.message || 'revisá la conexión'}`, 'warning');
+              }
+            }
+          }
+        ]
+      });
     } catch (error) {
       console.error('Error eliminando turno:', error);
-      const lower = (error.message || '').toLowerCase();
-      const msg = lower.includes('foreign key')
-        ? 'No se puede eliminar: tiene seña o servicio asociado. Reagendalo.'
-        : lower.includes('row-level security') || lower.includes('permission') || lower.includes('no se encontró el turno')
-          ? 'No tenés permiso para eliminar este turno (solo la dueña o una admin). Pedile a una admin que lo elimine.'
-          : (error.message || 'No se pudo eliminar el turno.');
-      if (notify) notify(msg, 'error');
+      if (notify) notify(error.message || 'No se pudo eliminar el turno.', 'error');
       setDeleting(false);
       return;
     }
@@ -834,32 +953,6 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
     });
     setDeleteConfirm(null);
     setDeleting(false);
-    // 2) Borrar el evento en Google Calendar (best-effort, no bloquea ni revierte).
-    // Se hace después para que un error 2000/400 de la Edge no impida borrar en la app.
-    try {
-      const authSession = await getValidSession();
-      if (authSession?.access_token) {
-        const { data: calendarResult, error: calendarError } = await supabase.functions.invoke('google-calendar', {
-          body: {
-            action: 'delete',
-            appointment: {
-              database_id: databaseId,
-              event_id: target.eventId || null
-            }
-          }
-        });
-        const edgeMessage = calendarError?.message || (calendarResult && calendarResult.success === false ? calendarResult.message : null);
-        if (notify) {
-          if (edgeMessage) notify(`Turno eliminado de la app. No se pudo borrar en Google Calendar: ${edgeMessage}`, 'warning');
-          else notify('Turno eliminado definitivamente y borrado de Google Calendar.', 'success');
-        }
-      } else if (notify) {
-        notify('Turno eliminado definitivamente.', 'success');
-      }
-    } catch (gcErr) {
-      console.warn('Google Calendar delete falló:', gcErr);
-      if (notify) notify(`Turno eliminado de la app. No se pudo borrar en Google Calendar: ${gcErr.message || 'revisá la conexión'}`, 'warning');
-    }
   };
 
   const checkout = (apt) => {
@@ -946,11 +1039,46 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
     try {
       const databaseId = cancelTarget.rawId;
       const legacyId = cancelTarget.legacy_id || (!databaseId ? cancelTarget.id : null);
-      await cancelAppointmentInDatabase({
-        id: databaseId || null,
-        legacyId,
-        motivo
+
+      await runTask({
+        title: 'Cancelando turno',
+        steps: [
+          {
+            label: 'Cancelando el turno',
+            run: async () => {
+              try {
+                await cancelAppointmentInDatabase({
+                  id: databaseId || null,
+                  legacyId,
+                  motivo
+                });
+              } catch (error) {
+                const lower = (error.message || '').toLowerCase();
+                const msg = lower.includes('row-level security') || lower.includes('permission')
+                  ? 'No tenés permiso para cancelar este turno (solo la dueña o una admin).'
+                  : (error.message || 'No se pudo cancelar el turno.');
+                // Re-lanza con el mensaje customizado para el toast del caller.
+                throw new Error(msg);
+              }
+            }
+          },
+          {
+            // Un turno cancelado no debe seguir ocupando el calendario del
+            // salón: se borra el evento en Google Calendar. Best-effort: la app
+            // ya quedó cancelada, un fallo acá solo advierte y no revierte.
+            label: 'Borrando de Google Calendar',
+            run: async () => {
+              try {
+                await syncAppointmentToGoogle(cancelTarget, 'delete');
+              } catch (gcErr) {
+                console.warn('Google Calendar delete falló (cancel):', gcErr);
+                if (notify) notify(`Turno cancelado en app, pero no se borró de Google Calendar: ${gcErr.message || 'revisá la conexión'}`, 'warning');
+              }
+            }
+          }
+        ]
       });
+
       setAppointments(prev => {
         const next = prev.map(a =>
           (a.rawId || a.legacy_id || a.id) === (databaseId || legacyId)
@@ -961,22 +1089,13 @@ function CalendarBoard({ session, notify, showLoader, onCheckoutFromAppointment,
         return next;
       });
       if (notify) notify('Turno cancelado. Quedó registrado con su motivo.', 'success');
-      // Un turno cancelado no debe seguir ocupando el calendario del salón: se
-      // borra el evento en Google Calendar (best-effort; la app ya quedó
-      // cancelada, así que un fallo de Calendar no revierte nada). Se dispara
-      // sin await para no bloquear el cierre del modal.
-      syncAppointmentToGoogle(cancelTarget, 'delete');
       cancelInitialRef.current = '';
       setCancelOpen(false);
       setCancelTarget(null);
       setCancelReason('');
     } catch (error) {
       console.error('Error cancelando turno:', error);
-      const lower = (error.message || '').toLowerCase();
-      const msg = lower.includes('row-level security') || lower.includes('permission')
-        ? 'No tenés permiso para cancelar este turno (solo la dueña o una admin).'
-        : (error.message || 'No se pudo cancelar el turno.');
-      if (notify) notify(msg, 'error');
+      if (notify) notify(error.message || 'No se pudo cancelar el turno.', 'error');
     } finally {
       setSavingCancel(false);
     }

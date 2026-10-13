@@ -94,7 +94,7 @@ const isWithinLast30Days = (dateValue, ref) => {
     return date >= start && date <= ref;
 };
 
-const StatsPanel = ({ session }) => {
+const StatsPanel = ({ session, notify, showLoader, runTask }) => {
     const [services, setServices] = useState([]);
     const [expenses, setExpenses] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -249,49 +249,69 @@ const StatsPanel = ({ session }) => {
     const confirmPayDebtor = async () => {
         if (!debtorToPay || !supabase || !session?.authId) return;
         setPaying(true);
+        const ids = debtorToPay.servicios.map((s) => s.rawId || s.id);
+        const change = Math.max(0, (Number(payAmount) || 0) - debtorToPay.total);
         try {
-            const ids = debtorToPay.servicios.map((s) => s.rawId || s.id);
-            const change = Math.max(0, (Number(payAmount) || 0) - debtorToPay.total);
-            if (change > 0) {
-                await saveExpenseToDatabase({
-                    usuario_id: session.authId,
-                    fecha: new Date().toISOString().slice(0, 10),
-                    concepto: `Vuelto de ${debtorToPay.cliente}`,
-                    monto: change,
-                    metodo_pago: returnMethod.toLowerCase(),
-                    categoria: 'Vuelto'
-                });
-            }
-            await Promise.all(ids.map((serviceId, index) => {
-                const match = services.find((service) => (service.rawId || service.id) === serviceId);
-                if (!match) return;
-                return completePendingPayment({
-                    serviceId,
-                    serviceOverride: {
-                        id: match.rawId || match.id,
-                        legacy_id: match.id,
-                        turno_id: match.turnoId || null,
-                        cliente_id: match.clienteId || null,
-                        fecha: match.fecha,
-                        servicio: match.servicio,
-                        precio: match.precio,
-                        metodo_pago: payMethod.toLowerCase(),
-                        completado: true
+            await runTask({
+                title: 'Registrando cobro',
+                steps: [
+                    {
+                        // Solo hay vuelto si el monto entregado supera la deuda.
+                        label: 'Registrando el vuelto',
+                        run: async () => {
+                            if (change <= 0) return;
+                            await saveExpenseToDatabase({
+                                usuario_id: session.authId,
+                                fecha: new Date().toISOString().slice(0, 10),
+                                concepto: `Vuelto de ${debtorToPay.cliente}`,
+                                monto: change,
+                                metodo_pago: returnMethod.toLowerCase(),
+                                categoria: 'Vuelto'
+                            });
+                        }
                     },
-                    paymentMethod: payMethod.toLowerCase(),
-                    vuelto: index === 0 ? change : 0,
-                    finalizeTurno: true,
-                    usuarioId: session.authId
-                });
-            }));
+                    {
+                        label: 'Cancelando la deuda',
+                        run: async () => {
+                            await Promise.all(ids.map((serviceId, index) => {
+                                const match = services.find((service) => (service.rawId || service.id) === serviceId);
+                                if (!match) return;
+                                return completePendingPayment({
+                                    serviceId,
+                                    serviceOverride: {
+                                        id: match.rawId || match.id,
+                                        legacy_id: match.id,
+                                        turno_id: match.turnoId || null,
+                                        cliente_id: match.clienteId || null,
+                                        fecha: match.fecha,
+                                        servicio: match.servicio,
+                                        precio: match.precio,
+                                        metodo_pago: payMethod.toLowerCase(),
+                                        completado: true
+                                    },
+                                    paymentMethod: payMethod.toLowerCase(),
+                                    vuelto: index === 0 ? change : 0,
+                                    finalizeTurno: true,
+                                    usuarioId: session.authId
+                                });
+                            }));
+                        }
+                    },
+                    {
+                        label: 'Actualizando el resumen',
+                        run: async () => {
+                            setServices((prev) =>
+                                prev.map((x) => {
+                                    const index = ids.indexOf(x.rawId || x.id);
+                                    return index === -1 ? x : { ...x, metodoPago: payMethod, vuelto: index === 0 ? change : 0, completado: true };
+                                })
+                            );
+                            await refreshServices();
+                        }
+                    }
+                ]
+            });
 
-            setServices((prev) =>
-                prev.map((x) => {
-                    const index = ids.indexOf(x.rawId || x.id);
-                    return index === -1 ? x : { ...x, metodoPago: payMethod, vuelto: index === 0 ? change : 0, completado: true };
-                })
-            );
-            await refreshServices();
             if (notify) notify('Cobro registrado y pago pendiente actualizado.', 'success');
             setPayConfirmOpen(false);
             setDebtorToPay(null);
