@@ -508,7 +508,8 @@ button {
 .form-group input[type="time"],
 .form-group input[type="tel"],
 .form-group input[type="url"],
-.form-group select {
+.form-group select,
+.form-group textarea {
     background: var(--white);
     border: 2px solid var(--barbie-light);
     border-radius: var(--radius-md);
@@ -521,20 +522,23 @@ button {
 }
 
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
     border-color: var(--barbie-pink);
     box-shadow: var(--shadow-focus), var(--shadow-inset);
     outline: none;
 }
 
 input::placeholder,
-select::placeholder {
+select::placeholder,
+textarea::placeholder {
     color: #aaaaaa;
     opacity: 0.8;
     transition: opacity 0.2s ease, color 0.2s ease;
 }
 
-input:focus::placeholder {
+input:focus::placeholder,
+textarea:focus::placeholder {
     color: transparent !important;
     opacity: 0 !important;
 }
@@ -3042,6 +3046,22 @@ button:active {
 
 .cancel-reason-note strong {
     font-weight: 700;
+}
+
+/* Campos multilínea con icono (textarea del modal de cancelar): el icono se
+   ancla arriba en vez de al centro (a mitad de 3 filas tapaba la segunda
+   línea de texto) y el contenido arranca después de él, igual que en inputs.
+   Se repite .input-wrapper para ganarle al empate de especificidad de
+   `.input-wrapper .input-icon`, que está definido más abajo en el archivo. */
+.input-wrapper--multiline textarea {
+    padding-left: 40px !important;
+    resize: vertical;
+    min-height: 84px;
+}
+
+.input-wrapper.input-wrapper--multiline .input-icon {
+    top: 16px;
+    transform: none;
 }
 
 .no-appointments-placeholder {

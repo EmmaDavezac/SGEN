@@ -1732,7 +1732,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
             <label htmlFor="cancel-reason-input">
               <i className="fa-solid fa-comment-dots" /> Motivo de la cancelación <span className="field-required">(obligatorio)</span>
             </label>
-            <div className="input-wrapper">
+            <div className="input-wrapper input-wrapper--multiline">
               <i className="fa-solid fa-comment-dots input-icon" />
               <textarea
                 id="cancel-reason-input"

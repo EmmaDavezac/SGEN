@@ -421,10 +421,43 @@ function ClientsPanel({ session, notify, showLoader }) {
     setSelectedHistoryService(null);
   };
 
-  const askDeleteClient = (client) => {
+  const askDeleteClient = async (client) => {
     if (!isSuperadmin) {
       if (notify) notify('Solo el superadmin puede eliminar clientas.', 'error');
       return;
+    }
+    if (!client?.id) {
+      if (notify) notify('No se pudo identificar a la clienta a eliminar.', 'error');
+      return;
+    }
+    // Chequeo de historial antes de abrir el modal: turnos y servicios
+    // referencian a la clienta con FK NOT NULL, así que sin este aviso el
+    // DELETE fallaría por clave foránea o, peor, fallaría en silencio.
+    try {
+      const [turnosRes, serviciosRes] = await Promise.all([
+        supabase.from('turnos').select('id', { count: 'exact', head: true }).eq('cliente_id', client.id),
+        supabase.from('servicios').select('id', { count: 'exact', head: true }).eq('cliente_id', client.id)
+      ]);
+      if (turnosRes.error) throw turnosRes.error;
+      if (serviciosRes.error) throw serviciosRes.error;
+      const nTurnos = turnosRes.count || 0;
+      const nServicios = serviciosRes.count || 0;
+      if (nTurnos > 0 || nServicios > 0) {
+        const partes = [];
+        if (nTurnos > 0) partes.push(`${nTurnos} turno${nTurnos === 1 ? '' : 's'}`);
+        if (nServicios > 0) partes.push(`${nServicios} servicio${nServicios === 1 ? '' : 's'}`);
+        if (notify) {
+          notify(
+            `No se puede eliminar a ${client.nombre || 'la clienta'}: tiene ${partes.join(' y ')} en el historial. El historial se conserva para no perder registros.`,
+            'error'
+          );
+        }
+        return;
+      }
+    } catch (err) {
+      // Si la verificación no pudo ejecutarse (red/permisos), no bloqueamos:
+      // el DELETE responde con un error claro (FK o RLS) en el paso siguiente.
+      console.warn('No se pudo verificar el historial de la clienta:', err);
     }
     setDeleteConfirm(client);
   };

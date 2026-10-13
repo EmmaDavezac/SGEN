@@ -190,10 +190,30 @@ export async function updateClientInDatabase(id, updates) {
     return data;
 }
 
+/**
+ * Borra una clienta de forma definitiva.
+ *
+ * Devolvemos las filas afectadas (`.select('id')`) porque RLS puede dejar un
+ * DELETE en 0 filas SIN error: sin esta verificación la app celebraba un
+ * borrado que nunca ocurrió y la clienta reaparecía al recargar.
+ */
 export async function deleteClientFromDatabase(id) {
     if (!supabase) throw new Error('Supabase no está disponible.');
-    const { error } = await supabase.from('clientes').delete().eq('id', id);
-    if (error) throw error;
+    const { data, error } = await supabase
+        .from('clientes')
+        .delete()
+        .eq('id', id)
+        .select('id');
+    if (error) {
+        const code = String(error.code || '');
+        if (code === '23503' || /violates foreign key constraint/i.test(error.message || '')) {
+            throw new Error('No se puede eliminar: la clienta tiene turnos o servicios en el historial. El historial se conserva para no perder registros.');
+        }
+        throw error;
+    }
+    if (!data || data.length === 0) {
+        throw new Error('No se pudo eliminar la clienta: no hay permisos (RLS) o ya no existe en el sistema.');
+    }
     return { success: true };
 }
 
