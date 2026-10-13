@@ -18,7 +18,12 @@ export default defineConfig({
       srcDir: 'public',
       filename: 'sw.js',
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,json}']
+        // El HTML nunca entra al precache: las navegaciones siempre van a red
+        // (ver public/sw.js). Si se precacheara, workbox respondería el
+        // index.html viejo antes de que corra el network-first y un rebuild
+        // no llegaría al navegador hasta actualizar el service worker.
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,json}'],
+        globIgnores: ['**/*.html']
       }
     })
   ],

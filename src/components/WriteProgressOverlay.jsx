@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { STEP_STATUS } from '../progressTask.js';
 
 /**
@@ -8,6 +9,10 @@ import { STEP_STATUS } from '../progressTask.js';
  * para que el progreso se vea incluso con un ConfirmModal todavía abierto)
  * para que no se pueda interactuar mientras dura la operación y evitar
  * errores desde la UI.
+ *
+ * Se monta por portal en `document.body` (igual que `Modal`): los ConfirmModal
+ * viven en body, y así ambas capas compiten en el mismo stacking context sin
+ * depender del árbol de la app.
  *
  * Dos presentaciones:
  *  - `indeterminate` (sin pasos): corazón animado + texto, igual al loader de
@@ -27,17 +32,18 @@ function WriteProgressOverlay({ task }) {
     const mode = steps && steps.length > 0 ? 'steps' : 'indeterminate';
 
     if (mode === 'indeterminate') {
-        return (
+        return createPortal(
             <div className="loader-overlay" aria-live="polite" aria-busy="true">
                 <div className="spinner-container">
                     <i className="fa-solid fa-heart heart-spinner" aria-hidden="true"></i>
                     <p>{task.title || 'Cargando...'}</p>
                 </div>
-            </div>
+            </div>,
+            document.body
         );
     }
 
-    return (
+    return createPortal(
         <div className="loader-overlay write-progress-overlay" aria-live="polite" aria-busy="true">
             <div className="write-progress-card">
                 <i className="fa-solid fa-heart heart-spinner" aria-hidden="true"></i>
@@ -62,7 +68,8 @@ function WriteProgressOverlay({ task }) {
                     Estamos guardando tu información, no cierres la app.
                 </p>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 

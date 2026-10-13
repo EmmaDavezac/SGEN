@@ -16,7 +16,10 @@ if (rootElement) {
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch((error) => {
+        // updateViaCache: 'none' → el navegador chequea /sw.js contra la red
+        // en cada visita (sin el caché HTTP de hasta 24 h), para que un
+        // rebuild llegue a la UI apenas se publique.
+        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch((error) => {
             console.error('No se pudo registrar el service worker:', error);
         });
     }, { once: true });
