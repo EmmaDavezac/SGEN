@@ -13,6 +13,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      manifest: false,
       injectRegister: false,
       strategies: 'injectManifest',
       srcDir: 'public',

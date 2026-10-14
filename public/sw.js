@@ -8,7 +8,7 @@ import { precacheAndRoute } from 'workbox-precaching';
 // network-first de abajo: un rebuild nunca llegaba al navegador hasta que
 // este service worker se actualizara, y la UI seguía con la versión vieja
 // (p. ej. el overlay de progreso quedaba con z-index bajo los modales).
-const CACHE_VERSION = 'v20';
+const CACHE_VERSION = 'v21';
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
 // Guardamos el manifest antes de consumirlo para saber qué requests cubre
@@ -27,7 +27,7 @@ const PRECACHE_URLS = new Set(
 self.addEventListener('fetch', (e) => {
   if (new URL(e.request.url).origin !== self.location.origin) return;
 
-  // Si es navegación, network-first; offline: última navegación del runtime cache.
+  // Si es navegación, network-first; offline: última navegación del runtime cache o shell index.html.
   if (e.request.mode === 'navigate') {
     e.respondWith((async () => {
       try {
@@ -35,6 +35,7 @@ self.addEventListener('fetch', (e) => {
         if (networkResponse && networkResponse.status === 200) {
           const cache = await caches.open(RUNTIME_CACHE);
           cache.put(e.request, networkResponse.clone());
+          cache.put('/index.html', networkResponse.clone());
         }
         return networkResponse;
       } catch (err) {
@@ -80,41 +81,6 @@ self.addEventListener('activate', (e) => {
       return null;
     }));
     await self.clients.claim();
-  })());
-});
-
-// Fetch: navegación network-first, otros recursos stale-while-revalidate
-self.addEventListener('fetch', (e) => {
-  if (new URL(e.request.url).origin !== self.location.origin) return;
-
-  // Si es navegación, network-first con fallback al precache (index.html)
-  if (e.request.mode === 'navigate') {
-    e.respondWith((async () => {
-      try {
-        const networkResponse = await fetch(e.request);
-        if (networkResponse && networkResponse.status === 200) {
-          const cache = await caches.open(RUNTIME_CACHE);
-          cache.put(e.request, networkResponse.clone());
-        }
-        return networkResponse;
-      } catch (err) {
-        return (await caches.match('/index.html')) || Response.error();
-      }
-    })());
-    return;
-  }
-
-  // Para otros recursos: stale-while-revalidate en caché runtime
-  e.respondWith((async () => {
-    const cache = await caches.open(RUNTIME_CACHE);
-    const cachedResponse = await cache.match(e.request);
-    const networkPromise = fetch(e.request).then(async (networkResponse) => {
-      if (networkResponse && networkResponse.status === 200) {
-        await cache.put(e.request, networkResponse.clone());
-      }
-      return networkResponse;
-    }).catch(() => cachedResponse || Response.error());
-    return cachedResponse || networkPromise;
   })());
 });
 

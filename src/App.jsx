@@ -65,7 +65,7 @@ function isValidTab(tab, isAdmin, settings = {}, allowCheckout = false) {
     // "Registrar" no es una pestaña de la navegación: solo es alcanzable al
     // cobrar un turno, y mientras dure ese checkout (allowCheckout) la pantalla
     // se considera válida. Al terminar, la URL de /registrar vuelve a Agenda.
-    if (isAdmin && allowCheckout && tab === 'registrar') return true;
+    if (allowCheckout && tab === 'registrar') return true;
     if (isAdmin && settings.allowCajasTab && tab === 'cajas') return true;
     return false;
 }
@@ -186,6 +186,13 @@ function App() {
 
     // Suscripción al guardia global de formularios (ver src/formGuard.js).
     useEffect(() => subscribeToFormGuard(setFormGuardActive), []);
+
+    // Normaliza la ruta si la PWA o el navegador abre directamente desde /index.html.
+    useEffect(() => {
+        if (window.location.pathname === '/index.html') {
+            window.history.replaceState({ tab: DEFAULT_TAB }, '', getPathForTab(DEFAULT_TAB));
+        }
+    }, []);
 
     // "Consultar ficha de la clienta" desde una venta: lleva a Clientes y le pide abrir
     // la ficha. ClientsPanel escucha el evento, así que tiene que estar montado

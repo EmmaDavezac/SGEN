@@ -14,8 +14,9 @@ export const ROUTES = {
 const routeEntries = Object.entries(ROUTES);
 
 export function getTabFromPath(pathname) {
-    const path = pathname || '/';
-    if (path === '/' || path === '') return 'calendario';
+    const raw = (pathname || '/').trim();
+    const path = raw.length > 1 ? raw.replace(/\/+$/, '') : raw;
+    if (path === '/' || path === '' || path === '/index.html') return 'calendario';
     return routeEntries.find(([, route]) => route === path)?.[0] || null;
 }
 
