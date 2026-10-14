@@ -212,6 +212,23 @@ Ver `supabase/functions/google-calendar/README.md` para el paso a paso del flujo
 ### 5. Correr en desarrollo
 ```bash
 npm run dev
+
+
+## 🗃️ Migración de datos a Supabase
+
+> **✅ Terminada y verificable** — el esquema, el bootstrap, las políticas RLS, las funciones Edge y los datos históricos están listos. Queda un solo paso de ejecución en el proyecto de Supabase (ver `supabase/MIGRATION_SUMMARY.md`).
+
+Los datos de negocio se cargan con `scripts/preparar-importacion.mjs`, que genera `csv/import_completo.sql`:
+- **84** clientas · **150** turnos · **173** servicios · **87** pagos · **35** gastos · **18** precios · **7** categorías.
+- El paquete se ejecuta en una sola transacción (`begin;` / `commit;`) y verifica filas, estado de turnos y relaciones.
+
+Para aplicarla en el proyecto Supabase (`pbsumqgiwdsmeppfkpew` / Evolet Beauty):
+1. Aplicar las **28 migraciones** de `supabase/migrations/` (SQL Editor o CLI).
+2. Ejecutar `csv/import_completo.sql` sobre la base.
+3. Revisar el reporte de `import_completo.sql`.
+
+Ver `supabase/MIGRATION_SUMMARY.md` para el desglose, las advertencias del reporte y la regla de seguridad de las claves.
+
 # abrir http://localhost:5173
 ```
 
