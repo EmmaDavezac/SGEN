@@ -1110,7 +1110,6 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
   };
 
   const selectedDayTitleText = `Turnos del ${selectedDay.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}`;
-  const selectedDayDateShort = `${String(selectedDay.getDate()).padStart(2, '0')}/${String(selectedDay.getMonth() + 1).padStart(2, '0')}/${selectedDay.getFullYear()}`;
 
   return (
     <div id="tab-calendario" className="tab-pane active">
@@ -1157,9 +1156,6 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
         <div className="chart-section calendar-day-section">
           <div className="calendar-selected-day-header">
             <h4 id="selected-day-title">{selectedDayTitleText}</h4>
-            <span id="selected-day-date" className="calendar-selected-day-date">
-              {selectedDayDateShort}
-            </span>
           </div>
 
           {scheduleOpen && (

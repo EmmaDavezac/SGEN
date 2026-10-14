@@ -1,8 +1,8 @@
-# 💅 Evolet Nails | Sistema Integral de Gestión & Contabilidad para Salón de Uñas
+# 💅 Evolet Studio | Sistema Integral de Gestión & Contabilidad para Salón de Uñas
 
 > **PWA Full-Stack en producción** · React 19 · Supabase (PostgreSQL · Auth · Edge Functions) · Vite · Diseño Y2K Pink / Mobile-First
 
-Solución SaaS de uso interno pensada para **Evolet Nails**, un salón de uñas en Argentina que necesitaba **unificar en un solo lugar** toda la información dispersa (agenda de turnos, servicios cobrados, fiados pendientes, gastos, precios y caja diaria) — eliminando planillas manuales y papel, y permitiendo contabilidad real sin errores de transcripción.
+Solución SaaS de uso interno pensada para **Evolet Studio**, un salón de uñas en Argentina que necesitaba **unificar en un solo lugar** toda la información dispersa (agenda de turnos, servicios cobrados, fiados pendientes, gastos, precios y caja diaria) — eliminando planillas manuales y papel, y permitiendo contabilidad real sin errores de transcripción.
 
 Todo fluye desde la **toma del turno** → **registro del servicio** → **cobro** → **historial** → **KPIs de cierre de mes**. Multi-rol: dueña/admin y manicureras con permisos segmentados.
 
@@ -257,4 +257,4 @@ El build es 100% static-friendly (Vercel, Netlify, Cloudflare Pages, etc.).
 Diseñado y desarrollado **end-to-end** con 💖 por **Emmanuel Davezac** —  
 Análisis del problema del salón, modelado de base de datos PostgreSQL + RLS, Supabase Edge Function para Google Calendar, frontend React mobile-first y PWA.
 
-Para **Evolet Nails** · Córdoba, Argentina 🇦🇷
+Para **Evolet Studio** · Córdoba, Argentina 🇦🇷

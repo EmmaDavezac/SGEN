@@ -528,7 +528,7 @@ function ClientsPanel({ session, notify, showLoader }) {
       <div className={`section-title ${registrationOpen ? 'section-title-with-back' : 'section-title-with-action'}`}>
         <div className="section-title-text">
           <h3>Clientes</h3>
-          <p>Consultá y agregá las clientas de Evolet Nails.</p>
+          <p>Consultá y agregá las clientas de Evolet Studio.</p>
         </div>
         <button
           type="button"

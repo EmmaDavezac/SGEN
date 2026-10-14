@@ -31,7 +31,7 @@ Hoja de ruta para convertir SGEN en una aplicación consistente, mantenible y po
 ## Prioridad 3: modelo de producto portable
 
 - [ ] Reemplazar el panel de precios por un catálogo de servicios con categorías configurables, precio, duración, estado activo e historial de cambios.
-- [ ] Separar la configuración específica de Evolet Nails de la lógica del producto: nombre, moneda, categorías, métodos de pago, permisos y textos configurables.
+- [ ] Separar la configuración específica de Evolet Studio de la lógica del producto: nombre, moneda, categorías, métodos de pago, permisos y textos configurables.
 - [ ] Definir una configuración inicial por negocio para facilitar la creación de nuevas instalaciones sin duplicar código.
 - [ ] Documentar las reglas de negocio, el esquema de datos, las variables de entorno y el procedimiento de despliegue.
 - [ ] Agregar auditoría para operaciones sensibles: cambios de precios, usuarios, pagos, gastos y eliminaciones lógicas.

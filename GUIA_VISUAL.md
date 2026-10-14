@@ -1,6 +1,6 @@
 # Guía visual de SGEN
 
-Referencia rápida para mantener una interfaz consistente en Evolet Nails y futuras instalaciones.
+Referencia rápida para mantener una interfaz consistente en Evolet Studio y futuras instalaciones.
 
 ## Principios
 

@@ -1,6 +1,6 @@
 # Tests manuales
 
-Checklist para validar los flujos principales de Evolet Nails antes y despues de cada cambio importante.
+Checklist para validar los flujos principales de Evolet Studio antes y despues de cada cambio importante.
 
 ## Instrucciones de uso
 

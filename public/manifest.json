@@ -1,7 +1,7 @@
 {
-    "short_name": "Evolet Nails",
-    "name": "Evolet Nails - Sistema de contabilidad",
-    "description": "Aplicación de contabilidad y registro de servicios para Evolet Nails",
+    "short_name": "Evolet Studio",
+    "name": "Evolet Studio - Sistema de contabilidad",
+    "description": "Aplicación de contabilidad y registro de servicios para Evolet Studio",
     "icons": [
         {
             "src": "icons/icon-192.png",

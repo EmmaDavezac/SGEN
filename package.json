@@ -1,7 +1,7 @@
 {
   "name": "evolet-nails-app",
   "version": "1.0.0",
-  "description": "Aplicación de contabilidad y registro de servicios para Evolet Nails",
+  "description": "Aplicación de contabilidad y registro de servicios para Evolet Studio",
   "type": "module",
   "scripts": {
     "dev": "vite",

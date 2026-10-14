@@ -16,7 +16,7 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
             <img className="mini-logo-image" src="/icons/favicon.svg?v=2" alt="Logo" />
           </div>
           <div className="header-business-block">
-            <h2 id="user-display-name" className="user-name">Evolet Nails</h2>
+            <h2 id="user-display-name" className="user-name">Evolet Studio</h2>
           </div>
         </div>
         

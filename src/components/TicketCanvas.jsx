@@ -171,7 +171,7 @@ export function generateTicketCanvas(item, targetCanvas, logoImg) {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#5A3D46';
     ctx.font = "bold 26px 'Outfit', Arial";
-    ctx.fillText('EVOLET NAILS', badgeX, badgeY + badgeRadius + 38);
+    ctx.fillText('EVOLET STUDIO', badgeX, badgeY + badgeRadius + 38);
 
     ctx.fillStyle = '#9E7D86';
     ctx.font = "13px 'Outfit', Arial";
@@ -304,7 +304,7 @@ export async function shareServiceTicketAsImage(item, canvasRef, notify) {
                 try {
                     await navigator.share({
                         files: [file],
-                        title: 'Ticket Evolet Nails',
+                        title: 'Ticket Evolet Studio',
                         text: `Ticket de ${item.cliente} - ${item.servicio}`
                     });
                     resolve({ success: true });

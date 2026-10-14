@@ -45,7 +45,7 @@ function RouteNotFound({ onGoHome }) {
                     <img src="/icons/favicon.svg?v=2" alt="" />
                 </div>
                 <section className="route-not-found-copy" aria-labelledby="route-not-found-title">
-                    <div className="route-not-found-eyebrow">Evolet Nails</div>
+                    <div className="route-not-found-eyebrow">Evolet Studio</div>
                     <h1 className="route-not-found-code">404</h1>
                     <h2 id="route-not-found-title">Página no encontrada</h2>
                     <p>No encontramos la página que buscabas. Volvé al inicio para continuar.</p>
@@ -506,6 +506,15 @@ function App() {
                 setCheckoutAppointment(null);
                 setActiveTab(DEFAULT_TAB);
                 notify('Sesión cerrada con éxito.', 'info');
+
+                // Cerramos también la sesión real de Supabase Auth. Si no, el token
+                // JWT sigue en localStorage y el useEffect de getSession() reinicia
+                // la sesión automáticamente al recargar la página.
+                if (supabase) {
+                    supabase.auth.signOut().catch((error) => {
+                        console.error('No se pudo cerrar la sesión de Supabase:', error);
+                    });
+                }
             }
         });
     };
@@ -673,7 +682,7 @@ function App() {
             {routeNotFound ? (
                 <RouteNotFound onGoHome={() => setActiveTab(DEFAULT_TAB)} />
             ) : !session ? (
-                <section className="login-screen active" aria-label="Login de Evolet Nails">
+                <section className="login-screen active" aria-label="Login de Evolet Studio">
                     <div className="sparkles-bg" aria-hidden="true" />
                     <div className="login-card">
                         <div className="brand-logo-container">
@@ -681,7 +690,7 @@ function App() {
                                 <img
                                     id="logo-img"
                                     src="/icons/favicon.svg"
-                                    alt="Evolet Nails"
+                                    alt="Evolet Studio"
                                     onError={(e) => {
                                         const target = e.currentTarget;
                                         if (target && target.parentNode) {
@@ -696,7 +705,7 @@ function App() {
                             </div>
                         </div>
 
-                        <h1>Evolet Nails</h1>
+                        <h1>Evolet Studio</h1>
                         <p className="subtitle">Sistema de Contabilidad</p>
 
                         {passwordResetMode === true ? (
@@ -733,14 +742,14 @@ function App() {
                                     </div>
                                 </div>
                                 <Button type="submit" className="btn-block" busy={loading}>
-                                    <i className="fa-solid fa-key" aria-hidden="true"></i> Actualizar contraseña
+                                    Actualizar contraseña
                                 </Button>
                             </form>
                         ) : passwordResetMode === 'request' ? (
                             <form className="retro-form password-recovery-form" onSubmit={handlePasswordRecoveryRequest}>
                                 <p className="login-form-heading">Te enviaremos un enlace temporal a tu email.</p>
                                 <div className="form-group">
-                                    <label htmlFor="react-recovery-email">Email autorizado <span className="field-required">(obligatorio)</span></label>
+                                    <label htmlFor="react-recovery-email">Email <span className="field-required">(obligatorio)</span></label>
                                     <div className="input-wrapper">
                                         <i className="fa-solid fa-envelope input-icon" aria-hidden="true"></i>
                                         <input
@@ -754,17 +763,17 @@ function App() {
                                     </div>
                                 </div>
                                 <Button type="submit" className="btn-block" busy={loading}>
-                                    <i className="fa-solid fa-envelope" aria-hidden="true"></i> Enviar enlace
+                                    Enviar enlace
                                 </Button>
-                                <button type="button" className="login-secondary-action" onClick={() => setPasswordResetMode(false)}>
+                                <Button type="button" variant="secondary" className="btn-block login-secondary-action" onClick={() => setPasswordResetMode(false)}>
                                     Volver al inicio de sesión
-                                </button>
+                                </Button>
                             </form>
                         ) : (
                         <form className="retro-form" onSubmit={handleLogin}>
                             <div className="form-group">
                                 <label htmlFor="react-login-email">
-                                    Email Autorizado <span className="field-required">(obligatorio)</span>
+                                    Email <span className="field-required">(obligatorio)</span>
                                 </label>
                                 <div className="input-wrapper">
                                     <i className="fa-solid fa-envelope input-icon" aria-hidden="true"></i>
@@ -804,11 +813,11 @@ function App() {
                             )}
 
                             <Button type="submit" className="btn-block" disabled={loginLocked}>
-                                <i className="fa-solid fa-heart-pulse" aria-hidden="true"></i> Ingresar
+                                Ingresar
                             </Button>
-                            <button type="button" className="login-secondary-action" onClick={() => setPasswordResetMode('request')}>
+                            <Button type="button" variant="secondary" className="btn-block login-secondary-action" onClick={() => setPasswordResetMode('request')}>
                                 Olvidé mi contraseña
-                            </button>
+                            </Button>
                         </form>
                         )}
                         <AppFooter compact />

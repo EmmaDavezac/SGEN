@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { supabase } from '../supabase.js';
 import { completePendingPayment, loadExpensesFromDatabase, loadServicesFromDatabase, saveExpenseToDatabase } from '../services.js';
@@ -67,6 +67,69 @@ const normalizeExpenseRecord = (item) => {
 };
 
 const formatPrice = (n) => Number(n || 0).toLocaleString('es-AR');
+
+// Cuenta progresiva: anima un número desde su valor actual hasta `target` con
+// una curva ease-out. Al montar arranca en 0 y, si el objetivo cambia (refresh
+// de datos), re-anima desde la cifra que se está mostrando en lugar de reiniciar.
+function useCountUp(target, duration = 900) {
+    const goal = Number(target) || 0;
+    const [value, setValue] = useState(0);
+    const valueRef = useRef(0);
+    const rafRef = useRef(null);
+
+    useEffect(() => {
+        const from = valueRef.current;
+        if (from === goal) return undefined;
+
+        let start = null;
+        const step = (now) => {
+            if (start === null) start = now;
+            const t = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - t, 3);
+            const current = from + (goal - from) * eased;
+            valueRef.current = current;
+            setValue(current);
+            if (t < 1) rafRef.current = requestAnimationFrame(step);
+        };
+        rafRef.current = requestAnimationFrame(step);
+        return () => {
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
+    }, [goal, duration]);
+
+    return value;
+}
+
+// Cifra KPI animada. `numeric` es el valor objetivo y `prefix` el signo a
+// mostrar ('$' para montos, '' para contadores). Reutiliza formatPrice para que
+// el formato de miles coincida con el resto del sistema.
+function AnimatedStatValue({ numeric, prefix = '$', duration = 900 }) {
+    const animated = useCountUp(numeric, duration);
+    return <>{prefix}{formatPrice(Math.round(animated))}</>;
+}
+
+// Barra de distribución animada: arranca en 0% y crece hasta `percent` al
+// montarse. La transición de ancho vive en el estilo inline (coherente con
+// useCountUp); el requestAnimationFrame garantiza un repintado en 0 antes de
+// fijar el ancho final, de modo que la animación se dispara también en el
+// primer render y al refrescar los datos (React reutilizaría el nodo y una
+// transición CSS plana no arrancaría desde 0 en el montaje).
+function AnimatedProgressBar({ percent, className = '', duration = 900 }) {
+    const target = Math.max(0, Math.min(100, Number(percent) || 0));
+    const [width, setWidth] = useState(0);
+
+    useEffect(() => {
+        const raf = requestAnimationFrame(() => setWidth(target));
+        return () => cancelAnimationFrame(raf);
+    }, [target]);
+
+    return (
+        <div
+            className={`progress ${className}`.trim()}
+            style={{ width: `${width}%`, transition: `width ${duration}ms ease-out` }}
+        ></div>
+    );
+}
 
 const summarizeService = (services) => {
     const names = [...new Set(services.map((service) => service.servicio).filter(Boolean))];
@@ -371,56 +434,64 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
             icon: 'fa-arrow-trend-up',
             iconColor: 'var(--barbie-pink)',
             label: 'Recaudado últimos 30 días',
-            value: `$${formatPrice(stats.recentIncome)}`
+            numeric: Number(stats.recentIncome) || 0,
+            prefix: '$'
         },
         {
             id: 'kpi-pending',
             icon: 'fa-hand-holding-hand',
             iconColor: '#ff4d4d',
             label: 'Pagos pendientes últimos 30 días',
-            value: `$${formatPrice(stats.recentFiado)}`
+            numeric: Number(stats.recentFiado) || 0,
+            prefix: '$'
         },
         {
             id: 'kpi-month-expenses',
             icon: 'fa-arrow-trend-down',
             iconColor: '#ff4d4d',
             label: 'Gastos últimos 30 días',
-            value: `$${formatPrice(stats.recentExpenseTotal)}`
+            numeric: Number(stats.recentExpenseTotal) || 0,
+            prefix: '$'
         },
         {
             id: 'kpi-net-balance',
             icon: 'fa-scale-balanced',
             iconColor: 'var(--gold)',
             label: 'Balance Neto',
-            value: `$${formatPrice(stats.netBalance)}`
+            numeric: Number(stats.netBalance) || 0,
+            prefix: '$'
         },
         {
             id: 'kpi-week-income',
             icon: 'fa-regular fa-calendar',
             iconColor: 'var(--barbie-pink)',
             label: 'Ingresos últimos 30 días',
-            value: `$${formatPrice(stats.recentIncome)}`
+            numeric: Number(stats.recentIncome) || 0,
+            prefix: '$'
         },
         {
             id: 'kpi-week-expenses',
             icon: 'fa-receipt',
             iconColor: '#ff4d4d',
             label: 'Gastos últimos 30 días',
-            value: `$${formatPrice(stats.recentExpenseTotal)}`
+            numeric: Number(stats.recentExpenseTotal) || 0,
+            prefix: '$'
         },
         {
             id: 'kpi-services-month',
             icon: 'fa-star',
             iconColor: 'var(--gold)',
             label: 'Servicios últimos 30 días',
-            value: stats.recentServicesCount.toString()
+            numeric: Number(stats.recentServicesCount) || 0,
+            prefix: ''
         },
         {
             id: 'kpi-average-ticket',
             icon: 'fa-hand-holding-dollar',
             iconColor: 'var(--barbie-pink)',
             label: 'Ticket Promedio',
-            value: `$${formatPrice(stats.avgTicket)}`
+            numeric: Number(stats.avgTicket) || 0,
+            prefix: '$'
         }
     ];
 
@@ -448,7 +519,7 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                         </span>
                         <div className="stat-info">
                             <span className="stat-label">{kpi.label}</span>
-                            <h2>{kpi.value}</h2>
+                            <h2><AnimatedStatValue numeric={kpi.numeric} prefix={kpi.prefix} /></h2>
                         </div>
                     </div>
                 ))}
@@ -557,10 +628,10 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                             <div key={row.key} className="payment-stat-row">
                                 <span className="payment-stat-label">{row.label}</span>
                                 <div className="payment-progress-bar">
-                                    <div
-                                        className="progress income-progress"
-                                        style={{ width: `${row.percent}%` }}
-                                    ></div>
+                                    <AnimatedProgressBar
+                                        percent={row.percent}
+                                        className="income-progress"
+                                    />
                                 </div>
                                 <span className="payment-stat-val">${formatPrice(row.value)}</span>
                             </div>
@@ -575,10 +646,10 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                             <div key={row.key} className="payment-stat-row">
                                 <span className="payment-stat-label">{row.label}</span>
                                 <div className="payment-progress-bar">
-                                    <div
-                                        className="progress expense-progress"
-                                        style={{ width: `${row.percent}%` }}
-                                    ></div>
+                                    <AnimatedProgressBar
+                                        percent={row.percent}
+                                        className="expense-progress"
+                                    />
                                 </div>
                                 <span className="payment-stat-val">${formatPrice(row.value)}</span>
                             </div>

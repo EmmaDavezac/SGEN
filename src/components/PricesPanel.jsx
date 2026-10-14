@@ -426,7 +426,7 @@ function PricesPanel({ session, notify, showLoader }) {
     const toggleService = (index) => {
         const service = catalog[selectedCategoryKey]?.[index];
         if (!service) return;
-        setPendingServiceToggle({ index, nextActive: service.active !== false, name: service.name });
+        setPendingServiceToggle({ index, nextActive: service.active === false, name: service.name });
     };
 
     const confirmServiceToggle = () => {
