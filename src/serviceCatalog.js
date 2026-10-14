@@ -65,3 +65,41 @@ export function createCategoryKey(name, existingKeys = []) {
     }
     return key;
 }
+
+/* Orden de presentation de las categorías en "Registrar Servicio":
+   semis → kapping → softgel → esculpidas → retiro → otro → pestañas.
+   Cada posición agrupa aliases equivalentes (clave o nombre visible) para
+   tolerar categorías renombradas o creadas desde Precios. */
+const CATEGORY_ORDER_ALIASES = [
+    ['semi', 'semis'],
+    ['kapping'],
+    ['softgel', 'soft gel'],
+    ['esculpidas', 'esculpidas en polygel'],
+    ['remocion', 'retiro', 'remocion de esmalte'],
+    ['personalizado', 'otro', 'personalizado / combinado'],
+    ['pestanas', 'pestañas']
+];
+
+function normalizeCategoryText(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+export function sortCategoriesForDisplay(categories = []) {
+    const rankOf = (category) => {
+        const key = normalizeCategoryText(category.key);
+        const name = normalizeCategoryText(category.name);
+        const index = CATEGORY_ORDER_ALIASES.findIndex(
+            (aliases) => aliases.includes(key) || aliases.includes(name)
+        );
+        return index === -1 ? CATEGORY_ORDER_ALIASES.length : index;
+    };
+    return [...categories].sort((a, b) => {
+        const diff = rankOf(a) - rankOf(b);
+        if (diff !== 0) return diff;
+        return normalizeCategoryText(a.name).localeCompare(normalizeCategoryText(b.name));
+    });
+}

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../supabase.js';
 import { finalizeRegisteredService, registerServiceDirectly, saveExpenseToDatabase } from '../services.js';
-import { cloneServiceCatalog, DEFAULT_SERVICE_CATEGORIES, DEFAULT_SERVICE_CATALOG } from '../serviceCatalog.js';
+import { cloneServiceCatalog, DEFAULT_SERVICE_CATEGORIES, DEFAULT_SERVICE_CATALOG, sortCategoriesForDisplay } from '../serviceCatalog.js';
 import Button, { DetailActionButton } from './Button.jsx';
 import Modal, { ConfirmModal, ModalCancelButton, ModalConfirmButton } from './Modal.jsx';
 import { useFormGuard } from '../formGuard.js';
@@ -15,7 +15,7 @@ function hasSuspiciousPrice(rawValue) {
 function RegisterServiceForm({ session, onBack, initialAppointment = null, onRegisterSuccess, allowFiado = true, notify, showLoader, runTask }) {
     const [clients, setClients] = useState([]);
     const [clientName, setClientName] = useState('');
-    const [categories, setCategories] = useState(DEFAULT_SERVICE_CATEGORIES);
+    const [categories, setCategories] = useState(() => sortCategoriesForDisplay(DEFAULT_SERVICE_CATEGORIES));
     const [catalog, setCatalog] = useState(() => cloneServiceCatalog(DEFAULT_SERVICE_CATALOG));
 
     const [selectedCategory, setSelectedCategory] = useState('semi');
@@ -84,11 +84,11 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                     newCatalog[price.categoria].push({ name: price.nombre, price: Number(price.precio) || 0, active: true });
                 });
                 if (!(priceResult.data || []).length) Object.assign(newCatalog, cloneServiceCatalog(DEFAULT_SERVICE_CATALOG));
-                setCategories(loadedCategories.map(category => ({
+                setCategories(sortCategoriesForDisplay(loadedCategories.map(category => ({
                     key: category.clave || category.key,
                     name: category.nombre || category.name,
                     active: category.activo !== false
-                })));
+                }))));
                 setCatalog(newCatalog);
             } catch (err) {
                 console.warn("Error fetching prices catalog:", err);
