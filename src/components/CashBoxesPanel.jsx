@@ -4,6 +4,7 @@ import Button, { PanelSaveButton } from './Button.jsx';
 import { ConfirmModal } from './Modal.jsx';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { useFormGuard } from '../formGuard.js';
+import { usePullToRefreshHandler } from '../pullToRefresh.js';
 import { loadCashboxDataFromDatabase, saveCashMovementToDatabase } from '../services.js';
 
 function todayISO() {
@@ -93,6 +94,9 @@ function CashBoxesPanel({ session, notify, showLoader }) {
             showLoader && showLoader(false);
         }
     }
+
+    // Deslizar hacia abajo recarga los movimientos y totales de cajas.
+    usePullToRefreshHandler(loadData);
 
     const handleSubmit = async (e) => {
         e.preventDefault();

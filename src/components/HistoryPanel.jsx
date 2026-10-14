@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { usePullToRefreshHandler } from '../pullToRefresh.js';
 import { supabase } from '../supabase.js';
 import { completePendingPayment, deleteServiceFromDatabase, loadServicesFromDatabase } from '../services.js';
 import Modal, { ConfirmModal } from './Modal.jsx';
@@ -121,6 +122,9 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
             setLoading(false);
         }
     };
+
+    // Deslizar hacia abajo recarga el historial de ventas.
+    usePullToRefreshHandler(loadServices);
 
     useEffect(() => {
         let ignore = false;

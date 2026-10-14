@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabase.js';
 import { ConfirmModal } from './Modal.jsx';
 import { PanelSaveButton } from './Button.jsx';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { useFormGuard } from '../formGuard.js';
+import { usePullToRefreshHandler } from '../pullToRefresh.js';
 import { loadExpensesFromDatabase, saveExpenseToDatabase } from '../services.js';
 
 const EXPENSE_PERIOD_OPTIONS = [
@@ -75,29 +76,26 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
     const isSearching = useSearching(search);
     const expenseListRef = useRef(null);
 
+    const loadExpenses = useCallback(async () => {
+        if (!session?.authId || !supabase) return;
+        setLoading(true);
+        try {
+            const data = await loadExpensesFromDatabase();
+            setExpenses(data.map(normalizeExpenseRecord));
+        } catch (err) {
+            console.error(err);
+            if (notify) notify('No se pudo cargar el listado de gastos.', 'error');
+        } finally {
+            setLoading(false);
+        }
+    }, [session, notify]);
+
     useEffect(() => {
-        let ignore = false;
+        loadExpenses();
+    }, [loadExpenses]);
 
-        const load = async () => {
-            if (!session?.authId || !supabase) return;
-            setLoading(true);
-            try {
-                const data = await loadExpensesFromDatabase();
-                const normalized = data.map(normalizeExpenseRecord);
-                if (!ignore) setExpenses(normalized);
-            } catch (err) {
-                console.error(err);
-                if (notify) notify('No se pudo cargar el listado de gastos.', 'error');
-            } finally {
-                if (!ignore) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        load();
-        return () => { ignore = true; };
-    }, [session, notify, showLoader]);
+    // Deslizar hacia abajo recarga el listado de gastos.
+    usePullToRefreshHandler(loadExpenses);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();

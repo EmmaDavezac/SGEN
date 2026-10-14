@@ -5,6 +5,7 @@ import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { ConfirmModal } from './Modal.jsx';
 import DetailWindow from './DetailWindow.jsx';
 import { useFormGuard } from '../formGuard.js';
+import { usePullToRefreshHandler } from '../pullToRefresh.js';
 
 const EMPTY_FORM = {
   nombre: '',
@@ -76,6 +77,9 @@ function UsersPanel({ session, notify, showLoader }) {
       setLoading(false);
     }
   };
+
+  // Deslizar hacia abajo recarga la lista de usuarios.
+  usePullToRefreshHandler(loadUsers);
 
   useEffect(() => {
     loadUsers();

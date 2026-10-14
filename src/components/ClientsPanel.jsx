@@ -9,6 +9,7 @@ import { deleteClientFromDatabase, loadAppointmentsFromDatabase, loadClientsFrom
 import { estadoBadgeClass, estadoLabel } from '../appointmentActions.js';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { useFormGuard } from '../formGuard.js';
+import { usePullToRefreshHandler } from '../pullToRefresh.js';
 
 function normalizeClientRecord(client) {
   if (!client || typeof client !== 'object') return null;
@@ -193,6 +194,12 @@ function ClientsPanel({ session, notify, showLoader }) {
     loadAppointmentsLight();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  // Deslizar hacia abajo recarga clientas (y el resumen de turnos por clienta).
+  usePullToRefreshHandler(async () => {
+    await loadClients(true);
+    await loadAppointmentsLight();
+  });
 
   // "Consultar ficha de la clienta" desde una venta: el Historial y la Agenda navegan a
   // esta pestaña y avisan qué clienta abrir. Se escucha por evento porque los

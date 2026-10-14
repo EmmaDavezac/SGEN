@@ -9,6 +9,7 @@ import {
     DEFAULT_SERVICE_CATALOG
 } from '../serviceCatalog.js';
 import { useFormGuard } from '../formGuard.js';
+import { usePullToRefreshHandler } from '../pullToRefresh.js';
 
 function PricesPanel({ session, notify, showLoader }) {
     const [categories, setCategories] = useState(DEFAULT_SERVICE_CATEGORIES);
@@ -79,6 +80,9 @@ function PricesPanel({ session, notify, showLoader }) {
     useEffect(() => {
         loadCatalog();
     }, [loadCatalog]);
+
+    // Deslizar hacia abajo recarga el catálogo de servicios y precios.
+    usePullToRefreshHandler(loadCatalog);
 
     const orderedCategories = useMemo(() => [...categories].sort((a, b) => {
         if (a.key === 'personalizado') return 1;

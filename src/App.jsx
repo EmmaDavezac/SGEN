@@ -90,6 +90,8 @@ function defaultSettings() {
     return {
         allowFiado: true,
         allowCajasTab: false,
+        allowDaySearch: false,
+        allowDayFilter: false,
     };
 }
 
@@ -104,6 +106,8 @@ function readStoredSettings() {
         return {
             allowFiado: parsed.allowFiado !== undefined ? !!parsed.allowFiado : true,
             allowCajasTab: !!parsed.allowCajasTab,
+            allowDaySearch: !!parsed.allowDaySearch,
+            allowDayFilter: !!parsed.allowDayFilter,
         };
     } catch (error) {
         console.warn('No se pudieron leer los ajustes guardados:', error);
@@ -867,6 +871,7 @@ function App() {
                             notify={notify}
                             showLoader={showLoader}
                             runTask={runTask}
+                            settings={settings}
                             onGoHistory={() => setActiveTab('historial')}
                             onVerCliente={verCliente}
                             onCheckoutFromAppointment={(apt) => {

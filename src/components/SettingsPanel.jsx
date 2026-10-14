@@ -1,7 +1,7 @@
 import React from 'react';
 
 function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
-    const { allowFiado, allowCajasTab } = settings;
+    const { allowFiado, allowCajasTab, allowDaySearch, allowDayFilter } = settings;
 
     const handleToggle = (key, checked) => {
         if (typeof onChangeSettings === 'function') {
@@ -13,6 +13,10 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
                 msg = checked ? 'Cobros pendientes (fiado) habilitados' : 'Cobros pendientes (fiado) deshabilitados';
             } else if (key === 'allowCajasTab') {
                 msg = checked ? 'Pestaña Cajas habilitada' : 'Pestaña Cajas oculta';
+            } else if (key === 'allowDaySearch') {
+                msg = checked ? 'Buscador de turnos habilitado' : 'Buscador de turnos deshabilitado';
+            } else if (key === 'allowDayFilter') {
+                msg = checked ? 'Filtro de turnos habilitado' : 'Filtro de turnos deshabilitado';
             }
             notify(msg, 'info');
         }
@@ -55,6 +59,36 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
                             type="checkbox"
                             checked={!!allowCajasTab}
                             onChange={(e) => handleToggle('allowCajasTab', e.target.checked)}
+                        />
+                        <span className="slider"></span>
+                    </label>
+                </div>
+
+                <div className="setting-row">
+                    <span>
+                        <i className="fa-solid fa-magnifying-glass setting-icon"></i>
+                        Buscar turno (turnos del día)
+                    </span>
+                    <label className="switch-toggle">
+                        <input
+                            type="checkbox"
+                            checked={!!allowDaySearch}
+                            onChange={(e) => handleToggle('allowDaySearch', e.target.checked)}
+                        />
+                        <span className="slider"></span>
+                    </label>
+                </div>
+
+                <div className="setting-row">
+                    <span>
+                        <i className="fa-solid fa-filter setting-icon"></i>
+                        Filtrar turnos (turnos del día)
+                    </span>
+                    <label className="switch-toggle">
+                        <input
+                            type="checkbox"
+                            checked={!!allowDayFilter}
+                            onChange={(e) => handleToggle('allowDayFilter', e.target.checked)}
                         />
                         <span className="slider"></span>
                     </label>

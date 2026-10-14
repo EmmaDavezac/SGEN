@@ -93,7 +93,12 @@ body {
     background-color: var(--cream-bg);
     color: var(--text-color);
     line-height: 1.5;
+    /* 100dvh usa el alto visible real (descontando la barra de URL/herramientas
+       del navegador móvil). Con 100vh el layout viewport quedaba más alto que el
+       visual viewport y la navbar fixed al bottom se despegaba del borde,
+       dejando un espacio vacío debajo. 100vh queda como fallback. */
     height: 100vh;
+    height: 100dvh;
     width: 100vw;
     overflow: hidden;
     position: relative;
@@ -844,6 +849,9 @@ button:disabled {
        scroll, para que el ancho del contenido sea estable y no "salte" cuando
        aparece/desaparece la barra. Mantiene cards y filtros en el mismo ancho. */
     scrollbar-gutter: stable;
+    /* Evita que el navegador muestre su propio overscroll/refresh al llegar al
+       tope: el pull-to-refresh lo maneja .app-content vía JS (pullToRefresh.js). */
+    overscroll-behavior-y: contain;
 }
 
 .app-content::-webkit-scrollbar {
@@ -1335,6 +1343,29 @@ button:disabled {
     border-radius: 50%;
 }
 
+/* Esqueleto de la grilla del calendario mensual (CalendarSkeleton): réplica de
+   .calendar-days-grid (7 columnas, gap 8px) con celdas del mismo alto que
+   .calendar-day (62px) para que no haya salto de layout al cargar los turnos. */
+.skeleton-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    padding-bottom: 25px; /* igual que .calendar-days-grid */
+}
+
+.skeleton-cal-cell {
+    min-height: 62px; /* igual que .calendar-day */
+    border-radius: var(--radius-sm);
+    background: linear-gradient(
+        90deg,
+        var(--barbie-pale) 25%,
+        var(--barbie-light) 37%,
+        var(--barbie-pale) 63%
+    );
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+}
+
 @keyframes skeleton-shimmer {
     0% {
         background-position: 100% 50%;
@@ -1348,7 +1379,8 @@ button:disabled {
 @media (prefers-reduced-motion: reduce) {
     .skeleton-avatar,
     .skeleton-line,
-    .skeleton-action {
+    .skeleton-action,
+    .skeleton-cal-cell {
         animation: none;
     }
 }
@@ -1929,6 +1961,65 @@ button:disabled {
 
 .nav-item.active .nav-icon {
     transform: scale(1.25) translateY(-2px);
+}
+
+/* =========================================================================
+   SPINNER NEUTRO REUTILIZABLE
+   Círculo con borde que gira. Puro CSS: reutilizable en cualquier componente
+   (.spinner) sin depender de que FontAwesome tenga un icono, y respeta la
+   preferencia de movimiento reducido (cubierto por el @media global de abajo
+   en prefer-reduced-motion). Escala con font-size / width-height en em.
+   ========================================================================= */
+.spinner {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 1em;
+    height: 1em;
+    border: 2px solid var(--barbie-pale);
+    border-top-color: var(--barbie-dark);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* =========================================================================
+   PULL-TO-REFRESH (deslizar hacia abajo para recargar)
+   Indicador flotante arriba y centrado. Baja con el arrastre (translateY en
+   línea desde AppLayout) y, al recargar, queda fijo con el .spinner girando.
+   ========================================================================= */
+.pull-refresh-indicator {
+    position: fixed;
+    top: calc(15px + env(safe-area-inset-top));
+    left: 50%;
+    /* El translate(-50%, Npx) lo setea inline; acá centramos y dimensionamos. */
+    z-index: 900;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--white);
+    border: 2px solid var(--barbie-pale);
+    box-shadow: var(--shadow-md);
+    color: var(--barbie-dark);
+    font-size: 16px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 160ms ease;
+}
+
+.pull-refresh-indicator .pull-refresh-arrow {
+    transition: transform 160ms ease;
+}
+
+.pull-refresh-indicator.is-refreshing .spinner {
+    font-size: 22px;
 }
 
 /* =========================================================================
@@ -4386,6 +4477,12 @@ button:active {
     font-size: 12px;
 }
 
+/* Botón Actualizar de la agenda: solo en desktop. En mobile/tablet la recarga
+   se hace con el gesto pull-to-refresh, así que este botón se oculta. */
+.calendar-refresh-btn {
+    display: none;
+}
+
 .calendar-day-section {
     margin-top: 20px;
 }
@@ -4471,6 +4568,11 @@ button:active {
        que dejaba la lista en ~478px en un viewport de 1280px. */
     .calendar-layout {
         grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.85fr);
+    }
+
+    /* En desktop no hay gesto táctil: el botón Actualizar es la vía de recarga. */
+    .calendar-refresh-btn {
+        display: inline-flex;
     }
     .calendar-day-section {
         margin-top: 0;

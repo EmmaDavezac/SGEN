@@ -7,6 +7,7 @@ import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import VentaDetalleModal from './VentaDetalleModal.jsx';
 import { estadoBadgeClass, estadoLabel, getAppointmentActions, getVisibleAppointmentActions, normalizeTurnoEstado } from '../appointmentActions.js';
 import { useFormGuard } from '../formGuard.js';
+import { usePullToRefreshHandler } from '../pullToRefresh.js';
 
 const DAYS_OF_WEEK = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -150,8 +151,27 @@ function emptyFormAppointment(selectedDay) {
   };
 }
 
-function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromAppointment, onGoHistory, onVerCliente = null }) {
+/**
+ * Esqueleto de carga de la grilla del calendario mensual. Imita la grilla real
+ * (N semanas x 7 celdas) con el mismo alto de `.calendar-day` (62px), así el
+ * layout no "salta" cuando llegan los turnos. La fila de días de semana real ya
+ * se muestra siempre arriba, así que acá solo se esqueletiza la grilla.
+ */
+function CalendarSkeleton({ weeks = 5 }) {
+  return (
+    <div className="skeleton-cal-grid" aria-hidden="true">
+      {Array.from({ length: weeks * 7 }).map((_, i) => (
+        <div key={i} className="skeleton-cal-cell" />
+      ))}
+    </div>
+  );
+}
+
+function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromAppointment, onGoHistory, onVerCliente = null, settings = {} }) {
   const email = session?.email || '';
+  // Ajustes (admin) que habilitan el buscador y el filtro de los turnos del día.
+  const allowDaySearch = !!settings.allowDaySearch;
+  const allowDayFilter = !!settings.allowDayFilter;
   const cacheKeyAppointments = `evolet_appointments_v4_${email}`;
   const cacheKeyClients = `evolet_clients_v4_${email}`;
   const isAdmin = session?.rol === 'admin' || session?.rol === 'superadmin';
@@ -204,6 +224,9 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
   const cancelInitialRef = useRef(null);
   const [deleting, setDeleting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // true solo durante la carga inicial de la agenda. Gobierna los skeletons de
+  // carga (lista del día + grilla del mes) para que no aparezcan "de golpe".
+  const [loading, setLoading] = useState(false);
   const [confirmation, setConfirmation] = useState(null);
   const confirmBypassRef = useRef(false);
 
@@ -223,6 +246,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
   const loadAll = async (forceRefresh = false) => {
     if (!session?.authId || !supabase) return;
 
+    setLoading(true);
     if (forceRefresh) setRefreshing(true);
 
     try {
@@ -260,6 +284,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
       console.error('Error cargando agenda React:', error);
       if (notify) notify(error.message || 'No se pudo cargar la agenda.', 'error');
     } finally {
+      setLoading(false);
       if (forceRefresh) setRefreshing(false);
     }
   };
@@ -270,6 +295,9 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  // Deslizar hacia abajo en la pestaña recarga la agenda (mismo loadAll del botón Actualizar).
+  usePullToRefreshHandler(() => loadAll(true));
 
   const today = new Date();
   const monthGrid = useMemo(() => getMonthGrid(calendarMonth.getFullYear(), calendarMonth.getMonth()), [calendarMonth]);
@@ -290,22 +318,42 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
     return [...list].sort((a, b) => new Date(a.horaInicio) - new Date(b.horaInicio));
   }, [appointmentsByDate, selectedKey]);
 
+  // Skeleton de carga inicial: solo mientras llega la primera tanda de datos y
+  // todavía no hay nada (ni del caché). Si hay caché, `appointments` se llena
+  // sincrónico y este flag queda en false, así no se tapa contenido real.
+  const showInitialSkeleton = loading && appointments.length === 0;
+
   const [daySearch, setDaySearch] = useState('');
   const isSearching = useSearching(daySearch);
   const [showDayFilters, setShowDayFilters] = useState(false);
   const [dayFilterStatus, setDayFilterStatus] = useState('todos');
 
+  // Si el admin apaga el buscador o el filtro, limpiamos su estado residual: al
+  // reactivarlos no debe aparecer un texto o filtro "fantasma" de la vez anterior.
+  useEffect(() => {
+    if (!allowDaySearch) setDaySearch('');
+  }, [allowDaySearch]);
+  useEffect(() => {
+    if (!allowDayFilter) {
+      setDayFilterStatus('todos');
+      setShowDayFilters(false);
+    }
+  }, [allowDayFilter]);
+
   const dayAppointmentsFiltrados = useMemo(() => {
-    const query = daySearch.trim().toLowerCase();
+    // Si el admin desactivó el buscador o el filtro, ese criterio se ignora por
+    // completo: así la lista siempre muestra todos los turnos del día aunque
+    // quedara estado residual de cuando estaba habilitado.
+    const query = allowDaySearch ? daySearch.trim().toLowerCase() : '';
     return selectedDayAppointments.filter((apt) => {
       const matchesSearch = !query
         || (apt.cliente || '').toLowerCase().includes(query)
         || (apt.servicio || '').toLowerCase().includes(query);
-      const matchesStatus = dayFilterStatus === 'todos'
+      const matchesStatus = !allowDayFilter || dayFilterStatus === 'todos'
         || normalizeTurnoEstado(apt.estado) === dayFilterStatus;
       return matchesSearch && matchesStatus;
     });
-  }, [selectedDayAppointments, daySearch, dayFilterStatus]);
+  }, [selectedDayAppointments, daySearch, dayFilterStatus, allowDaySearch, allowDayFilter]);
 
   const openNewAppointment = () => {
     const nextForm = { ...emptyFormAppointment(selectedDay), servicio: 'Turno' };
@@ -639,44 +687,50 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
     if (e) e.preventDefault();
     if (!supabase || !senaTarget || !session?.authId) return;
     const amount = Number(senaAmount || 0);
-    if (amount <= 0) {
-      if (notify) notify('Ingresá un monto de seña mayor a 0.', 'error');
+    // La seña es opcional: se puede confirmar/reservar un turno sin seña (amount 0).
+    // Solo se rechazan montos negativos (el input ya tiene min=0, esto es la red de seguridad).
+    if (amount < 0) {
+      if (notify) notify('El monto de la seña no puede ser negativo.', 'error');
       return;
     }
+    const conSena = amount > 0;
     if (!confirmBypassRef.current) {
-      requestConfirmation('Confirmar reserva', `¿Confirmás reservar el turno y registrar una seña de $${amount.toLocaleString('es-AR')}?`, () => submitSena());
+      const mensaje = conSena
+        ? `¿Confirmás reservar el turno y registrar una seña de $${amount.toLocaleString('es-AR')}?`
+        : '¿Confirmás reservar el turno sin seña?';
+      requestConfirmation('Confirmar reserva', mensaje, () => submitSena());
       return;
     }
     confirmBypassRef.current = false;
     setSavingSena(true);
     try {
-      await runTask({
-        title: 'Reservando turno',
-        steps: [
-          {
-            label: 'Marcando el turno como reservado',
-            run: async () => {
-              const updates = {
-                estado: 'reservado',
-                precio: amount
-              };
-              await updateAppointmentInDatabase({ id: senaTarget.rawId, updates });
-            }
-          },
-          {
-            label: 'Registrando la seña',
-            run: async () => {
-              await registerPaymentRecord({
-                turnoId: senaTarget.rawId,
-                usuarioId: session.authId,
-                amount,
-                paymentMethod: senaPayment,
-                type: 'sena'
-              });
-            }
+      // Los pasos del overlay se arman según haya seña o no: registrar el pago
+      // y fijar el precio del turno solo tienen sentido cuando hay seña.
+      const steps = [
+        {
+          label: 'Marcando el turno como reservado',
+          run: async () => {
+            const updates = { estado: 'reservado' };
+            if (conSena) updates.precio = amount;
+            await updateAppointmentInDatabase({ id: senaTarget.rawId, updates });
           }
-        ]
-      });
+        }
+      ];
+      if (conSena) {
+        steps.push({
+          label: 'Registrando la seña',
+          run: async () => {
+            await registerPaymentRecord({
+              turnoId: senaTarget.rawId,
+              usuarioId: session.authId,
+              amount,
+              paymentMethod: senaPayment,
+              type: 'sena'
+            });
+          }
+        });
+      }
+      await runTask({ title: 'Reservando turno', steps });
 
       setAppointments(prev => {
         const next = prev.map(a =>
@@ -685,7 +739,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
         try { localStorage.setItem(cacheKeyAppointments, JSON.stringify(next)); } catch (e) { /* ignore */ }
         return next;
       });
-      if (notify) notify('Seña cargada y turno reservado.', 'success');
+      if (notify) notify(conSena ? 'Seña cargada y turno reservado.' : 'Turno reservado.', 'success');
       setSenaOpen(false);
       setSenaTarget(null);
     } catch (error) {
@@ -1128,7 +1182,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
         <div className="calendar-header-actions">
           <button
             type="button"
-            className="btn btn-secondary btn-sm calendar-header-button mobile-icon-only"
+            className="btn btn-secondary btn-sm calendar-header-button calendar-refresh-btn"
             onClick={() => loadAll(true)}
             disabled={refreshing}
             title="Actualizar agenda"
@@ -1350,68 +1404,74 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
             </>
           )}
 
-          {!scheduleOpen && (
+          {!scheduleOpen && (allowDaySearch || allowDayFilter) && (
             <div className="filters-container">
-              <div className={`search-box-container${daySearch ? ' has-text' : ''}`}>
-                <i className="fa-solid fa-magnifying-glass search-icon"></i>
-                <input
-                  type="search"
-                  placeholder="Buscar turno..."
-                  className="search-input"
-                  value={daySearch}
-                  onChange={(e) => setDaySearch(e.target.value)}
-                />
-                {daySearch && (
+              {allowDaySearch && (
+                <div className={`search-box-container${daySearch ? ' has-text' : ''}`}>
+                  <i className="fa-solid fa-magnifying-glass search-icon"></i>
+                  <input
+                    type="search"
+                    placeholder="Buscar turno..."
+                    className="search-input"
+                    value={daySearch}
+                    onChange={(e) => setDaySearch(e.target.value)}
+                  />
+                  {daySearch && (
+                    <button
+                      type="button"
+                      className="search-clear-btn"
+                      title="Limpiar búsqueda"
+                      aria-label="Limpiar búsqueda"
+                      onClick={() => setDaySearch('')}
+                    >
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  )}
+                </div>
+              )}
+              {allowDayFilter && (
+                <>
                   <button
                     type="button"
-                    className="search-clear-btn"
-                    title="Limpiar búsqueda"
-                    aria-label="Limpiar búsqueda"
-                    onClick={() => setDaySearch('')}
+                    className="filter-toggle-btn"
+                    title="Filtrar turnos"
+                    aria-label="Filtrar turnos"
+                    aria-expanded={showDayFilters}
+                    onClick={() => setShowDayFilters((v) => !v)}
                   >
-                    <i className="fa-solid fa-xmark"></i>
+                    <i className="fa-solid fa-filter"></i>
                   </button>
-                )}
-              </div>
-              <button
-                type="button"
-                className="filter-toggle-btn"
-                title="Filtrar turnos"
-                aria-label="Filtrar turnos"
-                aria-expanded={showDayFilters}
-                onClick={() => setShowDayFilters((v) => !v)}
-              >
-                <i className="fa-solid fa-filter"></i>
-              </button>
-              {showDayFilters && (
-                <div className="filter-button-panel">
-                  <div className="filter-button-group">
-                    {[
-                      { key: 'todos', label: 'Todos' },
-                      { key: 'provisional', label: 'Provisionales' },
-                      { key: 'reservado', label: 'Reservados' },
-                      { key: 'completado', label: 'Cobrados' },
-                      { key: 'cancelado', label: 'Cancelados' }
-                    ].map((opt) => (
-                      <button
-                        key={opt.key}
-                        type="button"
-                        className={`filter-choice ${dayFilterStatus === opt.key ? 'active' : ''}`}
-                        onClick={() => setDayFilterStatus(opt.key)}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                  {showDayFilters && (
+                    <div className="filter-button-panel">
+                      <div className="filter-button-group">
+                        {[
+                          { key: 'todos', label: 'Todos' },
+                          { key: 'provisional', label: 'Provisionales' },
+                          { key: 'reservado', label: 'Reservados' },
+                          { key: 'completado', label: 'Cobrados' },
+                          { key: 'cancelado', label: 'Cancelados' }
+                        ].map((opt) => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            className={`filter-choice ${dayFilterStatus === opt.key ? 'active' : ''}`}
+                            onClick={() => setDayFilterStatus(opt.key)}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
 
           {!scheduleOpen && (
           <div id="day-appointments-container" className="day-appointments-container unified-list list-scroll list-section-gap">
-            {isSearching && <SkeletonList count={5} />}
-            {!isSearching && selectedDayAppointments.length === 0 && (
+            {(showInitialSkeleton || isSearching) && <SkeletonList count={5} />}
+            {!(showInitialSkeleton || isSearching) && selectedDayAppointments.length === 0 && (
               <div
                 className="no-appointments-placeholder empty-schedule-state calendar-empty-schedule"
                 id="btn-empty-schedule"
@@ -1425,11 +1485,11 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
               </div>
             )}
 
-            {!isSearching && selectedDayAppointments.length > 0 && dayAppointmentsFiltrados.length === 0 && (
+            {!(showInitialSkeleton || isSearching) && selectedDayAppointments.length > 0 && dayAppointmentsFiltrados.length === 0 && (
               <div className="list-empty-state"><p>No se encontraron turnos que coincidan con la búsqueda.</p></div>
             )}
 
-            {!isSearching && dayAppointmentsFiltrados.map(apt => {
+            {!(showInitialSkeleton || isSearching) && dayAppointmentsFiltrados.map(apt => {
             const estadoTextoLegacy = estadoLabel(apt.estado);
 
             return (
@@ -1492,7 +1552,10 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
           {DAYS_OF_WEEK.map(d => <div key={d}>{d}</div>)}
         </div>
 
-        <div id="calendar-days-grid" className="calendar-days-grid">
+        {showInitialSkeleton ? (
+          <CalendarSkeleton weeks={monthGrid.length} />
+        ) : (
+          <div id="calendar-days-grid" className="calendar-days-grid">
           {monthGrid.map((week, wIdx) => (
             <React.Fragment key={`week-${wIdx}`}>
               {week.map(day => {
@@ -1543,7 +1606,8 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
               })}
             </React.Fragment>
           ))}
-        </div>
+          </div>
+        )}
 
         {!scheduleOpen && (
           <button
@@ -1565,7 +1629,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
         open={senaOpen}
         onClose={closeSenaModal}
         closeOnBackdrop={!savingSena}
-        title="Cargar Seña y Reservar"
+        title="Confirmar y Reservar"
         subtitle={senaTarget ? `Turno de ${senaTarget.cliente || 'Cliente'} · ${formatDateArgentina(senaTarget.fecha)} ${formatTimeLabel(senaTarget.horaInicio)}` : ''}
         sizeClass=""
         actions={
@@ -1586,7 +1650,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
         <form className="cute-form modal-form" onSubmit={submitSena}>
           <div className="form-group">
             <label htmlFor="sena-amount-input">
-              <i className="fa-solid fa-dollar-sign" /> Monto de la Seña ($) <span className="field-required">(obligatorio)</span>
+              <i className="fa-solid fa-dollar-sign" /> Monto de la Seña ($) <span className="field-optional">(opcional)</span>
             </label>
             <div className="input-wrapper">
               <i className="fa-solid fa-dollar-sign input-icon" />
@@ -1598,10 +1662,10 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
                 placeholder="0"
                 value={senaAmount}
                 onChange={(e) => setSenaAmount(e.target.value)}
-                required
               />
             </div>
           </div>
+          {Number(senaAmount) > 0 && (
           <div className="form-group">
             <label>Método de Pago de la Seña</label>
             <div className="payment-method-selector">
@@ -1633,6 +1697,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
               </label>
             </div>
           </div>
+          )}
         </form>
       </Modal>
 

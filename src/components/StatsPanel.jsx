@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { usePullToRefreshHandler } from '../pullToRefresh.js';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { supabase } from '../supabase.js';
 import { completePendingPayment, loadExpensesFromDatabase, loadServicesFromDatabase, saveExpenseToDatabase } from '../services.js';
@@ -194,6 +195,9 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
             setLoading(false);
         }
     };
+
+    // Deslizar hacia abajo recarga servicios y gastos de las estadísticas.
+    usePullToRefreshHandler(refreshServices);
 
     useEffect(() => {
         let ignore = false;

@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import AppFooter from './AppFooter.jsx';
+import { usePullToRefreshGesture } from '../pullToRefresh.js';
 
 function AppLayout({ children, session, onLogout, activeTab, setActiveTab, settings = {} }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const isAdmin = session && (session.rol === 'admin' || session.rol === 'superadmin');
   const isSuperadmin = session && session.rol === 'superadmin';
   const { allowCajasTab = false } = settings;
+  // Pull-to-refresh: el gesto se detecta sobre el scroller `.app-content`
+  // (único contenedor con scroll, ya que el body tiene overflow: hidden).
+  const contentRef = useRef(null);
+  const { distance, refreshing } = usePullToRefreshGesture(contentRef);
+  // El indicador baja con el dedo; al recargar queda fijo girando.
+  const indicatorVisible = distance > 0 || refreshing;
 
   return (
     <section id="app-screen" className="app-screen active">
@@ -72,10 +79,21 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
       </header>
 
       {/* CONTENIDO PRINCIPAL SCROLLABLE */}
-      <main className={`app-content app-content-${activeTab}`}>
+      <main ref={contentRef} className={`app-content app-content-${activeTab}`}>
         {children}
         <AppFooter />
       </main>
+
+      {/* INDICADOR PULL-TO-REFRESH: baja con el arrastre y gira al recargar. */}
+      <div
+        className={`pull-refresh-indicator${refreshing ? ' is-refreshing' : ''}`}
+        style={{ opacity: indicatorVisible ? 1 : 0, transform: `translate(-50%, ${refreshing ? 24 : distance}px)` }}
+        aria-hidden={!indicatorVisible}
+      >
+        {refreshing
+          ? <span className="spinner" role="status" aria-label="Recargando"></span>
+          : <i className="fa-solid fa-arrow-down pull-refresh-arrow"></i>}
+      </div>
 
       {/* MENU DE NAVEGACION FLOTANTE INFERIOR */}
       <nav className="app-nav" aria-label="Navegación principal">
