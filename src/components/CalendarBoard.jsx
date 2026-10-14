@@ -712,7 +712,13 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
           run: async () => {
             const updates = { estado: 'reservado' };
             if (conSena) updates.precio = amount;
-            await updateAppointmentInDatabase({ id: senaTarget.rawId, updates });
+            // Fallback a legacy_id para turnos de caché vieja sin UUID (mismo
+            // criterio que submitReschedule).
+            await updateAppointmentInDatabase({
+              id: senaTarget.rawId,
+              legacyId: senaTarget.legacy_id || (!senaTarget.rawId ? senaTarget.id : null),
+              updates
+            });
           }
         }
       ];

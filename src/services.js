@@ -259,7 +259,7 @@ export async function updateAppointmentStatusInDatabase(id, updates) {
         .select('id, estado, precio')
         .maybeSingle();
     if (error) throw error;
-    if (!data) throw new Error('No se encontró el turno para actualizar.');
+    if (!data) throw new Error('No se encontró el turno para actualizar. Puede que tu rol no tenga permiso (RLS) o que el turno ya no exista.');
     return data;
 }
 
@@ -271,7 +271,7 @@ export async function updateAppointmentInDatabase({ id = null, legacyId = null, 
         .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, motivo_cancelacion, event_id, cliente_id, usuario_id')
         .maybeSingle();
     if (error) throw error;
-    if (!data) throw new Error('No se encontró el turno para actualizar.');
+    if (!data) throw new Error('No se encontró el turno para actualizar. Puede que tu rol no tenga permiso (RLS) o que el turno ya no exista.');
     return data;
 }
 function isUuid(value) {
@@ -401,8 +401,53 @@ export async function deleteAppointmentFromDatabase(id) {
 
 export async function deleteServiceFromDatabase(id) {
     if (!supabase) throw new Error('Supabase no está disponible.');
-    const { error } = await supabase.from('servicios').delete().eq('legacy_id', id);
-    if (error) throw error;
+    if (!id) throw new Error('Falta el ID del registro.');
+
+    // Resolver el UUID real del servicio: puede venir como UUID o como
+    // legacy_id (caché vieja), igual que en deleteAppointmentFromDatabase.
+    let uuid = null;
+    if (isUuid(id)) {
+        uuid = id;
+    } else {
+        const { data, error } = await supabase
+            .from('servicios')
+            .select('id')
+            .eq('legacy_id', id)
+            .maybeSingle();
+        if (error) throw error;
+        uuid = data?.id || null;
+    }
+    if (!uuid) {
+        throw new Error('No se encontró el registro a eliminar: puede que ya no exista o que tu rol no tenga permiso (solo admin).');
+    }
+
+    // `pagos` tiene FK a `servicios` sin cascade: se borran primero los pagos
+    // del servicio para no violar la integridad referencial (23503). El
+    // borrado de pagos es admin-only en RLS, igual que este en la interfaz.
+    const { error: pagosError } = await supabase
+        .from('pagos')
+        .delete()
+        .eq('servicio_id', uuid);
+    if (pagosError) throw pagosError;
+
+    const { data: deleted, error } = await supabase
+        .from('servicios')
+        .delete()
+        .eq('id', uuid)
+        .select('id');
+    if (error) {
+        const code = String(error.code || '');
+        if (code === '23503' || /violates foreign key constraint/i.test(error.message || '')) {
+            throw new Error('No se puede eliminar: el registro tiene datos asociados en el historial.');
+        }
+        throw error;
+    }
+    // RLS puede dejar el delete en 0 filas SIN error: verificar filas afectadas
+    // para no celebrar un borrado que nunca ocurrió (el registro reaparecía
+    // al recargar el historial).
+    if (!deleted || deleted.length === 0) {
+        throw new Error('No se pudo eliminar el registro: no tenés permiso (solo admin) o ya no existe.');
+    }
     return { success: true };
 }
 
@@ -522,8 +567,13 @@ export async function finalizeRegisteredService({
         .update({ estado: 'completado', precio: Number(precio) || 0 });
     query = turnoId ? query.eq('id', turnoId) : query.eq('legacy_id', turnoLegacyId);
 
-    const { error } = await query;
+    // RLS puede dejar el update en 0 filas SIN error: sin verificar, la app
+    // celebraba un cobro que nunca se aplicó y el turno seguía 'reservado'.
+    const { data, error } = await query.select('id');
     if (error) throw error;
+    if (!data || data.length === 0) {
+        throw new Error('No se pudo marcar el turno como cobrado: no tenés permiso (RLS) o el turno ya no existe.');
+    }
     return { updated: true, turnoId: turnoId || turnoLegacyId };
 }
 
@@ -583,11 +633,17 @@ export async function completePendingPayment({
 
     const matchId = serviceRecord.turno_id || null;
     if (matchId) {
-        const { error: turnoError } = await supabase
+        // Misma red de seguridad que finalizeRegisteredService: RLS puede dejar
+        // el update en 0 filas sin error y el cobro quedaría sin aplicar.
+        const { data: turnoUpdated, error: turnoError } = await supabase
             .from('turnos')
             .update({ estado: normalizeTurnoEstado('completado'), precio: Number(serviceRecord.precio) || 0 })
-            .eq('id', matchId);
+            .eq('id', matchId)
+            .select('id');
         if (turnoError) throw turnoError;
+        if (!turnoUpdated || turnoUpdated.length === 0) {
+            throw new Error('No se pudo marcar el turno como cobrado: no tenés permiso (RLS) o el turno ya no existe.');
+        }
         return { updated: true, turnoId: matchId };
     }
 
