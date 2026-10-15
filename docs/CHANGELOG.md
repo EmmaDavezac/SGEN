@@ -1,5 +1,17 @@
 # Changelog — SGEN
 
+## v1.3.5 — 2026-10-15 (SW v37)
+
+### Cambios
+- Modo oscuro para el tema barbie (mismo tema, sin crear uno nuevo): `TEMAS.barbie` ahora define `claro` y `oscuro`, y `BUSINESS.modo` selecciona el modo activo (`claro` por defecto).
+- `src/theme.js`: `aplicarTema(nombreTema, modo)`, `inicializarTema()`, `obtenerModo()` y `alternarModo()` manejan tema + modo, persistiendo ambos en localStorage y inyectando las CSS custom properties en `:root` sin recargar.
+- Menú de cuenta (`AppLayout.jsx`): nuevo ítem para alternar claro/oscuro (ícono luna/sol), recordando la elección por dispositivo.
+- `style.css`: variables de glass, sombras, bordes y fondo crema ahora también provienen del tema activo, por lo que el modo oscuro se aplica a toda la UI sin editar la hoja de estilos.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v36 → v37) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- (hash se completa tras el commit)
+
 ## v1.3.4 — 2026-10-15 (SW v36)
 
 ### Cambios

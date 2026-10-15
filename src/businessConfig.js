@@ -23,6 +23,10 @@ export const BUSINESS = {
   // Tema activo por defecto. Debe coincidir con una clave de TEMAS.
   tema: 'barbie',
 
+  // Modo de apariencia por defecto: 'claro' | 'oscuro'.
+  // Se recuerda por dispositivo y se puede alternar desde el menú de cuenta.
+  modo: 'claro',
+
   // Textos configurables del negocio (no son strings de interfaz genérica).
   // Se accede como BUSINESS.textos.<clave> y se pueden interpolar con {{nombre}}.
   textos: {
@@ -37,18 +41,46 @@ export const BUSINESS = {
 // Para añadir un tema nuevo basta con agregar una entrada aquí y seleccionarla en BUSINESS.tema.
 export const TEMAS = {
   barbie: {
-    '--brand-primary': '#FF69B4',
-    '--brand-dark': '#FF1493',
-    '--brand-light': '#FFC0CB',
-    '--brand-pale': '#FFF0F5',
-    '--brand-text': '#5A3D46',
-    '--brand-text-muted': '#9E7D86',
-    '--brand-text-light': '#CBB2B9',
-    '--brand-bg': '#FCF9F5',
-    '--brand-accent': '#FFD700',
-    '--brand-accent-dark': '#E6B800',
-    '--brand-danger': '#FF4D4D',
-    '--brand-focus': '#7A4DFF',
+    claro: {
+      '--brand-primary': '#FF69B4',
+      '--brand-dark': '#FF1493',
+      '--brand-light': '#FFC0CB',
+      '--brand-pale': '#FFF0F5',
+      '--brand-text': '#5A3D46',
+      '--brand-text-muted': '#9E7D86',
+      '--brand-text-light': '#CBB2B9',
+      '--brand-bg': '#FCF9F5',
+      '--brand-accent': '#FFD700',
+      '--brand-accent-dark': '#E6B800',
+      '--brand-danger': '#FF4D4D',
+      '--brand-focus': '#7A4DFF',
+      '--glass-bg': 'rgba(255, 255, 255, 0.75)',
+      '--glass-border': 'rgba(255, 105, 180, 0.25)',
+      '--shadow-md': 'rgba(0, 0, 0, 0.10)',
+      '--shadow-inset': 'rgba(0, 0, 0, 0.05)',
+      '--border-neutral': 'rgba(90, 61, 70, 0.18)',
+      '--cream-bg': '#FFF0F5',
+    },
+    oscuro: {
+      '--brand-primary': '#FF69B4',
+      '--brand-dark': '#FF1493',
+      '--brand-light': '#FFB7D1',
+      '--brand-pale': '#1a141a',
+      '--brand-text': '#e8e0e6',
+      '--brand-text-muted': '#b8a8b0',
+      '--brand-text-light': '#a090a0',
+      '--brand-bg': '#121016',
+      '--brand-accent': '#FFD700',
+      '--brand-accent-dark': '#E6B800',
+      '--brand-danger': '#FF4D4D',
+      '--brand-focus': '#7A4DFF',
+      '--glass-bg': 'rgba(20, 14, 20, 0.55)',
+      '--glass-border': 'rgba(255, 105, 180, 0.18)',
+      '--shadow-md': 'rgba(0, 0, 0, 0.35)',
+      '--shadow-inset': 'rgba(0, 0, 0, 0.25)',
+      '--border-neutral': 'rgba(255, 255, 255, 0.08)',
+      '--cream-bg': '#1a141a',
+    },
   },
   // Ejemplo de tema adicional (descomentar y usar en BUSINESS.tema):
   // minimal: {
@@ -67,6 +99,7 @@ export const TEMAS = {
   // },
 };
 
-export function obtenerTema(nombreTema = BUSINESS.tema) {
-  return TEMAS[nombreTema] || TEMAS.barbie;
+export function obtenerTema(nombreTema = BUSINESS.tema, modo = BUSINESS.modo) {
+  const tema = TEMAS[nombreTema] || TEMAS.barbie;
+  return tema[modo] || tema.claro || tema;
 }

@@ -3,10 +3,12 @@ import AppFooter from './AppFooter.jsx';
 import AboutModal from './AboutModal.jsx';
 import { usePullToRefreshGesture } from '../pullToRefresh.js';
 import { BUSINESS } from '../businessConfig.js';
+import { alternarModo, obtenerModo } from '../theme.js';
 
 function AppLayout({ children, session, onLogout, activeTab, setActiveTab, settings = {} }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [modo, setModo] = useState(() => obtenerModo());
   const isAdmin = session && (session.rol === 'admin' || session.rol === 'superadmin');
   const isSuperadmin = session && session.rol === 'superadmin';
   const { allowCajasTab = false } = settings;
@@ -75,6 +77,19 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
                 }}
               >
                 <i className="fa-solid fa-circle-info"></i> Acerca de
+              </button>
+              <button
+                id="menu-modo"
+                className="account-menu-item"
+                type="button"
+                onClick={() => {
+                  const resultado = alternarModo(BUSINESS.tema);
+                  setModo(resultado.modo);
+                  setMenuOpen(false);
+                }}
+              >
+                <i className={`fa-solid ${modo === 'claro' ? 'fa-moon' : 'fa-sun'}`}></i>
+                {modo === 'claro' ? 'Activar modo oscuro' : 'Activar modo claro'}
               </button>
               <button
                 id="menu-logout"
