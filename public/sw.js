@@ -8,7 +8,7 @@ import { precacheAndRoute } from 'workbox-precaching';
 // network-first de abajo: un rebuild nunca llegaba al navegador hasta que
 // este service worker se actualizara, y la UI seguía con la versión vieja
 // (p. ej. el overlay de progreso quedaba con z-index bajo los modales).
-const CACHE_VERSION = 'v21';
+const CACHE_VERSION = 'v22';
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
 // Guardamos el manifest antes de consumirlo para saber qué requests cubre
@@ -81,6 +81,15 @@ self.addEventListener('activate', (e) => {
       return null;
     }));
     await self.clients.claim();
+    // Avisar a las páginas que hay una versión nueva activa, para que
+    // muestren el overlay de actualización (~1.2s) antes de recargar.
+    // Ver AGENTS.md, regla "Versionado de la PWA".
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    clients.forEach((client) => {
+      try {
+        client.postMessage({ type: 'APP_VERSION', version: CACHE_VERSION });
+      } catch (err) { /* ignore */ }
+    });
   })());
 });
 
@@ -89,6 +98,12 @@ self.addEventListener('message', (event) => {
   if (!event.data) return;
   if (event.data === 'skipWaiting') {
     self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'GET_VERSION') {
+    try {
+      event.source?.postMessage?.({ type: 'APP_VERSION', version: CACHE_VERSION });
+    } catch (err) { /* ignore */ }
+    return;
   }
   if (event.data === 'clearCaches') {
     caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))));
