@@ -4,21 +4,38 @@ import { createPortal } from 'react-dom';
 /**
  * Overlay de actualización de versión de la PWA.
  *
- * Cuando el service worker detecta una versión nueva (CACHE_VERSION distinta),
- * se muestra este overlay con el corazón de la marca latiendo y el texto
- * "Actualizando a la nueva versión…" durante ~1.2s antes de recargar, para que
- * el cambio de versión no sea un salto abrupto (pantalla blanca / parpadeo).
+ * Diseño neutro y reutilizable (sin marca): spinner genérico FontAwesome
+ * (fa-circle-notch) + barra de progreso por fases + texto de fase.
  *
- * Reutiliza `.loader-overlay` (z-index 150000, por encima de modales) y
- * `.heart-spinner` (latido de la marca). Sin emojis (GUIA_VISUAL).
+ * Fases:
+ *  - "download": "Descargando nueva versión (vX)…" (pre-reload, SW nuevo
+ *    todavía no controla la página).
+ *  - "apply": "Aplicando actualización…" (el SW nuevo ya tomó el control,
+ *    a punto de recargar).
+ *  - "loading": "Cargando nueva versión (vX)…" (post-reload: la app arranca
+ *    con el bundle nuevo y el overlay solo se oculta cuando App está lista).
+ *
+ * Reutiliza `.loader-overlay` como contenedor (z-index 150000, por encima de
+ * modales); los estilos propios viven en `.app-update-*` (style.css).
+ * Sin emojis (GUIA_VISUAL).
  */
-function AppUpdateOverlay({ visible, version }) {
+const PHASE_TEXT = {
+    download: (version) => `Descargando nueva versión${version ? ` (${version})` : ''}…`,
+    apply: () => 'Aplicando actualización…',
+    loading: (version) => `Cargando nueva versión${version ? ` (${version})` : ''}…`,
+};
+
+function AppUpdateOverlay({ visible, version, phase = 'download' }) {
     if (!visible) return null;
+    const text = (PHASE_TEXT[phase] || PHASE_TEXT.download)(version);
     return createPortal(
         <div className="loader-overlay app-update-overlay" aria-live="polite" aria-busy="true">
-            <div className="spinner-container">
-                <i className="fa-solid fa-heart heart-spinner" aria-hidden="true"></i>
-                <p>Actualizando a la nueva versión{version ? ` (${version})` : ''}…</p>
+            <div className="app-update-card">
+                <i className="fa-solid fa-circle-notch fa-spin app-update-spinner" aria-hidden="true"></i>
+                <p className="app-update-text">{text}</p>
+                <div className="app-update-bar" aria-hidden="true">
+                    <div className={`app-update-bar-fill is-${phase}`} />
+                </div>
             </div>
         </div>,
         document.body

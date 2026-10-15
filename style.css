@@ -302,6 +302,73 @@ button {
     opacity: 0.75;
 }
 
+/* =========================================================================
+   Overlay de actualización de versión de la PWA (neutro y reutilizable).
+   Contenedor: .loader-overlay (z-index 150000, por encima de modales).
+   Sin marca: spinner genérico fa-circle-notch + barra de fases con tokens
+   globales. Sin emojis (GUIA_VISUAL). Respeta prefers-reduced-motion.
+   ========================================================================= */
+.app-update-overlay {
+    padding: 24px;
+}
+
+.app-update-card {
+    background: var(--white);
+    border: 2px solid var(--barbie-pale);
+    border-radius: var(--radius-lg);
+    box-shadow: none;
+    padding: 28px 32px;
+    max-width: 340px;
+    width: 100%;
+    text-align: center;
+}
+
+.app-update-spinner {
+    font-size: 44px;
+    color: var(--barbie-pink);
+}
+
+.app-update-text {
+    margin: 14px 0 18px;
+    font-family: 'Comfortaa', sans-serif;
+    font-weight: 600;
+    color: var(--barbie-dark);
+    font-size: 14px;
+}
+
+.app-update-bar {
+    height: 8px;
+    border-radius: var(--radius-sm);
+    background: var(--barbie-light);
+    overflow: hidden;
+}
+
+.app-update-bar-fill {
+    height: 100%;
+    width: 25%;
+    border-radius: inherit;
+    background: linear-gradient(135deg, var(--barbie-pink) 0%, var(--barbie-dark) 100%);
+    transition: width 0.4s ease;
+}
+
+.app-update-bar-fill.is-download {
+    width: 30%;
+}
+
+.app-update-bar-fill.is-apply {
+    width: 70%;
+}
+
+.app-update-bar-fill.is-loading {
+    width: 90%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-update-bar-fill {
+        transition: none;
+    }
+}
+
 /* Notificaciones Toast */
 .toast-container {
     position: fixed;
