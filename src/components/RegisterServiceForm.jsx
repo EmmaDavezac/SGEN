@@ -59,6 +59,13 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     const [vueltoReturnMethod, setVueltoReturnMethod] = useState('Efectivo');
     const cashInitialRef = useRef(null);
 
+    // Bloquear scroll del fondo mientras haya modales de cobro/confirmación abiertos (mobile UX)
+    useEffect(() => {
+      const open = showCashModal || showConfirmModal || showCashDiscardConfirm || showRegisterDiscardConfirm;
+      document.body.classList.toggle('no-scroll', open);
+      return () => document.body.classList.remove('no-scroll');
+    }, [showCashModal, showConfirmModal, showCashDiscardConfirm, showRegisterDiscardConfirm]);
+
     const priceInputRef = useRef(null);
 
     useEffect(() => {

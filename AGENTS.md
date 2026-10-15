@@ -9,9 +9,9 @@ Cada commit que cambie UI, lógica, estilos o el service worker **DEBE** subir
 la versión del service worker para forzar la actualización en los clientes
 instalados. Sin esto, la PWA sigue sirviendo la versión vieja cacheada.
 
-1. **Subir `CACHE_VERSION` en `public/sw.js`** (hoy `v23`):
+1. **Subir `CACHE_VERSION` en `public/sw.js`** (hoy `v25`):
    ```js
-   const CACHE_VERSION = 'v24'; // +1 en cada commit con cambios de app
+   const CACHE_VERSION = 'v26'; // +1 en cada commit con cambios de app
    ```
    - El nombre del caché runtime (`runtime-<versión>`) cambia, el `activate`
      borra el runtime viejo y `skipWaiting()` + `clients.claim()` toman el
@@ -39,3 +39,27 @@ instalados. Sin esto, la PWA sigue sirviendo la versión vieja cacheada.
 - Si el commit incluye bump de versión del SW, mencionarlo en el mensaje
   (ej. `fix(pwa): ... (SW v22 → v23)`).
 - No commitear `dist/` (está en `.gitignore`): el deploy lo reconstruye.
+
+## Historial de versiones (changelog)
+
+Cada versión publicada **DEBE** documentar sus cambios en `docs/CHANGELOG.md` para generar un historial con la información de cada versión y los commits asociados.
+
+1. **Entrada por versión**: agregar una entrada con número de versión, fecha, resumen de cambios (UI, lógica, estilos, service worker) y la versión de `CACHE_VERSION` correspondiente.
+2. **Commits de la versión**: listar los commits (hash corto + mensaje) que conforman la versión, agrupados bajo la entrada de versión.
+3. **Formato de entrada** (ejemplo):
+
+   ```markdown
+   ## v1.2.0 — 2026-10-15 (SW v25)
+
+   ### Cambios
+   - Teclado numérico en inputs de cantidad/precio (`inputMode="numeric"`).
+   - Retroalimentación táctil (`:active`) en botones y `.nav-item`.
+   - Bloqueo de scroll del fondo al abrir modales/drawers (`body.no-scroll`).
+   - `font-size: 16px` en inputs para evitar auto-zoom en iOS.
+   - `overscroll-behavior: contain` en `html, body` para parar el rebote elástico.
+
+   ### Commits
+   - c177e6a feat(mobile): numeric keyboard, tap feedback, scroll lock, font size, overscroll contain (SW v24 → v25)
+   ```
+
+4. **Actualizar en cada release**: al crear una tag o release, cerrar la entrada anterior y añadir la nueva con sus commits.

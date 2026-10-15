@@ -208,6 +208,12 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
   const [savingSena, setSavingSena] = useState(false);
   const senaInitialRef = useRef(null);
 
+  // Bloquear scroll del fondo mientras el modal de seña está abierto (mobile UX)
+  useEffect(() => {
+    document.body.classList.toggle('no-scroll', senaOpen);
+    return () => document.body.classList.remove('no-scroll');
+  }, [senaOpen]);
+
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
