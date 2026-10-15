@@ -8,7 +8,7 @@
 - Bump de `CACHE_VERSION` en `public/sw.js` (v38 → v39) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
-- (hash se completa tras el commit)
+- ddd6dd4 fix(tema): modo oscuro aplica a contenedores y cards (SW v38 → v39)
 
 ## v1.3.5 — 2026-10-15 (SW v37)
 
