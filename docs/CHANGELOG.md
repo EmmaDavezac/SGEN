@@ -8,7 +8,7 @@
 - Bump de `CACHE_VERSION` en `public/sw.js` (v34 → v35) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
-- (hash se completa tras el commit)
+- cc99c7a feat(i18n): lenguaje neutro: "clienta"/"clientas" a "cliente"/"clientes" en toda la app (SW v34 → v35)
 
 ## v1.3.2 — 2026-10-15 (SW v34)
 
