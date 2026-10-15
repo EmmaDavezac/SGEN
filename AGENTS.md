@@ -40,6 +40,11 @@ instalados. Sin esto, la PWA sigue sirviendo la versión vieja cacheada.
   (ej. `fix(pwa): ... (SW v22 → v23)`).
 - No commitear `dist/` (está en `.gitignore`): el deploy lo reconstruye.
 
+## Reglas de estilo y UI
+
+- **Sin emojis** en commits, mensajes de UI, changelog ni código: la guía visual
+  (`GUIA_VISUAL.md`) lo prohíbe. Usar texto plano en su lugar.
+
 ## Historial de versiones (changelog)
 
 Cada versión publicada **DEBE** documentar sus cambios en `docs/CHANGELOG.md` para generar un historial con la información de cada versión y los commits asociados.
