@@ -25,7 +25,13 @@ export default defineConfig({
         // no llegaría al navegador hasta actualizar el service worker.
         globPatterns: ['**/*.{js,css,html,png,svg,ico,json}'],
         globIgnores: ['**/*.html']
-      }
+      },
+      // Asegura que el service worker se entregue exactamente en public/sw.js
+      // y que el navegador lo sirva en esa ruta (y no en otro alias)
+      includeAssets: ['sw.js'],
+      // El cliente ya registra el SW con register('/sw.js', { updateViaCache: 'none' })
+      // en react-main.jsx, así que no lo duplicamos aquí.
+      supported: ['serviceworker']
     })
   ],
   build: {
