@@ -10,18 +10,23 @@ function AboutModal({ open, onClose }) {
       subtitle={`Versión ${APP_VERSION}`}
       onClose={onClose}
       showCloseButton
+      sizeClass="about-modal-card"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'center' }}>
-        <p style={{ margin: 0, color: 'var(--text-muted)' }}>
-          App de contabilidad y registro de servicios para tu negocio.
-        </p>
-        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-          Desarrollado con <i className="fa-solid fa-heart" style={{ color: 'var(--barbie-pink)', marginRight: 4 }} /> por
-          <strong>Evolet Studio</strong>.
-        </p>
-        <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
-          Service Worker: <code style={{ background: 'var(--barbie-pale)', padding: '2px 6px', borderRadius: 4 }}>{APP_VERSION}</code>
-        </p>
+      <div className="about-icon">
+        <i className="fa-solid fa-building panel-heading-icon" aria-hidden="true" />
+      </div>
+      <p className="about-description">
+        App de contabilidad y registro de servicios para tu negocio.
+      </p>
+      <div className="chart-section about-info">
+        <h4>
+          <i className="fa-solid fa-circle-info panel-heading-icon" aria-hidden="true" />
+          Información
+        </h4>
+        <div className="about-row">
+          <span className="about-label">Desarrollado por</span>
+          <span className="about-value">Emmanuel Davezac</span>
+        </div>
       </div>
     </Modal>
   );

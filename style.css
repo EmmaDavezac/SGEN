@@ -5662,3 +5662,71 @@ button:active {
     background: rgba(0, 0, 0, 0.06);
     transform: scale(0.96);
 }
+
+/* =========================================================================
+   MODAL ACERCA DE (usa clases nativas de la app: .modal-card, .chart-section)
+   ========================================================================= */
+.about-modal-card {
+    max-width: 420px;
+    width: min(92vw, 420px);
+}
+
+.about-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--barbie-pale);
+    color: var(--barbie-pink);
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 8px;
+    box-shadow: var(--shadow-inset);
+}
+
+.about-description {
+    margin: 0 0 16px;
+    font-size: 15px;
+    color: var(--text-muted);
+    max-width: 300px;
+    text-align: center;
+}
+
+.about-info {
+    border: none;
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+    padding: 0;
+}
+
+.about-info h4 {
+    text-align: center;
+    border-left: none;
+    padding-left: 0;
+    margin-bottom: 12px;
+}
+
+.about-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--barbie-light);
+}
+
+.about-row:last-child {
+    border-bottom: none;
+}
+
+.about-label {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.about-value {
+    font-size: 14px;
+    color: var(--text-color);
+    font-weight: 600;
+}

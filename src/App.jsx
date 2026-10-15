@@ -278,26 +278,37 @@ function App() {
         //   se rehidrata el perfil. Si el perfil ya no es legible (RLS), se
         //   limpia la sesión local para forzar un login fresco.
         const validateStoredSession = async () => {
+            // Timeout de seguridad: si Supabase no responde en 10s, no dejamos
+            // la pantalla atascada en "Verificando sesión".
+            const timeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('timeout validando sesión')), 10000)
+            );
+            let sessionData;
             try {
-                const { data, error } = await supabase.auth.getSession();
+                sessionData = await Promise.race([supabase.auth.getSession(), timeout]);
+            } catch {
+                // Timeout o error de red: no cerramos la sesión, solo marcamos
+                // authReady para que la app siga funcionando con su caché local.
+                if (isActive) setAuthReady(true);
+                return;
+            }
+            try {
+                const { data, error } = sessionData;
                 if (!isActive) return;
-                const authUser = error ? null : data.session?.user;
+                const authUser = error ? null : data?.session?.user;
                 if (!authUser) {
                     if (readStoredSession()) setSession(null);
+                    if (isActive) setAuthReady(true);
                     return;
                 }
+                // Tenemos un usuario válido de Supabase. Intentar refresh pero
+                // nunca cerrar la sesión si falla: ya tenemos sesión activa.
                 try {
                     const refreshed = await supabase.auth.refreshSession();
                     if (!isActive) return;
-                    if (refreshed.error || !refreshed.data.session?.user) {
-                        setSession(null);
-                        return;
-                    }
+                    // Si refresh falla, seguimos con el authUser de getSession.
                 } catch (refreshError) {
-                    // Sin red (PWA offline): se conserva la sesión guardada y
-                    // los paneles muestran su caché; no se cierra sesión.
-                    console.warn('No se pudo renovar la sesión (posible offline):', refreshError);
-                    return;
+                    console.warn('No se pudo renovar el token (sesión se conserva):', refreshError);
                 }
                 const { data: profile, error: profileError } = await supabase
                     .from('perfiles')
@@ -307,9 +318,13 @@ function App() {
                 if (!isActive) return;
                 if (profileError || !profile) {
                     setSession(null);
+                    if (isActive) setAuthReady(true);
                     return;
                 }
                 setSession({ ...profile, authId: authUser.id });
+            } catch (err) {
+                console.error('Error validando sesión:', err);
+                if (isActive) setAuthReady(true);
             } finally {
                 if (isActive) setAuthReady(true);
             }
