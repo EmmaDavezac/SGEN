@@ -779,6 +779,7 @@ function PricesPanel({ session, notify, showLoader }) {
                                 />
                                 <input
                                     type="number"
+                                    inputMode="numeric"
                                     min="0"
                                     step="1"
                                     value={serviceDraft.price}

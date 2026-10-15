@@ -758,6 +758,7 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                             <input
                                 id="pending-payment-amount"
                                 type="number"
+                                inputMode="numeric"
                                 min={debtorToPay?.total || 0}
                                 step="1"
                                 placeholder="Ej. 15000"

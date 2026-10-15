@@ -1372,6 +1372,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
                         <input
                           id="schedule-sena-amount"
                           type="number"
+                          inputMode="numeric"
                           min="0"
                           step="0.01"
                           placeholder="0"
@@ -1680,6 +1681,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
               <input
                 id="sena-amount-input"
                 type="number"
+                inputMode="numeric"
                 min="0"
                 step="0.01"
                 placeholder="0"

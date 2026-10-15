@@ -5617,3 +5617,41 @@ button:active {
         padding: 18px;
     }
 }
+
+/* =========================================================================
+   MEJORAS — MÓVIL
+   ========================================================================= */
+
+/* 3. Eliminar retraso de 300 ms en taps (botones, enlaces y nav inferior) */
+button,
+a,
+.nav-item {
+    touch-action: manipulation;
+}
+
+/* 4. Bloquear scroll del fondo cuando hay modales/drawers abiertos */
+body.no-scroll {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+}
+
+/* 5. Tamaño mínimo 16 px en inputs para evitar zoom automático en iOS */
+input,
+select,
+textarea {
+    font-size: 16px;
+}
+
+/* 6. Evitar rebote elástico (overscroll) al llegar al final de listas en móvil */
+html,
+body {
+    overscroll-behavior: contain;
+}
+
+/* 7. Feedback visual al pulsar en nav inferior y botones */
+.nav-item:active,
+button:active {
+    background: rgba(0, 0, 0, 0.06);
+    transform: scale(0.96);
+}
