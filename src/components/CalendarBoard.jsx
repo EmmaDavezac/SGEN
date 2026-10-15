@@ -478,15 +478,15 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
     if (!supabase || !session?.authId) return null;
     const nombre = scheduleForm.clientName.trim();
     if (!nombre) {
-      if (notify) notify('Ingresá un nombre de clienta para registrarla.', 'error');
+      if (notify) notify('Ingresá un nombre de cliente para registrarlo.', 'error');
       return null;
     }
     if (!confirmBypassRef.current) {
-      requestConfirmation('Registrar clienta', `¿Confirmás registrar a ${nombre} como nueva clienta?`, () => registerQuickClient());
+      requestConfirmation('Registrar cliente', `¿Confirmás registrar a ${nombre} como nueva cliente?`, () => registerQuickClient());
       return null;
     }
     confirmBypassRef.current = false;
-    if (showLoader) showLoader(true, 'Registrando clienta...');
+    if (showLoader) showLoader(true, 'Registrando cliente...');
     try {
       const data = await saveClientToDatabase({
           nombre,
@@ -504,11 +504,11 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
       setScheduleForm(prev => ({ ...prev, clientId: record.id, clientName: record.nombre }));
       setScheduleSuggestions([]);
       setScheduleQuickPanel(false);
-      if (notify) notify('Clienta registrada. Podés agendar su turno.', 'success');
+      if (notify) notify('Cliente registrada. Podés agendar su turno.', 'success');
       return record;
     } catch (error) {
-      console.error('Error creando clienta rápida:', error);
-      if (notify) notify(error.message || 'No se pudo registrar la clienta.', 'error');
+      console.error('Error creando cliente rápida:', error);
+      if (notify) notify(error.message || 'No se pudo registrar la cliente.', 'error');
       return null;
     } finally {
       if (showLoader) showLoader(false);
@@ -532,7 +532,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
       });
       return record.id;
     } catch (error) {
-      console.error('Error creando clienta implícita:', error);
+      console.error('Error creando cliente implícito:', error);
       return null;
     }
   };
@@ -543,7 +543,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
 
     const clientName = scheduleForm.clientName.trim();
     if (!clientName) {
-      useToast().notify('Ingresá el nombre de la clienta.', 'error');
+      useToast().notify('Ingresá el nombre de la cliente.', 'error');
       return;
     }
     if (!scheduleForm.fecha || !scheduleForm.horaInicio) {
@@ -564,10 +564,10 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
         title: 'Agendando turno',
         steps: [
           {
-            label: 'Asociando la clienta',
+            label: 'Asociando la cliente',
             run: async () => {
               clienteId = await resolveClientId();
-              if (!clienteId) throw new Error('No se pudo asociar la clienta al turno.');
+              if (!clienteId) throw new Error('No se pudo asociar la cliente al turno.');
             }
           },
           {
@@ -1268,7 +1268,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
                     <input
                       id="schedule-client-name"
                       type="text"
-                      placeholder="Nombre de la clienta"
+                      placeholder="Nombre de la cliente"
                       value={scheduleForm.clientName}
                       onChange={(e) => handleScheduleClientChange(e.target.value)}
                       autoComplete="off"
@@ -1298,7 +1298,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
                   )}
                   {scheduleQuickPanel && (
                     <div className="quick-client-panel">
-                      <strong><i className="fa-solid fa-user-plus" /> Clienta no encontrada</strong>
+                      <strong><i className="fa-solid fa-user-plus" /> Cliente no encontrado</strong>
                       <p>Registrala como activa para poder agendarle un turno.</p>
                       <div className="form-row-2">
                         <div className="form-group">
@@ -1829,7 +1829,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
               <textarea
                 id="cancel-reason-input"
                 rows="3"
-                placeholder="Ej. La clienta avisó que no podía ir"
+                placeholder="Ej. La cliente avisó que no podía ir"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 required

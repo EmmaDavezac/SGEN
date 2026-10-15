@@ -752,7 +752,7 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                         </div>
                     </div>
                     <div className="form-group">
-                        <label htmlFor="pending-payment-amount">¿Cuánto entregó la clienta? <span className="field-required">(obligatorio)</span></label>
+                        <label htmlFor="pending-payment-amount">¿Cuánto entregó la cliente? <span className="field-required">(obligatorio)</span></label>
                         <div className="input-wrapper">
                             <i className="fa-solid fa-dollar-sign input-icon" />
                             <input

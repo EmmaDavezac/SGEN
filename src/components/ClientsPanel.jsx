@@ -195,14 +195,14 @@ function ClientsPanel({ session, notify, showLoader }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
-  // Deslizar hacia abajo recarga clientas (y el resumen de turnos por clienta).
+  // Deslizar hacia abajo recarga clientes (y el resumen de turnos por cliente).
   usePullToRefreshHandler(async () => {
     await loadClients(true);
     await loadAppointmentsLight();
   });
 
-  // "Consultar ficha de la clienta" desde una venta: el Historial y la Agenda navegan a
-  // esta pestaña y avisan qué clienta abrir. Se escucha por evento porque los
+  // "Consultar ficha de la cliente" desde una venta: el Historial y la Agenda navegan a
+  // esta pestaña y avisan qué cliente abrir. Se escucha por evento porque los
   // paneles no se conocen entre sí (App.jsx solo cambia de pestaña).
   // Se usa un ref para no re-suscribir el listener en cada render.
   const clientsRef = useRef([]);
@@ -224,7 +224,7 @@ function ClientsPanel({ session, notify, showLoader }) {
       const clienteId = event?.detail?.clienteId || consumirClientePendiente();
       if (!clienteId) return;
       if (!abrirFichaPorId(clienteId) && clientsRef.current.length && notify) {
-        notify('No se encontró la ficha de esa clienta.', 'error');
+        notify('No se encontró la ficha de esa cliente.', 'error');
       }
     };
     window.addEventListener(CLIENTE_ABRIR_EVENTO, abrirFicha);
@@ -234,13 +234,13 @@ function ClientsPanel({ session, notify, showLoader }) {
 
   // Si el pedido llegó antes de que este panel estuviera montado (el evento se
   // dispara en el mismo tick del cambio de pestaña) o antes de cargar las
-  // clientas, queda pendiente y se atiende acá. Con la lista vacía no se avisa
+  // clientes, queda pendiente y se atiende acá. Con la lista vacía no se avisa
   // nada todavía: puede que siga cargando.
   useEffect(() => {
     if (!clients.length) return;
     const pendiente = consumirClientePendiente();
     if (pendiente && !abrirFichaPorId(pendiente) && notify) {
-      notify('No se encontró la ficha de esa clienta.', 'error');
+      notify('No se encontró la ficha de esa cliente.', 'error');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clients, notify]);
@@ -250,7 +250,7 @@ function ClientsPanel({ session, notify, showLoader }) {
     if (!supabase || !session?.authId) return;
     const nombre = newClient.nombre.trim();
     if (!nombre) {
-      if (notify) notify('Ingresá el nombre de la clienta.', 'error');
+      if (notify) notify('Ingresá el nombre de la cliente.', 'error');
       return;
     }
     setCreating(true);
@@ -262,11 +262,11 @@ function ClientsPanel({ session, notify, showLoader }) {
         notas: newClient.notas.trim() || null
       };
       if (!confirmBypassRef.current) {
-        requestConfirmation('Registrar clienta', `¿Confirmás registrar a ${nombre} como nueva clienta?`, () => submitNewClient());
+        requestConfirmation('Registrar cliente', `¿Confirmás registrar a ${nombre} como nueva cliente?`, () => submitNewClient());
         return;
       }
       confirmBypassRef.current = false;
-      if (showLoader) showLoader(true, 'Guardando clienta...');
+      if (showLoader) showLoader(true, 'Guardando cliente...');
       let data;
       try {
         data = await saveClientToDatabase(payload);
@@ -282,10 +282,10 @@ function ClientsPanel({ session, notify, showLoader }) {
       });
       setNewClient({ nombre: '', telefono: '', email: '', notas: '' });
       setRegistrationOpen(false);
-      if (notify) notify('Clienta agregada correctamente.', 'success');
+      if (notify) notify('Cliente agregado correctamente.', 'success');
     } catch (error) {
-      console.error('Error creando clienta:', error);
-      if (notify) notify(error.message || 'No se pudo guardar la clienta. Verificá que no exista previamente.', 'error');
+      console.error('Error creando cliente:', error);
+      if (notify) notify(error.message || 'No se pudo guardar la cliente. Verificá que no exista previamente.', 'error');
     } finally {
       setCreating(false);
     }
@@ -312,8 +312,8 @@ function ClientsPanel({ session, notify, showLoader }) {
       return;
     }
     setConfirmation({
-      title: 'Descartar clienta',
-      message: 'Hay datos sin guardar en la nueva clienta. ¿Querés descartarlos?',
+      title: 'Descartar cliente',
+      message: 'Hay datos sin guardar en la nueva cliente. ¿Querés descartarlos?',
       action: () => {
         setNewClient({ nombre: '', telefono: '', email: '', notas: '' });
         setRegistrationOpen(false);
@@ -352,7 +352,7 @@ function ClientsPanel({ session, notify, showLoader }) {
       }
       setDetailHistory(historyRaw.sort((a, b) => new Date(b.horaInicio || b.fecha) - new Date(a.horaInicio || a.fecha)));
     } catch (error) {
-      console.warn('No se pudo cargar el historial de la clienta:', error);
+      console.warn('No se pudo cargar el historial de la cliente:', error);
     } finally {
       setDetailLoading(false);
     }
@@ -362,7 +362,7 @@ function ClientsPanel({ session, notify, showLoader }) {
     if (!detailClient || !supabase || !session?.authId) return;
     const nombre = detailForm.nombre.trim();
     if (!nombre) {
-      if (notify) notify('El nombre de la clienta no puede quedar vacío.', 'error');
+      if (notify) notify('El nombre de la cliente no puede quedar vacío.', 'error');
       return;
     }
     if (!confirmBypassRef.current) {
@@ -389,9 +389,9 @@ function ClientsPanel({ session, notify, showLoader }) {
       });
       setDetailClient(normalizeClientRecord(updated));
       setDetailEditing(false);
-      if (notify) notify('Datos de la clienta actualizados.', 'success');
+      if (notify) notify('Datos de la cliente actualizados.', 'success');
     } catch (error) {
-      console.error('Error actualizando clienta:', error);
+      console.error('Error actualizando cliente:', error);
       if (notify) notify(error.message || 'No se pudieron guardar los cambios.', 'error');
     } finally {
       setDetailSaving(false);
@@ -430,15 +430,15 @@ function ClientsPanel({ session, notify, showLoader }) {
 
   const askDeleteClient = async (client) => {
     if (!isSuperadmin) {
-      if (notify) notify('Solo el superadmin puede eliminar clientas.', 'error');
+      if (notify) notify('Solo el superadmin puede eliminar clientes.', 'error');
       return;
     }
     if (!client?.id) {
-      if (notify) notify('No se pudo identificar a la clienta a eliminar.', 'error');
+      if (notify) notify('No se pudo identificar a la cliente a eliminar.', 'error');
       return;
     }
     // Chequeo de historial antes de abrir el modal: turnos y servicios
-    // referencian a la clienta con FK NOT NULL, así que sin este aviso el
+    // referencian a la cliente con FK NOT NULL, así que sin este aviso el
     // DELETE fallaría por clave foránea o, peor, fallaría en silencio.
     try {
       const [turnosRes, serviciosRes] = await Promise.all([
@@ -455,7 +455,7 @@ function ClientsPanel({ session, notify, showLoader }) {
         if (nServicios > 0) partes.push(`${nServicios} servicio${nServicios === 1 ? '' : 's'}`);
         if (notify) {
           notify(
-            `No se puede eliminar a ${client.nombre || 'la clienta'}: tiene ${partes.join(' y ')} en el historial. El historial se conserva para no perder registros.`,
+            `No se puede eliminar a ${client.nombre || 'la cliente'}: tiene ${partes.join(' y ')} en el historial. El historial se conserva para no perder registros.`,
             'error'
           );
         }
@@ -464,7 +464,7 @@ function ClientsPanel({ session, notify, showLoader }) {
     } catch (err) {
       // Si la verificación no pudo ejecutarse (red/permisos), no bloqueamos:
       // el DELETE responde con un error claro (FK o RLS) en el paso siguiente.
-      console.warn('No se pudo verificar el historial de la clienta:', err);
+      console.warn('No se pudo verificar el historial de la cliente:', err);
     }
     setDeleteConfirm(client);
   };
@@ -472,7 +472,7 @@ function ClientsPanel({ session, notify, showLoader }) {
   const confirmDeleteClient = async () => {
     if (!deleteConfirm || !supabase || !session?.authId) return;
     setDeleting(true);
-    if (showLoader) showLoader(true, 'Eliminando clienta...');
+    if (showLoader) showLoader(true, 'Eliminando cliente...');
     try {
       await deleteClientFromDatabase(deleteConfirm.id);
       setClients(prev => {
@@ -483,11 +483,11 @@ function ClientsPanel({ session, notify, showLoader }) {
       if (detailClient && detailClient.id === deleteConfirm.id) {
         setDetailClient(null);
       }
-      if (notify) notify('Clienta eliminada del sistema.', 'success');
+      if (notify) notify('Cliente eliminado del sistema.', 'success');
       setDeleteConfirm(null);
     } catch (error) {
-      console.error('Error eliminando clienta:', error);
-      if (notify) notify(error.message || 'No se pudo eliminar la clienta. Quizá tenga turnos o pagos asociados.', 'error');
+      console.error('Error eliminando cliente:', error);
+      if (notify) notify(error.message || 'No se pudo eliminar la cliente. Quizá tenga turnos o pagos asociados.', 'error');
     } finally {
       setDeleting(false);
       if (showLoader) showLoader(false);
@@ -496,7 +496,7 @@ function ClientsPanel({ session, notify, showLoader }) {
 
   const askToggleStatus = (client) => {
     if (!isAdmin) {
-      if (notify) notify('Solo los administradores pueden cambiar el estado de las clientas.', 'error');
+      if (notify) notify('Solo los administradores pueden cambiar el estado de las clientes.', 'error');
       return;
     }
     setStatusToggleConfirm(client);
@@ -517,10 +517,10 @@ function ClientsPanel({ session, notify, showLoader }) {
       if (detailClient && detailClient.id === statusToggleConfirm.id) {
         setDetailClient(prev => prev ? { ...prev, activo: nextActivo } : null);
       }
-      if (notify) notify(nextActivo ? 'Clienta dada de alta nuevamente.' : 'Clienta dada de baja.', 'success');
+      if (notify) notify(nextActivo ? 'Cliente dado de alta nuevamente.' : 'Cliente dado de baja.', 'success');
       setStatusToggleConfirm(null);
     } catch (error) {
-      console.error('Error cambiando estado de clienta:', error);
+      console.error('Error cambiando estado de cliente:', error);
       if (notify) notify(error.message || 'No se pudo actualizar el estado.', 'error');
     } finally {
       setTogglingStatus(false);
@@ -535,7 +535,7 @@ function ClientsPanel({ session, notify, showLoader }) {
       <div className={`section-title ${registrationOpen ? 'section-title-with-back' : 'section-title-with-action'}`}>
         <div className="section-title-text">
           <h3>Clientes</h3>
-          <p>Consultá y agregá las clientas de Evolet Studio.</p>
+          <p>Consultá y agregá las clientes de Evolet Studio.</p>
         </div>
         <button
           type="button"
@@ -543,7 +543,7 @@ function ClientsPanel({ session, notify, showLoader }) {
           onClick={toggleRegistrationForm}
           aria-expanded={registrationOpen}
           aria-controls="client-registration-form"
-          aria-label={registrationOpen ? 'Volver' : 'Registrar nueva clienta'}
+          aria-label={registrationOpen ? 'Volver' : 'Registrar nueva cliente'}
         >
           <i className={`fa-solid ${registrationOpen ? 'fa-arrow-left' : 'fa-plus'}`} aria-hidden="true" />
           <span className="mobile-action-label">{registrationOpen ? 'Volver' : 'Nuevo'}</span>
@@ -553,7 +553,7 @@ function ClientsPanel({ session, notify, showLoader }) {
       {registrationOpen ? <form id="client-registration-form" className="cute-form client-registration-form client-registration-form--spaced" onSubmit={submitNewClient}>
         <div className="client-registration-heading">
           <div>
-            <h4>Datos de la clienta</h4>
+            <h4>Datos de la cliente</h4>
             <p>Completá el nombre y agregá un teléfono si lo necesitás.</p>
           </div>
         </div>
@@ -567,7 +567,7 @@ function ClientsPanel({ session, notify, showLoader }) {
               <input
                 id="client-record-name"
                 type="text"
-                placeholder="Nombre de la clienta"
+                placeholder="Nombre de la cliente"
                 value={newClient.nombre}
                 onChange={(e) => setNewClient(p => ({ ...p, nombre: e.target.value }))}
                 required
@@ -660,7 +660,7 @@ function ClientsPanel({ session, notify, showLoader }) {
         {(loading || isSearching) && <SkeletonList count={6} />}
         {!loading && !isSearching && filteredClients.length === 0 && (
           <div className="list-empty-state">
-            <p>No se encontraron clientas que coincidan con la búsqueda.</p>
+            <p>No se encontraron clientes que coincidan con la búsqueda.</p>
           </div>
         )}
 
@@ -744,7 +744,7 @@ function ClientsPanel({ session, notify, showLoader }) {
                         type="text"
                         value={detailForm.nombre}
                         onChange={(e) => setDetailForm(p => ({ ...p, nombre: e.target.value }))}
-                        placeholder="Nombre de la clienta"
+                        placeholder="Nombre de la cliente"
                         required
                         readOnly={!detailEditing}
                       />
@@ -813,7 +813,7 @@ function ClientsPanel({ session, notify, showLoader }) {
                       <DetailActionButton
                         icon="fa-pen-to-square"
                         label="Editar"
-                        aria-label="Editar clienta"
+                        aria-label="Editar cliente"
                         onClick={() => setDetailEditing(true)}
                       />
                     )
@@ -915,8 +915,8 @@ function ClientsPanel({ session, notify, showLoader }) {
                     icon="fa-trash-can"
                     label="Eliminar"
                     variant="danger"
-                    title="Eliminar clienta"
-                    aria-label="Eliminar clienta"
+                    title="Eliminar cliente"
+                    aria-label="Eliminar cliente"
                     disabled={detailSaving}
                     onClick={() => askDeleteClient(detailClient)}
                   />
@@ -933,12 +933,12 @@ function ClientsPanel({ session, notify, showLoader }) {
             <div id="client-detail-history" className="client-history-list">
               {detailLoading && (
                 <div className="list-empty-state client-history-empty">
-                  <p>Cargando historial de la clienta…</p>
+                  <p>Cargando historial de la cliente…</p>
                 </div>
               )}
               {!detailLoading && detailHistory.length === 0 && (
                 <div className="list-empty-state client-history-empty">
-                  <p>Esta clienta no tiene turnos registrados.</p>
+                  <p>Esta cliente no tiene turnos registrados.</p>
                 </div>
               )}
               {!detailLoading && detailHistory.map(apt => (
@@ -1000,13 +1000,13 @@ function ClientsPanel({ session, notify, showLoader }) {
 
       <ConfirmModal
         open={!!deleteConfirm}
-        title="¿Eliminar Clienta?"
+        title="¿Eliminar Cliente?"
         message={
           deleteConfirm
-            ? `Se eliminará permanentemente a ${deleteConfirm.nombre || 'la clienta'} del sistema. Esta acción no se puede deshacer.`
+            ? `Se eliminará permanentemente a ${deleteConfirm.nombre || 'la cliente'} del sistema. Esta acción no se puede deshacer.`
             : ''
         }
-        confirmText="Eliminar clienta"
+        confirmText="Eliminar cliente"
         cancelText="Volver"
         confirmVariant="danger"
         onConfirm={confirmDeleteClient}
@@ -1016,12 +1016,12 @@ function ClientsPanel({ session, notify, showLoader }) {
 
       <ConfirmModal
         open={!!statusToggleConfirm}
-        title={statusToggleConfirm?.activo ? '¿Dar de baja?' : '¿Reactivar clienta?'}
+        title={statusToggleConfirm?.activo ? '¿Dar de baja?' : '¿Reactivar cliente?'}
         message={
           statusToggleConfirm
             ? statusToggleConfirm.activo
-              ? `Se marcará a ${statusToggleConfirm.nombre || 'la clienta'} como dada de baja. Seguirá apareciendo en historiales pero no en sugerencias ni búsquedas por defecto.`
-              : `Se reactivará a ${statusToggleConfirm.nombre || 'la clienta'}, volviendo a aparecer en búsquedas y sugerencias.`
+              ? `Se marcará a ${statusToggleConfirm.nombre || 'la cliente'} como dada de baja. Seguirá apareciendo en historiales pero no en sugerencias ni búsquedas por defecto.`
+              : `Se reactivará a ${statusToggleConfirm.nombre || 'la cliente'}, volviendo a aparecer en búsquedas y sugerencias.`
             : ''
         }
         confirmText={statusToggleConfirm?.activo ? 'Confirmar baja' : 'Confirmar alta'}

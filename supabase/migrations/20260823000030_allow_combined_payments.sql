@@ -1,7 +1,7 @@
 -- Cobros combinados: permitir metodo_pago = 'combinado' y guardar el reparto
 -- por método en columnas propias del servicio.
 --
--- Motivo: la clienta puede pagar parte en efectivo, parte en transferencia y
+-- Motivo: la cliente puede pagar parte en efectivo, parte en transferencia y
 -- dejar una porción fiada. Antes solo existía un método único por servicio
 -- (CHECK: efectivo | transferencia | fiado), así que no había dónde guardar
 -- el reparto.

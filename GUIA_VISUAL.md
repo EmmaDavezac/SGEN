@@ -132,7 +132,7 @@ Reglas de presentación:
 - Una acción no permitida **no se dibuja**: nunca hay que mostrar un botón que va a fallar.
 - Excepción: `Cobrar` en un reservado cuyo horario todavía no pasó se dibuja **deshabilitado**, con el motivo en el `title` (`.card-icon-btn:disabled`), porque es la acción que se va a buscar cuando el turno termine.
 - `Reagendar` no existe en provisional: para moverlo hay que cancelarlo y agendarlo de nuevo. Y **desaparece cuando el horario ya pasó**: mover un turno cuya hora llegó sería reescribir el historial. El turno pasado se cierra, no se mueve.
-- `Cancelar` no se ofrece en un reservado futuro: mientras haya tiempo, la salida es `Reagendar`. Aparece recién cuando el horario ya pasó (la clienta no vino), porque obliga a cargar un motivo que queda en el historial. Es la contracara de `Cobrar` y `Reagendar`: un reservado pasado solo se puede cerrar (cobrado o cancelado), no mover.
+- `Cancelar` no se ofrece en un reservado futuro: mientras haya tiempo, la salida es `Reagendar`. Aparece recién cuando el horario ya pasó (la cliente no vino), porque obliga a cargar un motivo que queda en el historial. Es la contracara de `Cobrar` y `Reagendar`: un reservado pasado solo se puede cerrar (cobrado o cancelado), no mover.
 - La restricción de superadmin es solo de interfaz: el borrado real lo autoriza RLS (dueño o admin). Un turno con seña o con servicio cobrado no se puede eliminar porque rompería la integridad referencial (`pagos` y `servicios` tienen FK a `turnos`); en ese caso se avisa y se sugiere reagendar.
 
 ### Ficha unificada de venta y turno (`VentaDetalleModal`)
@@ -163,7 +163,7 @@ muestran según lo que haya pasado:
 | --- | --- | --- |
 | Turno | solo con `turnoId` | fecha (ej. `10/10/2026`) y hora de inicio en una sola fila, estado con badge |
 | Cancelación | solo si el turno está cancelado | el motivo cargado, o "Sin motivo registrado" |
-| Servicio realizado | si no está cancelado | clienta (con atajo `Consultar`, icono de ojo, junto al nombre) y qué se hizo; cuándo y quién lo registró **solo para admins** (flag `isAdmin`) |
+| Servicio realizado | si no está cancelado | cliente (con atajo `Consultar`, icono de ojo, junto al nombre) y qué se hizo; cuándo y quién lo registró **solo para admins** (flag `isAdmin`) |
 | Seña | si hay pagos tipo `sena` | monto total, y por cada pago cuándo se pagó y con qué medio |
 | Cobro | si hay servicio | precio total, seña descontada, si hubo sobrepago **cuánto entregó** y **cuánto se le devolvió**, método de pago (resuelto desde `servicios` o el último cobro cuando el turno no lo trae) y estado del pago (fiado pendiente/saldado, pago completo o **Pendiente de cobro** si todavía no se cobró) |
 | Movimientos del turno | si hay más de un pago | seña, cobro y ajustes en orden cronológico |
@@ -172,11 +172,11 @@ Acciones: la cabecera queda **solo con `Volver`** (igual que en las otras ventan
 ficha); `Compartir comprobante` y `Cobrar` van **al pie** (`.detail-window-footer`),
 después de las secciones, en ambos formatos. El subtítulo de la cabecera **describe
 el contenido** (como en cliente/usuario): cliente y fecha no se repiten arriba porque
-ya están en las secciones ("Clienta", "Fecha y horario" / "Registrado"). En mobile,
+ya están en las secciones ("Cliente", "Fecha y horario" / "Registrado"). En mobile,
 `Compartir comprobante` ocupa **toda la fila** con su label visible, vía la clase
 reutilizable **`.detail-btn-full-mobile`** (aplicable a cualquier botón del pie de
 una ficha; en desktop el botón vuelve a su ancho contenido). El atajo a la ficha de la
-clienta (`Consultar`, junto a su nombre, icono de ojo `fa-eye` igual que en las
+cliente (`Consultar`, junto a su nombre, icono de ojo `fa-eye` igual que en las
 listas) navega a la pestaña Clientes y
 abre el perfil (por evento global
 `evolet:abrir-cliente`, módulo `clienteNav.js`); `Compartir comprobante` genera el

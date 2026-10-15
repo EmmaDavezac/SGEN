@@ -225,7 +225,7 @@ export function getAppointmentActions(apt, { isAdmin = false, isSuperadmin = fal
 
         // Reagendar: solo reservados que todavía no pasaron.
         // Un turno cuya hora ya llegó no se mueve: moverlo sería reescribir el
-        // historial. Si la clienta no vino, la salida es cancelarlo con motivo.
+        // historial. Si la cliente no vino, la salida es cancelarlo con motivo.
         build(
             APPOINTMENT_ACTIONS.REAGENDAR,
             estado === ESTADO_RESERVADO && !past,
@@ -237,7 +237,7 @@ export function getAppointmentActions(apt, { isAdmin = false, isSuperadmin = fal
                         ? 'El turno está cancelado.'
                         : 'El turno ya está cobrado.'
                 : past
-                    ? 'El horario del turno ya pasó. Si la clienta no vino, cancelalo con el motivo.'
+                    ? 'El horario del turno ya pasó. Si la cliente no vino, cancelalo con el motivo.'
                     : null
         ),
 
@@ -257,7 +257,7 @@ export function getAppointmentActions(apt, { isAdmin = false, isSuperadmin = fal
                     : 'El turno todavía no pasó. Se puede cobrar cuando termine.'
         ),
 
-        // Cancelar: solo reservados cuyo horario ya pasó (la clienta no vino).
+        // Cancelar: solo reservados cuyo horario ya pasó (la cliente no vino).
         // Es la contracara de Cobrar y de Reagendar: cuando el turno ya pasó, la
         // manicurista solo puede cerrarlo (cobrado o cancelado), no moverlo.
         // A diferencia de eliminar, el turno queda como registro con su motivo,

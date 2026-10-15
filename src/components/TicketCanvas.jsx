@@ -92,7 +92,7 @@ export function generateTicketCanvas(item, targetCanvas, logoImg) {
     const saldoPendiente = Number(item.saldoPendiente ?? item.saldo_pendiente) || 0;
 
     const rows = [
-        { label: 'CLIENTA', value: item.cliente, big: true },
+        { label: 'CLIENTE', value: item.cliente, big: true },
         { label: 'SERVICIO', value: item.servicio },
         { label: 'CATEGORÍA', value: capitalizeCategoryLabel(item.categoria) },
         { label: 'PRECIO TOTAL', value: `$${precio.toLocaleString('es-AR')}` },

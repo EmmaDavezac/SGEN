@@ -876,7 +876,7 @@ async function registerScheduleClient() {
     if (!name || !supabase || !state.currentUser?.authId) return;
     const button = document.getElementById("schedule-register-client");
     button.disabled = true;
-    showLoader(true, "Registrando clienta...");
+    showLoader(true, "Registrando cliente...");
     try {
         const { data, error } = await supabase.from("clientes").insert({
             nombre: name,
@@ -887,10 +887,10 @@ async function registerScheduleClient() {
         state.clientsList = [...(state.clientsList || []), data];
         updateScheduleClientSuggestions();
         panel.classList.add("hidden");
-        showToast("Clienta registrada. Ya podés agendar el turno.", "success");
+        showToast("Cliente registrada. Ya podés agendar el turno.", "success");
     } catch (error) {
-        console.error("Error registrando clienta desde agenda:", error);
-        showToast(error.code === "23505" ? "Ya existe una clienta con ese nombre." : "No se pudo registrar la clienta.", "error");
+        console.error("Error registrando cliente desde agenda:", error);
+        showToast(error.code === "23505" ? "Ya existe una cliente con ese nombre." : "No se pudo registrar la cliente.", "error");
     } finally {
         button.disabled = false;
         showLoader(false);
@@ -1142,7 +1142,7 @@ async function handleClientSubmit(event) {
     const notes = document.getElementById("client-record-notes").value.trim();
 
     if (!name) {
-        showToast("Ingresá el nombre de la clienta.", "error");
+        showToast("Ingresá el nombre de la cliente.", "error");
         nameInput.focus();
         return;
     }
@@ -1155,7 +1155,7 @@ async function handleClientSubmit(event) {
             notas: notes || null
         });
         if (error) {
-            if (error.code === "23505") throw new Error("Ya existe una clienta con ese nombre.");
+            if (error.code === "23505") throw new Error("Ya existe una cliente con ese nombre.");
             throw error;
         }
 
@@ -2191,7 +2191,7 @@ function generateTicketCanvas(item) {
         " - " + dateObj.toLocaleTimeString("es-AR", { hour: '2-digit', minute: '2-digit' });
 
     const rows = [
-        { label: "CLIENTA", value: item.cliente, big: true },
+        { label: "CLIENTE", value: item.cliente, big: true },
         { label: "SERVICIO", value: item.servicio },
         { label: "CATEGORÍA", value: capitalizeCategoryLabel(item.categoria) },
         { label: "PRECIO TOTAL", value: `$${precio.toLocaleString("es-AR")}` },
@@ -3750,7 +3750,7 @@ async function handleSenaSubmit(e) {
 
     const confirmed = await showGenericConfirmModal(
         "Confirmar reserva",
-        `Clienta: ${apt.cliente}\nTurno: ${apt.fecha || "-"}\nSeña: $${sena.toLocaleString("es-AR")}\nMétodo de pago: ${metodo}\n\n¿Confirmas cambiar el turno a Reservado y registrar la seña?`
+        `Cliente: ${apt.cliente}\nTurno: ${apt.fecha || "-"}\nSeña: $${sena.toLocaleString("es-AR")}\nMétodo de pago: ${metodo}\n\n¿Confirmas cambiar el turno a Reservado y registrar la seña?`
     );
     if (!confirmed) return;
 
@@ -3860,7 +3860,7 @@ async function handleRescheduleSubmit(e) {
 
     const confirmed = await showGenericConfirmModal(
         "Confirmar reagendamiento",
-        `Clienta: ${apt.cliente}\nFecha actual: ${apt.fecha || "-"}\nNueva fecha: ${newDate}\nNueva hora: ${newTime}\n\n¿Confirmas modificar este turno?`
+        `Cliente: ${apt.cliente}\nFecha actual: ${apt.fecha || "-"}\nNueva fecha: ${newDate}\nNueva hora: ${newTime}\n\n¿Confirmas modificar este turno?`
     );
     if (!confirmed) return;
 
@@ -3987,7 +3987,7 @@ async function handleScheduleSubmit(e) {
     }
 
     if (!supabase || !state.currentUser.authId) {
-        showToast("Para agendar un turno necesitás una clienta registrada en Supabase.", "error");
+        showToast("Para agendar un turno necesitás una cliente registrada en Supabase.", "error");
         return;
     }
 
@@ -3998,12 +3998,12 @@ async function handleScheduleSubmit(e) {
         .maybeSingle();
     if (clientLookupError) {
         console.error("Error validando cliente del turno:", clientLookupError);
-        showToast("No se pudo validar la clienta. Intentá nuevamente.", "error");
+        showToast("No se pudo validar la cliente. Intentá nuevamente.", "error");
         return;
     }
     if (!registeredClient || registeredClient.activo === false) {
         document.getElementById("schedule-new-client-panel")?.classList.remove("hidden");
-        showToast("Elegí una clienta activa o registrá esta clienta para continuar.", "error");
+        showToast("Elegí una cliente activa o registrá esta cliente para continuar.", "error");
         return;
     }
 
@@ -4043,7 +4043,7 @@ async function handleScheduleSubmit(e) {
 
     const confirmed = await showGenericConfirmModal(
         "Confirmar turno",
-        `Clienta: ${cliente}\nFecha: ${dateVal}\nHora: ${timeVal}\nEstado: ${statusVal}\nSeña: $${senaAmount.toLocaleString("es-AR")}\nMétodo de pago de seña: ${senaPaymentMethod}\n\n¿Confirmas agendar este turno?`
+        `Cliente: ${cliente}\nFecha: ${dateVal}\nHora: ${timeVal}\nEstado: ${statusVal}\nSeña: $${senaAmount.toLocaleString("es-AR")}\nMétodo de pago de seña: ${senaPaymentMethod}\n\n¿Confirmas agendar este turno?`
     );
     if (!confirmed) {
         if (scheduleModal) scheduleModal.classList.remove("hidden");

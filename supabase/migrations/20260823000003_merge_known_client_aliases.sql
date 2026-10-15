@@ -1,4 +1,4 @@
--- Unifica nombres que representan a la misma clienta.
+-- Unifica nombres que representan a la misma cliente.
 -- Actualiza referencias antes de eliminar duplicados para no perder historicos.
 
 do $$

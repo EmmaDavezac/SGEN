@@ -1,4 +1,4 @@
--- Conserva la clienta exacta usada por un servicio historico que no pudo mapearse.
+-- Conserva la cliente exacta usada por un servicio historico que no pudo mapearse.
 -- No se asume que Dana y Dana seña sean la misma persona.
 
 insert into public.clientes (nombre)

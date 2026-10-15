@@ -504,7 +504,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     const confirmMessageLines = pendingSubmitData ? (
         <>
             <div className="confirm-item">
-                <span className="confirm-label">Clienta</span>
+                <span className="confirm-label">Cliente</span>
                 <strong>{pendingSubmitData.cliente}</strong>
             </div>
             <div className="confirm-item">
@@ -588,7 +588,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                     </div>
                 )}
                 <div className="form-group">
-                    <label htmlFor="client-name">Nombre de la Clienta <span className="field-required">(obligatorio)</span></label>
+                    <label htmlFor="client-name">Nombre de la Cliente <span className="field-required">(obligatorio)</span></label>
                     <div className="input-wrapper">
                         <i className="fa-solid fa-user input-icon" />
                         <input
@@ -884,7 +884,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
             <Modal
                 open={showCashModal}
                 title="Cobro en Efectivo"
-                subtitle="Ingresá el monto que entrega la clienta"
+                subtitle="Ingresá el monto que entrega la cliente"
                 onClose={handleCashCancel}
                 closeOnBackdrop={false}
                 actions={
@@ -895,7 +895,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                 }
             >
                 <div className="form-group form-group--flush">
-                    <label htmlFor="cash-amount-given">Entrega de clienta ($)</label>
+                    <label htmlFor="cash-amount-given">Entrega de cliente ($)</label>
                     <div className="input-wrapper">
                         <i className="fa-solid fa-hand-holding-dollar input-icon" />
                         <input
@@ -928,7 +928,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                         <strong id="cash-summary-due">${Number(netoACobrar).toLocaleString("es-AR")}</strong>
                     </div>
                     <div className="cash-summary-row">
-                        <span>Entrega clienta</span>
+                        <span>Entrega cliente</span>
                         <strong id="cash-summary-given">${Number(amountGiven || 0).toLocaleString("es-AR")}</strong>
                     </div>
                     <div className="cash-summary-row cash-summary-row--highlight">

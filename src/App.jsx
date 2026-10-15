@@ -197,7 +197,7 @@ function App() {
         }
     }, []);
 
-    // "Consultar ficha de la clienta" desde una venta: lleva a Clientes y le pide abrir
+    // "Consultar ficha de la cliente" desde una venta: lleva a Clientes y le pide abrir
     // la ficha. ClientsPanel escucha el evento, así que tiene que estar montado
     // cuando llega (por eso se dispara después de cambiar de pestaña).
     const verCliente = useCallback((clienteId) => {

@@ -3081,7 +3081,7 @@ button:active {
     max-width: 520px;
 }
 
-/* El atajo "Consultar" de la clienta vive junto a su nombre dentro de la fila
+/* El atajo "Consultar" de la cliente vive junto a su nombre dentro de la fila
    (no en la cabecera de la ficha): se alinea al texto y no rompe la fila. */
 .detail-row .client-ficha-shortcut {
     margin-left: 10px;
@@ -3291,7 +3291,7 @@ button:active {
 
 /* Mobile: los botones pasan a quedar A UN LADO del dato en vez de una segunda
    fila. Con iconos de 44px, poner tres columnas dejaría el nombre en ~40px, así
-   que la hora sube sobre la clienta y la columna de acciones se acota a dos
+   que la hora sube sobre la cliente y la columna de acciones se acota a dos
    iconos por fila (44 + 6 + 44 = 94px). */
 @media (max-width: 520px) {
     .appointment-card.appointment-card--stacked {
@@ -3797,7 +3797,7 @@ button:active {
     gap: 6px;
 }
 
-/* Fila de acciones de la card de clientas: WhatsApp a la izquierda del ojo. */
+/* Fila de acciones de la card de clientes: WhatsApp a la izquierda del ojo. */
 .client-card-actions-row {
     display: flex;
     align-items: center;
@@ -4212,7 +4212,7 @@ button:active {
     text-align: center;
 }
 
-/* Formulario de invitación: mismo contenedor que el alta de Clientas — tarjeta
+/* Formulario de invitación: mismo contenedor que el alta de Clientes — tarjeta
    blanca con borde y sombra (no "pelado" sobre el fondo de la página). */
 .users-invite-form {
     display: grid;
@@ -4681,7 +4681,7 @@ button:active {
 }
 
 @media (min-width: 900px) {
-    /* La lista es el contenido que se lee (nombre de clienta + acciones) y el
+    /* La lista es el contenido que se lee (nombre de cliente + acciones) y el
        calendario es navegación: le sobra con su mínimo. Antes era 0.95fr/1.05fr,
        que dejaba la lista en ~478px en un viewport de 1280px. */
     .calendar-layout {
@@ -4766,7 +4766,7 @@ button:active {
 }
 
 /* Ventanas entre 900px y ~1200px: el calendario se queda con su mínimo de 420px y
-   la lista caía a ~230px, truncando el nombre de la clienta. Antes de ese ancho
+   la lista caía a ~230px, truncando el nombre de la cliente. Antes de ese ancho
    conviene apilar (lista arriba, calendario abajo) en vez de repartir en dos
    columnas que no entran. */
 @media (min-width: 900px) and (max-width: 1180px) {

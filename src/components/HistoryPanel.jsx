@@ -76,7 +76,7 @@ const normalizeServiceRecord = (item) => {
 };
 
 /**
- * Cuánto debe todavía la clienta de este servicio, o 0 si no debe nada.
+ * Cuánto debe todavía la cliente de este servicio, o 0 si no debe nada.
  * - Fiado puro: precio menos la seña ya cobrada (regla histórica).
  * - Combinado: la porción fiada que quedó al registrar (o al cobrar).
  * - Resto: nada.
@@ -307,7 +307,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
                         type="search"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Buscar clienta o servicio..."
+                        placeholder="Buscar cliente o servicio..."
                         className="search-input"
                     />
                     {search && (

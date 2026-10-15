@@ -19,7 +19,7 @@ Antes de este sistema, la operación del salón sufría estos dolores:
 | 🧾 Fiados dispersos → deudoras olvidadas | Panel de fiados pendientes + cobro integrado en Historial |
 | 📊 Cuadre mensual manual en Excel (3 horas) | KPIs automáticos: ingresos, gastos, neto, ticket promedio, deudoras, % por categoría |
 | 🏷 Precios sin catálogo → cada empleada cobra distinto | Catálogo oficial editable por admin solo |
-| 👩 Clientas sin ficha → no hay historial de repetición | Ficha individual por clienta con turnos + servicios históricos |
+| 👩 Clientes sin ficha → no hay historial de repetición | Ficha individual por cliente con turnos + servicios históricos |
 | 📱 Todo en una PC del local → no se puede revisar desde casa | **PWA instalable en celular** de cada empleada, con acceso según rol |
 
 ---
@@ -30,12 +30,12 @@ Antes de este sistema, la operación del salón sufría estos dolores:
 |---|---|
 | 🔐 **Autenticación multi-rol** | Inicio de sesión por email + contraseña (Supabase Auth). Dos perfiles: `admin` (dueña) y `usuaria` (manicurera). |
 | 📅 **Agenda de turnos** | Vista mensual + detalle diario. Agendar, reagendar, cancelar y **registrar seña para reservar**. Integración **opcional bidireccional con Google Calendar** vía Supabase Edge Function (turnos aparecen también en el calendario del salón). |
-| ➕ **Cobrar / Registrar Servicio** | Formulario mobile-first, accesible al **cobrar un turno** desde la Agenda. Categorías predefinidas (Semi, Kapping, Soft Gel, Esculpidas, Remoción, Personalizado), clienta existente o nueva, métodos de pago (Transferencia · Efectivo · **Combinado** · Fiado), cálculo automático de seña descontada y vuelto, retiro previo externo. El combinado reparte el neto entre efectivo + transferencia y deja el resto como saldo pendiente cobrable después (elige el medio al saldarlo). |
-| 🎟 **Ticket compartible por WhatsApp** | Al registrar se genera un ticket estilizado en `<canvas>` → exporta PNG → usa **Web Share API** con fallback de descarga para enviar por WhatsApp directo a la clienta. |
+| ➕ **Cobrar / Registrar Servicio** | Formulario mobile-first, accesible al **cobrar un turno** desde la Agenda. Categorías predefinidas (Semi, Kapping, Soft Gel, Esculpidas, Remoción, Personalizado), cliente existente o nueva, métodos de pago (Transferencia · Efectivo · **Combinado** · Fiado), cálculo automático de seña descontada y vuelto, retiro previo externo. El combinado reparte el neto entre efectivo + transferencia y deja el resto como saldo pendiente cobrable después (elige el medio al saldarlo). |
+| 🎟 **Ticket compartible por WhatsApp** | Al registrar se genera un ticket estilizado en `<canvas>` → exporta PNG → usa **Web Share API** con fallback de descarga para enviar por WhatsApp directo a la cliente. |
 | 📜 **Historial de ventas** | Filtros por período · categoría · método de pago. Cobro de fiados pendientes inline. Eliminación lógica de registros reservada solo a admin. |
 | 💳 **Gastos** | Registro y listado de egresos del salón (insumos, alquiler, servicios) con categoría y método. |
-| 📊 **Panel de Estadísticas** | KPIs: Ingresos brutos, Gastos, Fiados pendientes, **Balance neto**, Ticket promedio. Distribución % por categoría de servicio y listado de clientas deudoras ordenado por mayor deuda. |
-| 👩 **Gestión de Clientas** | Alta, edición, activar / desactivar y baja lógica. Ficha individual con historial de turnos y servicios prestados a cada clienta. |
+| 📊 **Panel de Estadísticas** | KPIs: Ingresos brutos, Gastos, Fiados pendientes, **Balance neto**, Ticket promedio. Distribución % por categoría de servicio y listado de clientes deudoras ordenado por mayor deuda. |
+| 👩 **Gestión de Clientes** | Alta, edición, activar / desactivar y baja lógica. Ficha individual con historial de turnos y servicios prestados a cada cliente. |
 | 🏷 **Catálogo de Precios** *(solo admin)* | Lista oficial editable de servicios y sus precios. Persistida en PostgreSQL. |
 | 🏦 **Gestión de Cajas** *(solo admin, flag opcional)* | Consolidado en tiempo real de Efectivo vs Mercado Pago + movimientos manuales (depósitos / extracciones) con trazabilidad. |
 | ⚙️ **Ajustes locales** *(solo admin)* | Toggles: habilitar fiado, habilitar módulo Cajas. Guardados en `localStorage` por dispositivo. |
@@ -133,7 +133,7 @@ SGEN/
 │   │   ├── CalendarBoard.jsx     #   Agenda calendario mensual
 │   │   ├── HistoryPanel.jsx      #   Historial + cobro de fiados
 │   │   ├── RegisterServiceForm.jsx # Alta de servicio / cobro
-│   │   ├── ClientsPanel.jsx      #   ABM + fichas de clientas
+│   │   ├── ClientsPanel.jsx      #   ABM + fichas de clientes
 │   │   ├── StatsPanel.jsx        #   KPIs + distribuciones
 │   │   ├── ExpensesPanel.jsx     #   Gestión de gastos
 │   │   ├── PricesPanel.jsx       #   Catálogo admin
@@ -219,7 +219,7 @@ npm run dev
 > **✅ Terminada y verificable** — el esquema, el bootstrap, las políticas RLS, las funciones Edge y los datos históricos están listos. Queda un solo paso de ejecución en el proyecto de Supabase (ver `supabase/MIGRATION_SUMMARY.md`).
 
 Los datos de negocio se cargan con `scripts/preparar-importacion.mjs`, que genera `csv/import_completo.sql`:
-- **84** clientas · **150** turnos · **173** servicios · **87** pagos · **35** gastos · **18** precios · **7** categorías.
+- **84** clientes · **150** turnos · **173** servicios · **87** pagos · **35** gastos · **18** precios · **7** categorías.
 - El paquete se ejecuta en una sola transacción (`begin;` / `commit;`) y verifica filas, estado de turnos y relaciones.
 
 Para aplicarla en el proyecto Supabase (`pbsumqgiwdsmeppfkpew` / Evolet Beauty):

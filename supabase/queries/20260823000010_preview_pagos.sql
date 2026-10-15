@@ -87,7 +87,7 @@ from payment_candidates
 where monto > 0
 order by fecha, cliente, tipo;
 
--- Casos potencialmente duplicados: la misma clienta tiene una fila Seña y un servicio
+-- Casos potencialmente duplicados: la misma cliente tiene una fila Seña y un servicio
 -- final con columna Seña. Revisarlos antes de importar pagos definitivos.
 select
     c.nombre as cliente,

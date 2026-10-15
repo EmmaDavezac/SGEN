@@ -91,7 +91,7 @@ Resultado esperado:
 
 **Objetivo:** confirmar que un servicio se puede cobrar con dos medios a la vez.
 
-1. Abrir Registrar Servicio y completar clienta, servicio y precio.
+1. Abrir Registrar Servicio y completar cliente, servicio y precio.
 2. Elegir el método `Combinado`.
 3. Cargar cuánto se cobra en Efectivo y cuánto en Transferencia (el resto queda como pendiente/fi­ado; si los pendientes están deshabilitados en Ajustes, el reparto debe cubrir el neto completo).
 4. Confirmar el registro.
@@ -123,27 +123,27 @@ Resultado esperado:
 - [ ] El metodo del gasto es correcto.
 - [ ] Se muestra mensaje de exito o warning explicito.
 
-## 5. Crear una clienta
+## 5. Crear una cliente
 
 1. Abrir Clientes.
-2. Crear una clienta con nombre y telefono.
+2. Crear una cliente con nombre y telefono.
 3. Confirmar el registro.
 4. Recargar la seccion.
 
 Resultado esperado:
 
-- [ ] La clienta aparece en el listado.
+- [ ] La cliente aparece en el listado.
 - [ ] Nombre y telefono son correctos.
 - [ ] No aparece Email ni Notas en la interfaz.
 - [ ] No se crean duplicados.
 
-## 6. Editar y eliminar una clienta
+## 6. Editar y eliminar una cliente
 
-- [ ] Abrir la ficha de una clienta.
+- [ ] Abrir la ficha de una cliente.
 - [ ] Editar nombre o telefono.
 - [ ] Guardar y recargar.
 - [ ] Confirmar que el cambio persiste.
-- [ ] Eliminar una clienta de prueba.
+- [ ] Eliminar una cliente de prueba.
 - [ ] Confirmar que desaparece del listado.
 
 ## 7. Crear, reagendar y cancelar un turno

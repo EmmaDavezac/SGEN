@@ -1,5 +1,15 @@
 # Changelog — SGEN
 
+## v1.3.3 — 2026-10-15 (SW v35)
+
+### Cambios
+- Lenguaje neutro: todas las referencias a "clienta"/"clientas" pasan a "cliente"/"clientes" en UI, documentos, comentarios, migraciones SQL y scripts (textos visibles y comentarios; sin tocar nombres de esquema ni identificadores ajenos al español).
+- Ajuste de concordancia de género en mensajes de notificación tras el cambio de sustantivo ("Cliente agregado correctamente", "Cliente eliminado del sistema", etc.).
+- Bump de `CACHE_VERSION` en `public/sw.js` (v34 → v35) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- (hash se completa tras el commit)
+
 ## v1.3.2 — 2026-10-15 (SW v34)
 
 ### Cambios

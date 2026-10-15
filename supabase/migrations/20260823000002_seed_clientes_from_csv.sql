@@ -1,5 +1,5 @@
 -- Importacion inicial de 46 clientes desde los CSV exportados.
--- Es idempotente: los nombres repetidos se conservan como una sola clienta.
+-- Es idempotente: los nombres repetidos se conservan como una sola cliente.
 
 insert into public.clientes (nombre)
 values

@@ -191,15 +191,15 @@ function VentaDetalleModal({
                 <div className="detail-block">
                     <h4>Servicio realizado</h4>
                     <div className="detail-block-rows">
-                        {/* El atajo a la ficha de la clienta vive junto a su
+                        {/* El atajo a la ficha de la cliente vive junto a su
                             nombre (no en la cabecera), como en las listas. */}
-                        <Fila label="Clienta">
+                        <Fila label="Cliente">
                             {service.cliente || 'Cliente'}
                             {onVerCliente && service.clienteId && (
                                 <DetailActionButton
                                     icon="fa-eye"
                                     label="Consultar"
-                                    title="Consultar ficha de la clienta"
+                                    title="Consultar ficha de la cliente"
                                     className="client-ficha-shortcut"
                                     onClick={() => onVerCliente(service.clienteId)}
                                 />
@@ -282,7 +282,7 @@ function VentaDetalleModal({
 
     // El subtítulo describe el contenido (como en la ficha de cliente y de
     // usuario): cliente y fecha ya aparecen en las secciones de abajo
-    // ("Clienta", "Fecha y horario" / "Registrado"), no hace falta repetirlos.
+    // ("Cliente", "Fecha y horario" / "Registrado"), no hace falta repetirlos.
     const fichaSubtitle = appointment
         ? 'Datos del turno, cobro y pagos'
         : 'Datos de la venta, cobro y pagos';
