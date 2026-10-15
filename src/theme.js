@@ -4,12 +4,36 @@ import { BUSINESS, obtenerTema } from './businessConfig.js';
 const TEMA_STORAGE_KEY = 'sgen_tema';
 const MODO_STORAGE_KEY = 'sgen_modo';
 
+// Valores posibles de modo: 'claro' | 'oscuro' | 'sistema'
+const MODO_SISTEMA = 'sistema';
+
+// Detecta si el dispositivo pide modo oscuro via prefers-color-scheme.
+function modoDelDispositivo() {
+  if (typeof window === 'undefined' || !window.matchMedia) {
+    return 'claro';
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro';
+}
+
+// Resuelve el modo efectivo a aplicar: localStorage > prefers-color-scheme del dispositivo > BUSINESS.modo.
+function resolverModo(modoGuardado) {
+  if (modoGuardado) {
+    return modoGuardado;
+  }
+  if (modoDelDispositivo() === 'oscuro') {
+    return 'oscuro';
+  }
+  return BUSINESS.modo || 'claro';
+}
+
 // Inyecta las variables de color del tema (y modo) como CSS custom properties en :root.
 // Así style.css puede seguir usando var(--brand-primary, ...) y el tema activo
 // las sobrescribe sin tocar la hoja de estilos. Permite cambiar de tema/modo sin recargar.
 // El mismo tema (ej. 'barbie') soporta los modos 'claro' y 'oscuro'.
 export function aplicarTema(nombreTema, modo = 'claro') {
-  const tema = obtenerTema(nombreTema, modo);
+  // Resuelve 'sistema' a claro/oscuro según prefers-color-scheme del dispositivo.
+  const modoResuelto = modo === MODO_SISTEMA ? modoDelDispositivo() : modo;
+  const tema = obtenerTema(nombreTema, modoResuelto);
   const root = document.documentElement;
 
   for (const [propiedad, valor] of Object.entries(tema)) {
@@ -27,19 +51,22 @@ export function aplicarTema(nombreTema, modo = 'claro') {
   return { nombreTema, modo };
 }
 
-// Lee el tema y el modo guardados o los defaults de BUSINESS y los aplica.
+// Lee el tema y el modo guardados o los defaults del dispositivo / negocio y los aplica.
+// Por defecto respeta prefers-color-scheme del dispositivo.
 export function inicializarTema() {
   const guardadoTema = localStorage.getItem(TEMA_STORAGE_KEY) || BUSINESS.tema;
-  const guardadoModo = localStorage.getItem(MODO_STORAGE_KEY) || BUSINESS.modo;
-  return aplicarTema(guardadoTema, guardadoModo);
+  const guardadoModo = localStorage.getItem(MODO_STORAGE_KEY);
+  const modo = resolverModo(guardadoModo);
+  return aplicarTema(guardadoTema, modo);
 }
 
-// Devuelve el modo actualmente activo ('claro' | 'oscuro').
+// Devuelve el modo actualmente activo ('claro' | 'oscuro' | 'sistema').
 export function obtenerModo() {
   try {
-    return localStorage.getItem(MODO_STORAGE_KEY) || BUSINESS.modo;
+    const guardado = localStorage.getItem(MODO_STORAGE_KEY);
+    return resolverModo(guardado);
   } catch (e) {
-    return BUSINESS.modo;
+    return resolverModo(null);
   }
 }
 
@@ -49,5 +76,12 @@ export function alternarModo(nombreTema = BUSINESS.tema) {
   const nuevo = actual === 'claro' ? 'oscuro' : 'claro';
   return aplicarTema(nombreTema, nuevo);
 }
+
+// Establece el modo explícitamente ('claro' | 'oscuro' | 'sistema') y lo aplica.
+export function establecerModo(modo, nombreTema = BUSINESS.tema) {
+  return aplicarTema(nombreTema, modo);
+}
+
+export { MODO_SISTEMA };
 
 export { obtenerTema };

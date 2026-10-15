@@ -1,6 +1,7 @@
 import React from 'react';
+import { MODO_SISTEMA } from '../theme.js';
 
-function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
+function SettingsPanel({ settings = {}, onChangeSettings, onChangeModo, modo, notify }) {
     const { allowFiado, allowCajasTab, allowDaySearch, allowDayFilter } = settings;
 
     const handleToggle = (key, checked) => {
@@ -92,6 +93,22 @@ function SettingsPanel({ settings = {}, onChangeSettings, notify }) {
                         />
                         <span className="slider"></span>
                     </label>
+                </div>
+
+                <div className="setting-row">
+                    <span>
+                        <i className="fa-solid fa-palette setting-icon"></i>
+                        Apariencia
+                    </span>
+                    <select
+                        className="setting-select"
+                        value={modo || MODO_SISTEMA}
+                        onChange={(e) => onChangeModo(e.target.value)}
+                    >
+                        <option value={MODO_SISTEMA}>Seguir el dispositivo (sistema)</option>
+                        <option value="claro">Claro</option>
+                        <option value="oscuro">Oscuro</option>
+                    </select>
                 </div>
             </div>
 

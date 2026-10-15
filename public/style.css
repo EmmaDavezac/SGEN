@@ -318,7 +318,7 @@ button {
 }
 
 .app-update-card {
-    background: var(--white);
+    background: var(--surface-bg);
     border: 2px solid var(--brand-pale);
     border-radius: var(--radius-lg);
     box-shadow: none;
@@ -388,7 +388,7 @@ button {
 }
 
 .toast {
-    background: var(--white);
+    background: var(--surface-bg);
     color: var(--text-color);
     padding: 14px 20px;
     border-radius: var(--radius-md);
@@ -461,7 +461,7 @@ button {
 }
 
 .login-card {
-    background: var(--white);
+    background: var(--surface-bg);
     border: 2px solid var(--brand-pale);
     padding: 36px 30px;
     border-radius: var(--radius-lg);
@@ -563,7 +563,7 @@ button {
 .form-group input[type="url"],
 .form-group select,
 .form-group textarea {
-    background: var(--white);
+    background: var(--surface-bg);
     border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
     padding: 12px 16px;
@@ -707,14 +707,14 @@ button:disabled {
 
 .btn-primary:hover:not(:disabled),
 .btn-primary:active:not(:disabled) {
-    background: var(--white);
+    background: var(--surface-bg);
     color: var(--brand-dark);
     border-color: var(--brand-primary);
     box-shadow: none;
 }
 
 .btn-secondary {
-    background: var(--white);
+    background: var(--surface-bg);
     border-color: var(--brand-primary);
     color: var(--brand-dark);
 }
@@ -755,7 +755,7 @@ button:disabled {
 }
 
 .btn-primary.is-pressed:not(:disabled) {
-    background: var(--white);
+    background: var(--surface-bg);
     color: var(--brand-dark);
     border-color: var(--brand-primary);
 }
@@ -841,14 +841,14 @@ button:disabled {
 
 /* Header Superior */
 .app-header {
-    background: var(--white);
+    background: var(--surface-bg);
     border-bottom: 2px solid var(--brand-pale);
     padding: 15px 20px 10px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    box-shadow: 0 4px 12px rgba(90, 61, 70, 0.05);
+    box-shadow: var(--shadow-md);
     z-index: 50;
 }
 
@@ -1137,7 +1137,7 @@ button:disabled {
     font-size: 13px;
     padding: 10px 18px;
     border-radius: 50px;
-    background: var(--white);
+    background: var(--surface-bg);
     color: var(--text-color);
     border: 2px solid var(--brand-light);
     box-sizing: border-box;
@@ -1166,7 +1166,7 @@ button:disabled {
 }
 
 .btn-service {
-    background: var(--white);
+    background: var(--surface-bg);
     border: 2px solid var(--brand-pale);
     padding: 14px 10px;
     border-radius: var(--radius-md);
@@ -1203,7 +1203,7 @@ button:disabled {
 }
 
 .btn-service:hover:not(.active) {
-    background: var(--white);
+    background: var(--surface-bg);
     border-color: var(--brand-primary);
     color: var(--brand-dark);
     box-shadow: none;
@@ -1229,7 +1229,7 @@ button:disabled {
 }
 
 .pay-btn-content {
-    background: var(--white);
+    background: var(--surface-bg);
     border: 2px solid var(--brand-pale);
     padding: 10px 5px;
     border-radius: var(--radius-md);
@@ -1269,7 +1269,7 @@ button:disabled {
 .search-input {
     flex: 1;
     min-height: 42px;
-    background: var(--white);
+    background: var(--surface-bg);
     border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
     padding: 10px 14px;
@@ -1282,7 +1282,7 @@ button:disabled {
     max-width: 140px;
     border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
-    background-color: var(--white);
+    background-color: var(--surface-bg);
     color: var(--text-color);
     font-weight: 500;
     padding: 0 10px;
@@ -1322,7 +1322,7 @@ button:disabled {
     padding: 10px;
     border: 1px solid var(--brand-light);
     border-radius: var(--radius-md);
-    background: var(--white);
+    background: var(--surface-bg);
 }
 
 .list-empty-state {
@@ -1332,7 +1332,7 @@ button:disabled {
     padding: 18px;
     border: 1px dashed var(--brand-light);
     border-radius: var(--radius-md);
-    background: var(--white);
+    background: var(--surface-bg);
     color: var(--text-muted);
     text-align: center;
     font-size: 13px;
@@ -1483,7 +1483,7 @@ button:disabled {
     border: 1px solid var(--brand-light);
     border-radius: 999px;
     color: var(--text-color);
-    background: var(--white);
+    background: var(--surface-bg);
     font-size: 11px;
     font-weight: 700;
 }
@@ -1508,7 +1508,7 @@ button:disabled {
     padding: 5px;
     border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
-    background: var(--white);
+    background: var(--surface-bg);
     box-shadow: 0 10px 24px rgba(90, 61, 70, .16);
 }
 
@@ -1553,7 +1553,7 @@ button:disabled {
 }
 
 .history-card {
-    background: var(--white);
+    background: var(--surface-bg);
     border-radius: var(--radius-sm);
     padding: 12px;
     border: 2px solid var(--brand-pale);
@@ -1684,7 +1684,7 @@ button:disabled {
     padding: 0;
     border: 1px solid var(--brand-pale);
     border-radius: 50%;
-    background: var(--white);
+    background: var(--surface-bg);
     color: var(--text-light);
     font-size: 13px;
     cursor: pointer;
@@ -1790,7 +1790,7 @@ button:disabled {
 .card-icon-btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;
-    background: var(--white);
+    background: var(--surface-bg);
     border-color: var(--brand-pale);
     color: var(--text-light);
     transform: none;
@@ -1808,7 +1808,7 @@ button:disabled {
 }
 
 .stat-card {
-    background: var(--white);
+    background: var(--surface-bg);
     border-radius: var(--radius-md);
     padding: 16px 12px;
     border: 2px solid var(--brand-pale);
@@ -1835,7 +1835,7 @@ button:disabled {
 
 #tab-estadisticas .stat-card.pink-glow {
     border-color: var(--brand-pale);
-    background: var(--white);
+    background: var(--surface-bg);
     box-shadow: none;
 }
 
@@ -1864,7 +1864,7 @@ button:disabled {
 }
 
 .chart-section {
-    background: var(--white);
+    background: var(--surface-bg);
     border-radius: var(--radius-lg);
     border: 2px solid var(--brand-pale);
     padding: 18px;
@@ -1957,7 +1957,7 @@ button:disabled {
 /* Ajustes: la nota informativa comparte la superficie unificada de tarjetas
    (blanco, borde --brand-pale, radius-sm, sin sombra) en vez del fondo rosa. */
 #tab-ajustes .card-info-box {
-    background-color: var(--white);
+    background-color: var(--surface-bg);
     border: 2px solid var(--brand-pale);
     border-radius: var(--radius-sm);
     box-shadow: none;
@@ -1977,7 +1977,7 @@ button:disabled {
     left: 5%;
     width: 90%;
     height: 65px;
-    background: var(--white);
+    background: var(--surface-bg);
     border: 2px solid var(--brand-pale);
     border-radius: 50px;
     display: flex;
@@ -2008,7 +2008,7 @@ button:disabled {
     color: var(--brand-dark);
     background: var(--brand-pale);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(90, 61, 70, 0.12);
+    box-shadow: var(--shadow-md);
 }
 
 .nav-icon {
@@ -2076,7 +2076,7 @@ button:disabled {
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: var(--white);
+    background: var(--surface-bg);
     border: 2px solid var(--brand-pale);
     box-shadow: var(--shadow-md);
     color: var(--brand-dark);
@@ -2248,7 +2248,7 @@ button:disabled {
     border: 1px solid var(--brand-pale);
     border-radius: 50%;
     color: var(--text-muted);
-    background: var(--white);
+    background: var(--surface-bg);
     cursor: pointer;
 }
 
@@ -2274,7 +2274,7 @@ button:disabled {
 }
 
 .modal-body {
-    background: var(--white);
+    background: var(--surface-bg);
     border: 2px solid var(--brand-pale);
     border-radius: var(--radius-md);
     padding: 16px;
@@ -2283,8 +2283,8 @@ button:disabled {
 }
 
 .cash-summary-card {
-    background: #fff8fc;
-    border: 1px solid #f4c4d8;
+    background: var(--cream-bg);
+    border: 1px solid var(--border-neutral);
     border-radius: 14px;
     padding: 12px;
     margin-top: 12px;
@@ -2307,10 +2307,10 @@ button:disabled {
 }
 
 .cash-summary-row--highlight {
-    background: #fff0f5;
+    background: var(--brand-pale);
     border-radius: 10px;
     padding: 6px 8px;
-    color: #b7286e;
+    color: var(--brand-dark);
 }
 
 .cash-helper-text {
@@ -2468,7 +2468,7 @@ button:active {
 }
 
 .btn-danger:hover {
-    background: var(--white);
+    background: var(--surface-bg);
     color: #b92d43 !important;
     border-color: #dc3f55;
     box-shadow: none;
@@ -2513,7 +2513,7 @@ button:active {
     padding: 14px;
     border: 1px solid var(--brand-pale);
     border-radius: var(--radius-md);
-    background: var(--white);
+    background: var(--surface-bg);
     box-shadow: 0 2px 8px rgba(90, 61, 70, 0.02);
 }
 
@@ -2534,7 +2534,7 @@ button:active {
     padding: 8px 12px;
     border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
-    background: var(--white);
+    background: var(--surface-bg);
     color: var(--text-color);
     font: inherit;
     font-size: 14px;
@@ -2842,11 +2842,11 @@ button:active {
    ESTILOS PARA EL CALENDARIO / AGENDA
    ========================================================================= */
 .calendar-card {
-    background: var(--white);
+    background: var(--surface-bg);
     border: 2px solid var(--brand-pale);
     border-radius: var(--radius-md);
     padding: 18px;
-    box-shadow: 0 4px 12px rgba(90, 61, 70, 0.02);
+    box-shadow: var(--shadow-md);
     margin-bottom: 25px;
     position: relative;
 }
@@ -2883,7 +2883,7 @@ button:active {
 
 .btn-cal-nav:hover,
 .btn-cal-nav:active {
-    background: var(--white);
+    background: var(--surface-bg);
     color: var(--brand-dark);
     border-color: var(--brand-primary);
 }
@@ -2992,93 +2992,93 @@ button:active {
 
 /* Modificadores para pildoras del calendario según el estado */
 .event-preview-pill.provisional {
-    background-color: #f3f4f6;
-    color: #4b5563;
-    border-left-color: #f59e0b; /* Borde ámbar/naranja provisional */
+    background-color: var(--estado-pill-provisional-bg);
+    color: var(--estado-pill-provisional-color);
+    border-left-color: var(--estado-pill-provisional-border);
 }
 .event-preview-pill.reservado,
 .event-preview-pill.reserved {
-    background-color: #e0f2fe;
-    color: #0369a1;
-    border-left-color: #0284c7; /* Borde azul reservado */
+    background-color: var(--estado-pill-reservado-bg);
+    color: var(--estado-pill-reservado-color);
+    border-left-color: var(--estado-pill-reservado-border);
 }
 .event-preview-pill.completado,
 .event-preview-pill.completed {
-    background-color: #e8f5e9; /* verde suave */
-    color: #1b5e20; /* verde oscuro */
-    border-left-color: #2e7d32; /* borde verde */
+    background-color: var(--estado-pill-completado-bg);
+    color: var(--estado-pill-completado-color);
+    border-left-color: var(--estado-pill-completado-border);
 }
 
 /* Modificadores para tarjetas del listado de turnos */
 .appointment-card.provisional {
-    border: 2px dashed #d1d5db;
-    background-color: #f9fafb;
+    border: 2px dashed var(--estado-provisional-border);
+    background-color: var(--estado-provisional-bg);
 }
 .appointment-card.provisional .appointment-time-start {
-    color: #6b7280;
+    color: var(--estado-provisional-color);
 }
 .appointment-card.provisional:hover {
-    border-color: #9ca3af;
+    border-color: var(--estado-provisional-border);
     transform: none;
 }
 
 .appointment-card.reservado,
 .appointment-card.reserved {
-    border: 2px solid #7dd3fc;
-    background-color: #f0f9ff;
+    border: 2px solid var(--estado-reservado-border);
+    background-color: var(--estado-reservado-bg);
     box-shadow: 0 2px 8px rgba(90, 61, 70, 0.08);
 }
 .appointment-card.reservado .appointment-time-start,
 .appointment-card.reserved .appointment-time-start {
-    color: #0284c7;
+    color: var(--estado-reservado-color);
     font-weight: 700;
 }
 .appointment-card.reservado:hover,
 .appointment-card.reserved:hover {
-    border-color: #0284c7;
+    border-color: var(--estado-reservado-border);
     transform: none;
 }
 
 .appointment-card.completado,
 .appointment-card.completed {
-    border: 2px solid #2e7d32; /* verde */
-    background: linear-gradient(135deg, #f1f8ee 70%, #e8f5e9 100%);
+    border: 2px solid var(--estado-completado-border);
+    background: linear-gradient(135deg, var(--estado-completado-bg) 70%, var(--estado-pill-completado-bg) 100%);
 }
 .appointment-card.completado .appointment-time-start,
 .appointment-card.completed .appointment-time-start {
-    color: #1b5e20; /* verde oscuro */
+    color: var(--estado-completado-color);
 }
 .appointment-card.completado:hover,
 .appointment-card.completed:hover {
-    border-color: #2e7d32;
+    border-color: var(--estado-completado-border);
     transform: none;
 }
 
 /* Turnos cancelados: apagados, sin borde de color, para que no compitan con
    los activos. Antes caían en el modificador "reservado" por error. */
 .appointment-card.cancelado {
-    border: 2px dashed #e5e7eb;
-    background-color: #fafafa;
+    border: 2px dashed var(--estado-cancelado-border);
+    background-color: var(--estado-cancelado-bg);
     opacity: 0.75;
 }
 .appointment-card.cancelado .appointment-time-start {
-    color: #9ca3af;
+    color: var(--estado-cancelado-color);
 }
 .appointment-card.cancelado:hover {
-    border-color: #d1d5db;
+    border-color: var(--estado-cancelado-border);
     transform: none;
 }
 
 .event-preview-pill.cancelado {
-    background-color: #f3f4f6;
-    color: #9ca3af;
-    border-left-color: #d1d5db;
+    background-color: var(--estado-pill-cancelado-bg);
+    color: var(--estado-pill-cancelado-color);
+    border-left-color: var(--estado-pill-cancelado-border);
     text-decoration: line-through;
 }
 
 .status-tag.cancelado {
-    background-color: #F3F4F6;
-    color: #6B7280;
+    background-color: var(--estado-pill-cancelado-bg);
+    color: var(--estado-pill-cancelado-color);
 }
 
 /* Ficha unificada de venta y turno (VentaDetalleModal), ambos formatos */
@@ -3162,7 +3162,7 @@ button:active {
     padding: 8px 10px;
     border: 1px solid var(--brand-pale);
     border-radius: 10px;
-    background: var(--white);
+    background: var(--surface-bg);
     font-size: 13px;
 }
 
@@ -3462,7 +3462,7 @@ button:active {
 
 .calendar-add-btn:hover,
 .calendar-add-btn:active {
-    background: var(--white);
+    background: var(--surface-bg);
     color: var(--brand-dark);
     border-color: var(--brand-primary);
     box-shadow: none;
@@ -3532,7 +3532,7 @@ button:active {
     gap: 12px;
     padding: 12px 14px;
     margin-top: 10px;
-    background: var(--white);
+    background: var(--surface-bg);
     border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
     color: var(--text-color);
@@ -3548,6 +3548,29 @@ button:active {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.setting-select {
+    margin-left: auto;
+    padding: 6px 10px;
+    border: 2px solid var(--brand-pale);
+    border-radius: var(--radius-sm);
+    background: var(--surface-bg);
+    color: var(--text-color);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239E7D86' d='M6 8.5L1 3.5h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    min-width: 200px;
+}
+
+.setting-select:focus {
+    outline: none;
+    border-color: var(--brand-primary);
 }
 
 @media (max-width: 520px) {
@@ -3582,7 +3605,7 @@ button:active {
     padding: 8px;
     border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
-    background: var(--white);
+    background: var(--surface-bg);
     box-shadow: 0 12px 28px rgba(90, 61, 70, .18);
 }
 
@@ -3668,7 +3691,7 @@ button:active {
     padding: 20px;
     border: 1px solid var(--brand-pale);
     border-radius: var(--radius-md);
-    background: var(--white);
+    background: var(--surface-bg);
     box-shadow: var(--shadow-md);
 }
 
@@ -3999,7 +4022,7 @@ button:active {
 .stats-panel {
     border-radius: var(--radius-lg);
     border: 2px solid var(--brand-pale);
-    background: var(--white);
+    background: var(--surface-bg);
     box-shadow: 0 4px 12px rgba(90, 61, 70, 0.02);
 }
 
@@ -4097,7 +4120,7 @@ button:active {
 }
 .route-not-found-copy .home-link:hover,
 .route-not-found-copy .home-link:active {
-    background: var(--white);
+    background: var(--surface-bg);
     color: var(--brand-dark);
     border-color: var(--brand-primary);
 }
@@ -4226,7 +4249,7 @@ button:active {
     padding: 20px;
     border: 1px solid var(--brand-pale);
     border-radius: var(--radius-md);
-    background: var(--white);
+    background: var(--surface-bg);
     box-shadow: var(--shadow-md);
 }
 
@@ -4335,7 +4358,7 @@ button:active {
     border: 2px solid var(--brand-light);
     border-radius: 10px;
     color: var(--text-color);
-    background: var(--white);
+    background: var(--surface-bg);
     font: inherit;
     font-size: 12px;
     cursor: pointer;
@@ -4444,7 +4467,7 @@ button:active {
     padding: 12px 14px;
     border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
-    background: var(--white);
+    background: var(--surface-bg);
 }
 
 .external-removal-label {
@@ -4575,7 +4598,7 @@ button:active {
 
 .cash-return-method-grid .pay-btn {
     border: 2px solid rgba(255, 105, 180, 0.2);
-    background: var(--white);
+    background: var(--surface-bg);
 }
 
 .cash-return-method-grid .pay-btn.is-selected {
@@ -4990,7 +5013,7 @@ button:active {
     padding: 14px;
     border: 2px solid var(--brand-pale);
     border-radius: var(--radius-md);
-    background: var(--white);
+    background: var(--surface-bg);
     box-shadow: var(--shadow-md);
     transition: var(--transition);
 }
@@ -5048,7 +5071,7 @@ button:active {
     padding: 12px;
     border: 2px solid var(--brand-pale);
     border-radius: var(--radius-sm);
-    background: var(--white);
+    background: var(--surface-bg);
     box-shadow: none;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -5247,7 +5270,7 @@ button:active {
     width: 100%;
     min-height: 44px;
     padding: 10px 14px 10px 40px;
-    background: var(--white);
+    background: var(--surface-bg);
     border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
     color: var(--text-color);
@@ -5295,7 +5318,7 @@ button:active {
     padding: 12px 14px;
     border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
-    background: var(--white);
+    background: var(--surface-bg);
     cursor: pointer;
     font-weight: 600;
     color: var(--text-color);

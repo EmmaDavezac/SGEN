@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { signInWithSupabase, supabase } from './supabase.js';
 import AppLayout from './components/AppLayout.jsx';
 import { BUSINESS } from './businessConfig.js';
+import { obtenerModo, establecerModo, MODO_SISTEMA } from './theme.js';
 import Button, { DetailActionButton, PanelCancelButton, PanelSaveButton } from './components/Button.jsx';
 import WriteProgressOverlay from './components/WriteProgressOverlay.jsx';
 import { runSteps, createSteps } from './progressTask.js';
@@ -144,6 +145,8 @@ function App() {
     const [confirmation, setConfirmation] = useState(null);
     // true cuando algún panel tiene un formulario de creación/edición abierto.
     const [formGuardActive, setFormGuardActive] = useState(false);
+    // Modo de apariencia: 'claro' | 'oscuro' | 'sistema'. Por defecto respeta el dispositivo.
+    const [modo, setModoState] = useState(() => obtenerModo());
     const toastNotifyRef = useRef(null);
 
     const initialSession = readStoredSession();
@@ -190,6 +193,16 @@ function App() {
 
     // Suscripción al guardia global de formularios (ver src/formGuard.js).
     useEffect(() => subscribeToFormGuard(setFormGuardActive), []);
+
+    // Cuando el modo es 'sistema', reaplica el tema si el dispositivo cambia
+    // su prefers-color-scheme (claro <-> oscuro).
+    useEffect(() => {
+        if (modo !== MODO_SISTEMA) return undefined;
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const handler = () => establecerModo(MODO_SISTEMA);
+        media.addEventListener('change', handler);
+        return () => media.removeEventListener('change', handler);
+    }, [modo]);
 
     // Normaliza la ruta si la PWA o el navegador abre directamente desde /index.html.
     useEffect(() => {
@@ -762,6 +775,11 @@ function App() {
         setSettings((prev) => ({ ...prev, [key]: !!checked }));
     }, []);
 
+    const handleChangeModo = useCallback((nuevoModo) => {
+        setModoState(nuevoModo);
+        establecerModo(nuevoModo);
+    }, []);
+
     return (
         <>
             <ConfirmModal
@@ -1044,6 +1062,8 @@ function App() {
                         <SettingsPanel
                             settings={settings}
                             onChangeSettings={handleChangeSettings}
+                            onChangeModo={handleChangeModo}
+                            modo={modo}
                             notify={notify}
                         />
                     )}

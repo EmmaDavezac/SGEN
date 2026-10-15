@@ -1,5 +1,18 @@
 # Changelog — SGEN
 
+## v1.3.7 — 2026-10-15 (SW v41)
+
+### Cambios
+- El tema por defecto ahora sigue el dispositivo (`prefers-color-scheme`) en lugar de estar hardcodeado: si no hay elección guardada en localStorage, se usa el modo del sistema; si el dispositivo cambia de claro a oscuro, la app se adapta automáticamente.
+- Eliminado el botón "Activar modo oscuro / claro" del menú de cuenta en el header.
+- Agregado selector de apariencia en la pestaña Ajustes: "Seguir el dispositivo (sistema)", "Claro", "Oscuro". La elección se guarda en localStorage y se aplica sin recargar.
+- `src/theme.js`: nuevas funciones `establecerModo(modo)`, `MODO_SISTEMA` constante, y `aplicarTema` resuelve `'sistema'` a claro/oscuro según `prefers-color-scheme`. `inicializarTema()` y `obtenerModo()` respetan el orden: localStorage > dispositivo > `BUSINESS.modo`.
+- `BUSINESS.modo` documentado como valor de respaldo cuando no hay localStorage ni prefers-color-scheme disponible.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v40 → v41) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- (pendiente de commit)
+
 ## v1.3.6 — 2026-10-15 (SW v39)
 
 ### Cambios
