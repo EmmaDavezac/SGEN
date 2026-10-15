@@ -10,7 +10,7 @@
 - Bump de `CACHE_VERSION` en `public/sw.js` (v36 → v37) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
-- (hash se completa tras el commit)
+- 9081ffa feat(tema): modo oscuro para el tema barbie (mismo tema, sin crear uno nuevo) (SW v36 → v37)
 
 ## v1.3.4 — 2026-10-15 (SW v36)
 
