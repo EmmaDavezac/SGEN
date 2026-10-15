@@ -11,7 +11,7 @@
 - Bump de `CACHE_VERSION` en `public/sw.js` (v35 → v36) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
-- (hash se completa tras el commit)
+- bdeeb7a feat(white-label): negocio y tema configurables para portear a otros salones (SW v35 → v36)
 
 ## v1.3.3 — 2026-10-15 (SW v35)
 
