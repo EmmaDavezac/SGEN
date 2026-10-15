@@ -13,11 +13,12 @@
  *                        │                                   │                                    │
  *                        │                            Reagendar (mover)                          │ (solo lectura)
  *                        │                            Cancelar (ya pasó, con motivo)              │
- *                        └ Eliminar (cualquier sesión)      └ Eliminar → solo superadmin          └ Eliminar → solo superadmin
+ *                        └ Eliminar (cualquier sesión)      └ Eliminar en cascada → solo superadmin      └ Eliminar en cascada → solo superadmin
  *
  * Cancelar no borra: el turno queda como cancelado con su motivo, la seña y el
  * historial siguen consultables. Eliminar borra la fila y solo aplica a
- * provisionales.
+ * provisionales; el superadmin puede borrar en cascada (turno + servicio +
+ * pagos) cualquier turno con confirmación explícita.
  *
  * El módulo no importa nada (ni supabase) para poder testearse en aislamiento.
  */

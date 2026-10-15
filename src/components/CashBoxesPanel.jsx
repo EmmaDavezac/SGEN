@@ -58,7 +58,12 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                     const neto = Math.max(0, Number(s.precio) - Number(s.sena));
                     if (metodo === 'efectivo') cash += neto;
                     else if (metodo === 'transferencia') mp += neto;
-                    else if (metodo === 'fiado') {
+                    else if (metodo === 'combinado') {
+                        // Cobro combinado: cada caja lleva solo lo que se cobró
+                        // en su medio; la porción fiada no entra a ninguna.
+                        cash += Number(s.monto_efectivo) || 0;
+                        mp += Number(s.monto_transferencia) || 0;
+                    } else if (metodo === 'fiado') {
                     }
                 });
             }

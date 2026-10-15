@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getValidSession, supabase } from '../supabase.js';
 import Modal, { ConfirmModal, ModalCancelButton, ModalConfirmButton } from './Modal.jsx';
 import { ListIconButton, PanelSaveButton } from './Button.jsx';
-import { cancelAppointmentInDatabase, deleteAppointmentFromDatabase, hasLinkedServiceForTurno, hasSenaForTurno, loadAppointmentsFromDatabase, loadClientsFromDatabase, registerPaymentRecord, saveAppointmentToDatabase, saveClientToDatabase, updateAppointmentInDatabase } from '../services.js';
+import { cancelAppointmentInDatabase, deleteAppointmentFromDatabase, deleteTurnoCascade, hasLinkedServiceForTurno, hasSenaForTurno, loadAppointmentsFromDatabase, loadClientsFromDatabase, registerPaymentRecord, saveAppointmentToDatabase, saveClientToDatabase, updateAppointmentInDatabase } from '../services.js';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import VentaDetalleModal from './VentaDetalleModal.jsx';
 import { estadoBadgeClass, estadoLabel, getAppointmentActions, getVisibleAppointmentActions, normalizeTurnoEstado } from '../appointmentActions.js';
@@ -898,7 +898,10 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
       return;
     }
     // La seña vive en pagos y el cobro en servicios: ambos con FK al turno.
-    // Si existen, el DELETE fallaría, así que lo avisamos antes de prometerlo.
+    // Si existen, el DELETE simple fallaría, así que lo avisamos antes de
+    // prometerlo. Excepción: el superadmin puede borrar en cascada (turno +
+    // servicio + pagos), así que en ese caso se confirma igual y se avisa
+    // que se borrarán también los pagos.
     const turnoId = apt.rawId || apt.legacy_id || apt.id;
     try {
       const [tieneSena, tieneServicio] = await Promise.all([
@@ -906,6 +909,10 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
         hasLinkedServiceForTurno(turnoId).catch(() => false)
       ]);
       if (tieneSena || tieneServicio) {
+        if (isSuperadmin) {
+          setDeleteConfirm({ ...apt, cascade: true, tieneSena, tieneServicio });
+          return;
+        }
         if (notify) notify(
           tieneServicio
             ? 'El turno ya tiene un servicio cobrado asociado: eliminarlo rompería el historial de caja.'
@@ -926,17 +933,27 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
     setDeleting(true);
     const target = deleteConfirm;
     const databaseId = target.rawId || target.legacy_id || target.id;
-    // 1) Borrado total en Supabase primero (solo provisional/reservado sin seña).
-    // Si la manicurista es dueña o es admin, RLS lo autoriza.
+    const cascade = Boolean(target.cascade) && isSuperadmin;
+    // 1) Borrado total en Supabase primero. Sin seña/servicio: DELETE simple
+    // (dueña o admin según RLS). Con seña/servicio: solo superadmin, en
+    // cascada (pagos → servicio → turno).
     try {
       await runTask({
         title: 'Eliminando turno',
         steps: [
           {
-            label: 'Eliminando el turno',
+            label: cascade ? 'Eliminando el turno y sus pagos' : 'Eliminando el turno',
             run: async () => {
               try {
-                await deleteAppointmentFromDatabase(databaseId);
+                if (cascade) {
+                  const resumen = await deleteTurnoCascade(databaseId);
+                  if (notify) notify(
+                    `Turno eliminado en cascada: turno + ${resumen.servicios} servicio(s) + ${resumen.pagos} pago(s).`,
+                    'success'
+                  );
+                } else {
+                  await deleteAppointmentFromDatabase(databaseId);
+                }
               } catch (error) {
                 const lower = (error.message || '').toLowerCase();
                 const msg = lower.includes('foreign key')
@@ -1825,13 +1842,15 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
 
       <ConfirmModal
         open={!!deleteConfirm}
-        title="¿Eliminar Turno definitivamente?"
+        title={deleteConfirm?.cascade ? '¿Eliminar turno y pagos en cascada?' : '¿Eliminar Turno definitivamente?'}
         message={
           deleteConfirm
-            ? `Se eliminará TOTALMENTE el turno de ${deleteConfirm.cliente || 'Cliente'} para el ${formatDateArgentina(deleteConfirm.fecha)} a las ${formatTimeLabel(deleteConfirm.horaInicio)}. También se borrará del Google Calendar.${isSuperadmin ? '' : ' Solo válido porque no tiene seña ni servicio cobrado.'} Esta acción no se puede deshacer.`
+            ? (deleteConfirm.cascade
+              ? `ATENCIÓN (superadmin): se eliminará en CASCADA el turno de ${deleteConfirm.cliente || 'Cliente'} para el ${formatDateArgentina(deleteConfirm.fecha)} a las ${formatTimeLabel(deleteConfirm.horaInicio)}${deleteConfirm.tieneServicio ? ', INCLUIDO el servicio cobrado del historial' : ''}${deleteConfirm.tieneSena ? ' y la seña registrada' : ''}. También se borrará del Google Calendar. Esta acción no se puede deshacer.`
+              : `Se eliminará TOTALMENTE el turno de ${deleteConfirm.cliente || 'Cliente'} para el ${formatDateArgentina(deleteConfirm.fecha)} a las ${formatTimeLabel(deleteConfirm.horaInicio)}. También se borrará del Google Calendar.${isSuperadmin ? '' : ' Solo válido porque no tiene seña ni servicio cobrado.'} Esta acción no se puede deshacer.`)
             : ''
         }
-        confirmText="Eliminar Turno"
+        confirmText={deleteConfirm?.cascade ? 'Eliminar todo' : 'Eliminar Turno'}
         cancelText="Volver"
         confirmVariant="danger"
         onConfirm={confirmDeleteAppointment}

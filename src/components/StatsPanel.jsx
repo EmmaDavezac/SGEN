@@ -34,6 +34,7 @@ const normalizePaymentMethod = (raw) => {
     const map = {
         efectivo: 'Efectivo',
         transferencia: 'Transferencia',
+        combinado: 'Combinado',
         fiado: 'Fiado'
     };
     return map[key] || raw || 'Transferencia';
@@ -52,8 +53,40 @@ const normalizeServiceRecord = (item) => {
         precio: Number(item?.precio) || 0,
         sena: Number(item?.sena) || 0,
         vuelto: Number(item?.vuelto) || 0,
-        metodoPago: normalizePaymentMethod(item?.metodo_pago || item?.metodoPago)
+        metodoPago: normalizePaymentMethod(item?.metodo_pago || item?.metodoPago),
+        montoEfectivo: Number(item?.monto_efectivo ?? item?.montoEfectivo) || 0,
+        montoTransferencia: Number(item?.monto_transferencia ?? item?.montoTransferencia) || 0,
+        saldoPendiente: Number(item?.saldo_pendiente ?? item?.saldoPendiente) || 0
     };
+};
+
+/**
+ * Deuda pendiente de un servicio: 0 si ya está cobrado.
+ * - Fiado puro: precio menos la seña (la seña ya se cobró al reservar).
+ * - Combinado: la porción fiada que quedó al registrar.
+ */
+const pendingAmountOf = (svc) => {
+    const metodo = (svc?.metodoPago || '').toLowerCase();
+    if (metodo === 'combinado') return Math.max(0, Number(svc?.saldoPendiente) || 0);
+    if (metodo === 'fiado') return Math.max(0, Number(svc?.precio || 0) - Number(svc?.sena || 0));
+    return 0;
+};
+
+/**
+ * Cuánto dinero entró realmente por un servicio (para los KPI de ingresos):
+ * - Fiado puro: nada todavía (todo queda como pendiente).
+ * - Combinado: lo cobrado en efectivo + transferencia, más la seña previa.
+ * - Resto: precio completo.
+ */
+const collectedAmountOf = (svc) => {
+    const metodo = (svc?.metodoPago || '').toLowerCase();
+    if (metodo === 'fiado') return 0;
+    if (metodo === 'combinado') {
+        return (Number(svc?.montoEfectivo) || 0)
+            + (Number(svc?.montoTransferencia) || 0)
+            + (Number(svc?.sena) || 0);
+    }
+    return Number(svc?.precio) || 0;
 };
 
 const normalizeExpenseRecord = (item) => {
@@ -235,11 +268,13 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
 
         const sum = (arr, key) => arr.reduce((acc, x) => acc + Number(x[key] || 0), 0);
 
-        const recentIncome = sum(recentServices.filter((s) => (s.metodoPago || '').toLowerCase() !== 'fiado'), 'precio');
-        const recentFiado = sum(recentServices.filter((s) => (s.metodoPago || '').toLowerCase() === 'fiado'), 'precio');
+        // Ingresos = dinero realmente cobrado. Los fiados puros no aportan y
+        // los combinados solo su porción cobrada (+ seña previa).
+        const recentIncome = recentServices.reduce((acc, s) => acc + collectedAmountOf(s), 0);
+        const recentFiado = recentServices.reduce((acc, s) => acc + pendingAmountOf(s), 0);
         const recentExpenseTotal = sum(recentExpenses, 'monto');
         const netBalance = recentIncome - recentExpenseTotal;
-        const ticketCount = recentServices.filter((s) => (s.metodoPago || '').toLowerCase() !== 'fiado').length;
+        const ticketCount = recentServices.filter((s) => collectedAmountOf(s) > 0).length;
         const avgTicket = ticketCount > 0 ? recentIncome / ticketCount : 0;
 
         return {
@@ -257,14 +292,14 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
     const debtors = useMemo(() => {
         const map = new Map();
         stats.recentServices
-            .filter((s) => (s.metodoPago || '').toLowerCase() === 'fiado')
+            .filter((s) => pendingAmountOf(s) > 0)
             .forEach((s) => {
                 const key = s.cliente || 'Sin nombre';
                 if (!map.has(key)) {
                     map.set(key, { cliente: key, total: 0, servicios: [] });
                 }
                 const entry = map.get(key);
-                entry.total += Math.max(0, Number(s.precio || 0) - Number(s.sena || 0));
+                entry.total += pendingAmountOf(s);
                 entry.servicios.push(s);
             });
         return Array.from(map.values()).sort((a, b) => b.total - a.total);
@@ -283,13 +318,14 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
         const totals = {};
         INCOME_CATEGORIES.forEach((c) => { totals[c] = 0; });
         stats.recentServices
-            .filter((s) => (s.metodoPago || '').toLowerCase() !== 'fiado')
             .forEach((s) => {
+                const cobrado = collectedAmountOf(s);
+                if (cobrado <= 0) return;
                 const cat = normalizeCategory(s.categoria);
                 if (totals[cat] !== undefined) {
-                    totals[cat] += Number(s.precio || 0);
+                    totals[cat] += cobrado;
                 } else {
-                    totals.personalizado += Number(s.precio || 0);
+                    totals.personalizado += cobrado;
                 }
             });
         const entries = Object.entries(totals).map(([key, val]) => ({ key, label: INCOME_CATEGORY_LABELS[key] || key, value: val }));
@@ -343,6 +379,11 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                             await Promise.all(ids.map((serviceId, index) => {
                                 const match = services.find((service) => (service.rawId || service.id) === serviceId);
                                 if (!match) return;
+                                const esCombinado = (match.metodoPago || '').toLowerCase() === 'combinado';
+                                // Cada servicio se salda por su deuda real: en el
+                                // combinado solo falta su porción fiada; en el fiado
+                                // puro, precio menos la seña.
+                                const deuda = pendingAmountOf(match);
                                 return completePendingPayment({
                                     serviceId,
                                     serviceOverride: {
@@ -354,9 +395,14 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                                         servicio: match.servicio,
                                         precio: match.precio,
                                         metodo_pago: payMethod.toLowerCase(),
+                                        monto_efectivo: match.montoEfectivo || 0,
+                                        monto_transferencia: match.montoTransferencia || 0,
+                                        saldo_pendiente: match.saldoPendiente || 0,
                                         completado: true
                                     },
                                     paymentMethod: payMethod.toLowerCase(),
+                                    amount: deuda,
+                                    combined: esCombinado,
                                     vuelto: index === 0 ? change : 0,
                                     finalizeTurno: true,
                                     usuarioId: session.authId
@@ -370,7 +416,21 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                             setServices((prev) =>
                                 prev.map((x) => {
                                     const index = ids.indexOf(x.rawId || x.id);
-                                    return index === -1 ? x : { ...x, metodoPago: payMethod, vuelto: index === 0 ? change : 0, completado: true };
+                                    if (index === -1) return x;
+                                    const esCombinado = (x.metodoPago || '').toLowerCase() === 'combinado';
+                                    return esCombinado
+                                        ? {
+                                            ...x,
+                                            montoEfectivo: payMethod === 'Efectivo'
+                                                ? (x.montoEfectivo || 0) + pendingAmountOf(x)
+                                                : x.montoEfectivo,
+                                            montoTransferencia: payMethod === 'Transferencia'
+                                                ? (x.montoTransferencia || 0) + pendingAmountOf(x)
+                                                : x.montoTransferencia,
+                                            saldoPendiente: 0,
+                                            vuelto: index === 0 ? change : 0
+                                        }
+                                        : { ...x, metodoPago: payMethod, vuelto: index === 0 ? change : 0, completado: true };
                                 })
                             );
                             await refreshServices();

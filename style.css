@@ -4444,6 +4444,57 @@ button:active {
     display: none;
 }
 
+/* Reparto del cobro combinado (Registrar Servicio) */
+.combined-split-box {
+    background: var(--soft-bg, #fdf3f8);
+    border: 1px solid var(--barbie-pink, #ff6fb5);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 16px;
+}
+
+.combined-split-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.combined-split-summary {
+    background: var(--white, #fff);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-top: 4px;
+}
+
+.combined-split-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 14px;
+}
+
+.combined-split-row--pending strong {
+    color: #b26a00;
+}
+
+.combined-split-row--pending.is-pending {
+    font-weight: 600;
+}
+
+.combined-split-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: #c62828;
+    font-size: 13px;
+    margin: 10px 0 0;
+}
+
+
 .cash-return-method-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

@@ -85,15 +85,30 @@ export function generateTicketCanvas(item, targetCanvas, logoImg) {
     const fechaStr = dateObj.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
         ' - ' + dateObj.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 
+    // Cobro combinado: el ticket detalla cómo se repartió el cobro.
+    const esCombinado = (item.metodoPago || '').toLowerCase() === 'combinado';
+    const montoEfectivo = Number(item.montoEfectivo ?? item.monto_efectivo) || 0;
+    const montoTransferencia = Number(item.montoTransferencia ?? item.monto_transferencia) || 0;
+    const saldoPendiente = Number(item.saldoPendiente ?? item.saldo_pendiente) || 0;
+
     const rows = [
         { label: 'CLIENTA', value: item.cliente, big: true },
         { label: 'SERVICIO', value: item.servicio },
         { label: 'CATEGORÍA', value: capitalizeCategoryLabel(item.categoria) },
         { label: 'PRECIO TOTAL', value: `$${precio.toLocaleString('es-AR')}` },
-        { label: 'MÉTODO DE PAGO', value: item.metodoPago },
+        { label: 'MÉTODO DE PAGO', value: esCombinado ? 'Combinado' : item.metodoPago }
+    ];
+    if (esCombinado) {
+        rows.push({ label: '  · Efectivo', value: `$${montoEfectivo.toLocaleString('es-AR')}` });
+        rows.push({ label: '  · Transferencia', value: `$${montoTransferencia.toLocaleString('es-AR')}` });
+        if (saldoPendiente > 0) {
+            rows.push({ label: '  · Pendiente', value: `$${saldoPendiente.toLocaleString('es-AR')}` });
+        }
+    }
+    rows.push(
         { label: 'FECHA Y HORA', value: fechaStr },
         { label: 'ATENDIDO POR', value: item.usuario || '-' }
-    ];
+    );
 
     const headerHeight = 110;
     const badgeRadius = 44;

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../supabase.js';
 import { finalizeRegisteredService, registerServiceDirectly, saveExpenseToDatabase } from '../services.js';
 import { cloneServiceCatalog, DEFAULT_SERVICE_CATEGORIES, DEFAULT_SERVICE_CATALOG, sortCategoriesForDisplay } from '../serviceCatalog.js';
+import { computeCombinedSplit } from '../paymentSplit.js';
 import Button, { DetailActionButton } from './Button.jsx';
 import Modal, { ConfirmModal, ModalCancelButton, ModalConfirmButton } from './Modal.jsx';
 import { useFormGuard } from '../formGuard.js';
@@ -12,7 +13,12 @@ function hasSuspiciousPrice(rawValue) {
     return num > 0 && num < 1000;
 }
 
-function RegisterServiceForm({ session, onBack, initialAppointment = null, onRegisterSuccess, allowFiado = true, notify, showLoader, runTask }) {
+function RegisterServiceForm({ session, onBack, initialAppointment = null, onRegisterSuccess, allowFiado: allowFiadoProp = true, settings = null, notify, showLoader, runTask }) {
+    // App entrega `settings` (no `allowFiado`): el toggle de Ajustes gobierna
+    // tanto el botón "Pendiente de pago" como la porción fiada del combinado.
+    const allowFiado = settings && settings.allowFiado !== undefined
+        ? !!settings.allowFiado
+        : !!allowFiadoProp;
     const [clients, setClients] = useState([]);
     const [clientName, setClientName] = useState('');
     const [categories, setCategories] = useState(() => sortCategoriesForDisplay(DEFAULT_SERVICE_CATEGORIES));
@@ -33,6 +39,11 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     const [selectedRemoval, setSelectedRemoval] = useState(null);
 
     const [paymentMethod, setPaymentMethod] = useState('Transferencia');
+    // Reparto del cobro combinado: qué parte se cobra en efectivo y qué parte
+    // en transferencia. El resto del neto queda como porción fiada (si los
+    // pendientes están habilitados).
+    const [splitEfectivo, setSplitEfectivo] = useState('');
+    const [splitTransferencia, setSplitTransferencia] = useState('');
     const [loading, setLoading] = useState(false);
 
     const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -207,14 +218,23 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     };
 
     const paymentMethods = allowFiado
-        ? ['Transferencia', 'Efectivo', 'Fiado']
-        : ['Transferencia', 'Efectivo'];
+        ? ['Transferencia', 'Efectivo', 'Combinado', 'Fiado']
+        : ['Transferencia', 'Efectivo', 'Combinado'];
 
     const netoACobrar = useMemo(() => {
         const base = Number(finalPrice) || 0;
         const s = Number(sena) || 0;
         return Math.max(0, base - s);
     }, [finalPrice, sena]);
+
+    // Reparto en vivo del cobro combinado: alimenta el resumen mientras se
+    // tipea y la validación del submit (un solo lugar de cálculo, testeado).
+    const combinedSplit = useMemo(() => computeCombinedSplit({
+        neto: netoACobrar,
+        efectivo: splitEfectivo,
+        transferencia: splitTransferencia,
+        allowFiado
+    }), [netoACobrar, splitEfectivo, splitTransferencia, allowFiado]);
 
     const computedCashChange = useMemo(() => {
         const given = Number(amountGiven) || 0;
@@ -246,6 +266,18 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
             seña: Number(sena) || 0,
             metodoPago: paymentMethod
         };
+
+        if (paymentMethod === 'Combinado') {
+            if (combinedSplit.error) {
+                if (notify) notify(combinedSplit.error, 'error');
+                return;
+            }
+            submitPayload.reparto = {
+                efectivo: combinedSplit.efectivo,
+                transferencia: combinedSplit.transferencia,
+                pendiente: combinedSplit.pendiente
+            };
+        }
 
         setPendingSubmitData(submitPayload);
 
@@ -293,6 +325,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
 
         const senaNum = Number(pendingSubmitData.seña) || 0;
         const neto = Math.max(0, Number(pendingSubmitData.precio) - senaNum);
+        const esCombinado = pendingSubmitData.metodoPago === 'Combinado';
+        const reparto = pendingSubmitData.reparto || null;
         const vueltoNum = pendingSubmitData.metodoPago === 'Efectivo' ? cashVuelto : 0;
         const vueltoReturn = vueltoNum > 0 ? (vueltoReturnMethod || 'Efectivo') : null;
         // Flags compartidos entre los pasos del overlay y el toast final.
@@ -310,6 +344,10 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
             precio: pendingSubmitData.precio,
             seña: senaNum,
             metodoPago: pendingSubmitData.metodoPago,
+            // Reparto del cobro combinado (0 en los métodos únicos).
+            montoEfectivo: reparto ? reparto.efectivo : 0,
+            montoTransferencia: reparto ? reparto.transferencia : 0,
+            saldoPendiente: reparto ? reparto.pendiente : 0,
             usuario_id: session?.authId,
             completado: true,
             vuelto: vueltoNum
@@ -342,6 +380,14 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                                     serviceId: lastResp?.service?.rawId || null,
                                     paymentAmount: pendingSubmitData.metodoPago === 'Fiado' ? 0 : neto,
                                     paymentMethod: pendingSubmitData.metodoPago,
+                                    // Combinado: una fila en pagos por cada medio
+                                    // cobrado; la porción fiada no genera fila.
+                                    payments: esCombinado && reparto
+                                        ? [
+                                            { amount: reparto.efectivo, method: 'Efectivo' },
+                                            { amount: reparto.transferencia, method: 'Transferencia' }
+                                        ].filter((entry) => entry.amount > 0)
+                                        : null,
                                     usuarioId: session.authId
                                 });
                                 turnoFinalizado = true;
@@ -390,6 +436,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
             setHasExternalRemoval(false);
             setSelectedRemoval(null);
             setPaymentMethod('Transferencia');
+            setSplitEfectivo('');
+            setSplitTransferencia('');
             setVueltoReturnMethod('Efectivo');
             if (priceInputRef.current) {
                 delete priceInputRef.current.dataset.priceAlertShown;
@@ -421,6 +469,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         clientName.trim() ||
         sena ||
         paymentMethod !== 'Transferencia' ||
+        splitEfectivo ||
+        splitTransferencia ||
         hasExternalRemoval ||
         selectedRemoval
     );
@@ -471,6 +521,24 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                     )}
                 </strong>
             </div>
+            {pendingSubmitData.metodoPago === 'Combinado' && pendingSubmitData.reparto && (
+                <>
+                    <div className="confirm-item">
+                        <span className="confirm-label">Efectivo</span>
+                        <strong>${Number(pendingSubmitData.reparto.efectivo).toLocaleString("es-AR")}</strong>
+                    </div>
+                    <div className="confirm-item">
+                        <span className="confirm-label">Transferencia</span>
+                        <strong>${Number(pendingSubmitData.reparto.transferencia).toLocaleString("es-AR")}</strong>
+                    </div>
+                    {pendingSubmitData.reparto.pendiente > 0 && (
+                        <div className="confirm-item">
+                            <span className="confirm-label">Pendiente (fiado)</span>
+                            <strong>${Number(pendingSubmitData.reparto.pendiente).toLocaleString("es-AR")}</strong>
+                        </div>
+                    )}
+                </>
+            )}
         </>
     ) : null;
 
@@ -718,6 +786,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                                     <span className="pay-icon">
                                         {method === 'Transferencia' && <i className="fa-solid fa-mobile-screen-button"></i>}
                                         {method === 'Efectivo' && <i className="fa-solid fa-money-bill-wave"></i>}
+                                        {method === 'Combinado' && <i className="fa-solid fa-layer-group"></i>}
                                         {method === 'Fiado' && <i className="fa-solid fa-hand-holding-hand"></i>}
                                     </span>
                                     <span>{method === 'Fiado' ? 'Pendiente de pago' : method}</span>
@@ -726,6 +795,69 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                         ))}
                     </div>
                 </div>
+
+                {paymentMethod === 'Combinado' && (
+                    <div className="combined-split-box">
+                        <div className="combined-split-title">
+                            <i className="fa-solid fa-layer-group"></i>
+                            Reparto del cobro
+                        </div>
+                        <div className="form-row-2">
+                            <div className="form-group">
+                                <label htmlFor="split-efectivo">Efectivo ($)</label>
+                                <div className="input-wrapper">
+                                    <i className="fa-solid fa-money-bill-wave input-icon" />
+                                    <input
+                                        id="split-efectivo"
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={splitEfectivo}
+                                        onChange={(e) => setSplitEfectivo(e.target.value)}
+                                        placeholder="0"
+                                        inputMode="numeric"
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label htmlFor="split-transferencia">Transferencia ($)</label>
+                                <div className="input-wrapper">
+                                    <i className="fa-solid fa-mobile-screen-button input-icon" />
+                                    <input
+                                        id="split-transferencia"
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={splitTransferencia}
+                                        onChange={(e) => setSplitTransferencia(e.target.value)}
+                                        placeholder="0"
+                                        inputMode="numeric"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="combined-split-summary">
+                            <div className="combined-split-row">
+                                <span>Neto a cobrar</span>
+                                <strong>${netoACobrar.toLocaleString("es-AR")}</strong>
+                            </div>
+                            <div className="combined-split-row">
+                                <span>Cobrado ahora</span>
+                                <strong>${combinedSplit.cobrado.toLocaleString("es-AR")}</strong>
+                            </div>
+                            <div className={`combined-split-row combined-split-row--pending ${combinedSplit.pendiente > 0 ? 'is-pending' : ''}`}>
+                                <span>Pendiente (fiado)</span>
+                                <strong>${combinedSplit.pendiente.toLocaleString("es-AR")}</strong>
+                            </div>
+                        </div>
+                        {combinedSplit.error && (
+                            <p className="combined-split-error">
+                                <i className="fa-solid fa-triangle-exclamation"></i>
+                                {combinedSplit.error}
+                            </p>
+                        )}
+                    </div>
+                )}
 
                 <Button type="submit" className="btn-block" disabled={loading}>
                     <i className="fa-solid fa-check"></i> {loading ? 'Registrando...' : 'Registrar'}

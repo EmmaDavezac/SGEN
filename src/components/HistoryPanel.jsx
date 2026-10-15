@@ -28,6 +28,7 @@ const PAYMENT_OPTIONS = [
     { key: 'todos', label: 'Todos' },
     { key: 'efectivo', label: 'Efectivo' },
     { key: 'transferencia', label: 'Transferencia' },
+    { key: 'combinado', label: 'Combinado' },
     { key: 'fiado', label: 'Fiado' }
 ];
 
@@ -47,6 +48,7 @@ const normalizePaymentMethod = (raw) => {
     const map = {
         efectivo: 'Efectivo',
         transferencia: 'Transferencia',
+        combinado: 'Combinado',
         fiado: 'Fiado'
     };
     return map[key] || raw || 'Transferencia';
@@ -65,9 +67,25 @@ const normalizeServiceRecord = (item) => {
         precio: Number(item?.precio) || 0,
         sena: Number(item?.sena) || 0,
         metodoPago: normalizePaymentMethod(item?.metodo_pago || item?.metodoPago),
+        montoEfectivo: Number(item?.monto_efectivo ?? item?.montoEfectivo) || 0,
+        montoTransferencia: Number(item?.monto_transferencia ?? item?.montoTransferencia) || 0,
+        saldoPendiente: Number(item?.saldo_pendiente ?? item?.saldoPendiente) || 0,
         completado: item?.completado ? 'Sí' : 'No',
         vuelto: Number(item?.vuelto) || 0
     };
+};
+
+/**
+ * Cuánto debe todavía la clienta de este servicio, o 0 si no debe nada.
+ * - Fiado puro: precio menos la seña ya cobrada (regla histórica).
+ * - Combinado: la porción fiada que quedó al registrar (o al cobrar).
+ * - Resto: nada.
+ */
+const pendingAmountOf = (svc) => {
+    const metodo = (svc?.metodoPago || '').toLowerCase();
+    if (metodo === 'combinado') return Math.max(0, Number(svc?.saldoPendiente) || 0);
+    if (metodo === 'fiado') return Math.max(0, Number(svc?.precio || 0) - Number(svc?.sena || 0));
+    return 0;
 };
 
 const formatDateTime = (dateValue) => {
@@ -85,6 +103,7 @@ const paymentIcon = (method) => {
     const m = (method || '').toLowerCase();
     if (m === 'efectivo') return 'fa-money-bill-wave';
     if (m === 'transferencia') return 'fa-mobile-screen-button';
+    if (m === 'combinado') return 'fa-layer-group';
     return 'fa-hand-holding-hand';
 };
 
@@ -103,6 +122,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
 
     const [payConfirmOpen, setPayConfirmOpen] = useState(false);
     const [serviceToPay, setServiceToPay] = useState(null);
+    const [payMethod, setPayMethod] = useState('Transferencia');
     const [paying, setPaying] = useState(false);
 
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -196,6 +216,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
 
     const requestPayFiado = (svc) => {
         setServiceToPay(svc);
+        setPayMethod('Transferencia');
         setPayConfirmOpen(true);
     };
 
@@ -205,6 +226,12 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
         if (showLoader) showLoader(true, 'Registrando cobro...');
         try {
             const rawServiceId = serviceToPay.rawId || serviceToPay.id;
+            const esCombinado = (serviceToPay.metodoPago || '').toLowerCase() === 'combinado';
+            // Se cobra exactamente lo que falta: en un combinado la porción
+            // fiada; en un fiado puro, precio menos la seña ya cobrada (misma
+            // cuenta que usa la lista de deudoras de Estadísticas).
+            const montoPendiente = pendingAmountOf(serviceToPay);
+            const metodoElegido = payMethod === 'Efectivo' ? 'efectivo' : 'transferencia';
             await completePendingPayment({
                 serviceId: rawServiceId,
                 serviceOverride: {
@@ -215,17 +242,37 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
                     fecha: serviceToPay.fecha,
                     servicio: serviceToPay.servicio,
                     precio: serviceToPay.precio,
-                    metodo_pago: 'transferencia',
+                    metodo_pago: metodoElegido,
+                    monto_efectivo: serviceToPay.montoEfectivo || 0,
+                    monto_transferencia: serviceToPay.montoTransferencia || 0,
+                    saldo_pendiente: serviceToPay.saldoPendiente || 0,
                     completado: true
                 },
-                paymentMethod: 'transferencia',
+                paymentMethod: metodoElegido,
+                amount: montoPendiente,
+                combined: esCombinado,
                 vuelto: 0,
                 finalizeTurno: true,
                 usuarioId: session.authId
             });
 
             setServices((prev) =>
-                prev.map((x) => x.id === serviceToPay.id ? { ...x, metodoPago: 'Transferencia', completado: 'Sí' } : x)
+                prev.map((x) => x.id === serviceToPay.id
+                    ? (esCombinado
+                        ? {
+                            ...x,
+                            metodoPago: 'Combinado',
+                            montoEfectivo: metodoElegido === 'efectivo'
+                                ? (x.montoEfectivo || 0) + (montoPendiente || 0)
+                                : x.montoEfectivo,
+                            montoTransferencia: metodoElegido === 'transferencia'
+                                ? (x.montoTransferencia || 0) + (montoPendiente || 0)
+                                : x.montoTransferencia,
+                            saldoPendiente: 0,
+                            completado: 'Sí'
+                        }
+                        : { ...x, metodoPago: payMethod, completado: 'Sí' })
+                    : x)
             );
             await loadServices();
             if (notify) notify('Cobro registrado con éxito 💖', 'success');
@@ -333,9 +380,11 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
                 )}
 
                 {!loading && !isSearching && filtered.map((svc) => {
+                    const pendiente = pendingAmountOf(svc);
                     const isFiado = (svc.metodoPago || '').toLowerCase() === 'fiado';
+                    const isCombinado = (svc.metodoPago || '').toLowerCase() === 'combinado';
                     return (
-                        <div key={svc.id} className={`history-card unified-card ${isFiado ? 'card-pending' : ''}`}>
+                        <div key={svc.id} className={`history-card unified-card ${(isFiado || pendiente > 0) ? 'card-pending' : ''}`}>
                             <div className="client-avatar" aria-hidden="true">
                                 <i className="fa-solid fa-receipt"></i>
                             </div>
@@ -350,7 +399,11 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
                                     <span className="pay-badge" title="Método de pago">
                                         <i className={`fa-solid ${paymentIcon(svc.metodoPago)}`}></i>
                                         {' '}
-                                        {isFiado ? 'Pendiente de pago' : svc.metodoPago}
+                                        {isFiado
+                                            ? 'Pendiente de pago'
+                                            : (isCombinado && pendiente > 0
+                                                ? `Combinado · falta $${formatPrice(pendiente)}`
+                                                : svc.metodoPago)}
                                     </span>
                                 </div>
                             </div>
@@ -390,7 +443,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
                 turnoId={selectedService?.turnoId || null}
                 notify={notify}
                 onClose={() => { setDetailOpen(false); setSelectedService(null); }}
-                onPay={selectedService && (selectedService.metodoPago || '').toLowerCase() === 'fiado'
+                onPay={selectedService && pendingAmountOf(selectedService) > 0
                     ? () => { setDetailOpen(false); requestPayFiado(selectedService); }
                     : null}
                 onVerCliente={onVerCliente}
@@ -400,13 +453,31 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
             <ConfirmModal
                 open={payConfirmOpen && !!serviceToPay}
                 title="Confirmar cobro"
-                message={serviceToPay ? `¿Registrar el cobro de $${formatPrice(serviceToPay.precio)} para ${serviceToPay.cliente}?` : ''}
                 confirmText="Cobrar"
                 confirmVariant="primary"
                 busy={paying}
                 onConfirm={confirmPayFiado}
-                onCancel={() => { setPayConfirmOpen(false); setServiceToPay(null); setPaying(false); }}
-            />
+                onCancel={() => { setPayConfirmOpen(false); setServiceToPay(null); setPayMethod('Transferencia'); setPaying(false); }}
+            >
+                <div className="confirm-message">
+                    {serviceToPay ? `¿Registrar el cobro de $${formatPrice(pendingAmountOf(serviceToPay))} para ${serviceToPay.cliente}?` : ''}
+                </div>
+                <div className="form-group" style={{ marginTop: '12px' }}>
+                    <label htmlFor="history-pay-method">¿Con qué medio lo cobra?</label>
+                    <div className="input-wrapper">
+                        <i className="fa-solid fa-credit-card input-icon" />
+                        <select
+                            id="history-pay-method"
+                            value={payMethod}
+                            onChange={(e) => setPayMethod(e.target.value)}
+                            disabled={paying}
+                        >
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                        </select>
+                    </div>
+                </div>
+            </ConfirmModal>
 
             <ConfirmModal
                 open={deleteConfirmOpen && !!serviceToDelete}

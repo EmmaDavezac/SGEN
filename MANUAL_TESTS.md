@@ -75,17 +75,36 @@ Resultado esperado:
 
 1. Abrir Historial de Ventas.
 2. Elegir un servicio con estado `Fiado`.
-3. Seleccionar `Cobrar`.
-4. Confirmar el cobro.
+3. Seleccionar `Consultar` y luego `Cobrar` (o el flujo de cobro del Historial).
+4. Elegir el medio (Efectivo o Transferencia) y confirmar el cobro.
 5. Recargar el Historial.
 
 Resultado esperado:
 
 - [ ] Se muestra un mensaje de exito.
 - [ ] El servicio deja de figurar como pendiente.
-- [ ] El metodo de pago queda actualizado.
+- [ ] El metodo de pago queda actualizado al medio elegido.
 - [ ] El turno relacionado queda `Completado`.
 - [ ] No se crea un pago duplicado.
+
+## 3b. Registrar un cobro combinado
+
+**Objetivo:** confirmar que un servicio se puede cobrar con dos medios a la vez.
+
+1. Abrir Registrar Servicio y completar clienta, servicio y precio.
+2. Elegir el método `Combinado`.
+3. Cargar cuánto se cobra en Efectivo y cuánto en Transferencia (el resto queda como pendiente/fi­ado; si los pendientes están deshabilitados en Ajustes, el reparto debe cubrir el neto completo).
+4. Confirmar el registro.
+5. Recargar Historial y revisar la ficha de la venta; si quedó saldo, cobrarlo desde Historial o Estadísticas eligiendo el medio.
+
+Resultado esperado:
+
+- [ ] El servicio queda registrado con método `Combinado` y el reparto visible (efectivo + transferencia + pendiente).
+- [ ] Si el reparto supera el neto, se muestra un error y no se registra.
+- [ ] Si todo queda pendiente, se pide usar `Pendiente de pago` en lugar de `Combinado`.
+- [ ] Cada caja (Efectivo / Transferencia) refleja solo lo cobrado en su medio; la porción fiada no entra a ninguna.
+- [ ] El saldo pendiente se puede cobrar después eligiendo Efectivo o Transferencia.
+- [ ] No se crean registros ni pagos duplicados.
 
 ## 4. Cobro con vuelto
 
@@ -135,6 +154,23 @@ Resultado esperado:
 - [ ] Confirmar que se mueve correctamente.
 - [ ] Cancelarlo.
 - [ ] Confirmar que el estado queda `Cancelado` o que se elimina segun el flujo definido.
+
+## 7b. Eliminar turno en cascada (solo superadmin)
+
+**Objetivo:** confirmar que el superadmin puede borrar un turno con seña o servicio cobrado, eliminando también sus pagos.
+
+1. Con sesión superadmin, crear un turno de prueba, cargarle seña y cobrarlo (queda reservado/cobrado con pagos asociados).
+2. Intentar eliminarlo: debe pedir confirmación de borrado **en cascada** (avisa que se borran turno + servicio + pagos).
+3. Confirmar con "Eliminar todo".
+4. Recargar Agenda e Historial.
+
+Resultado esperado:
+
+- [ ] Solo el superadmin ve la opción de eliminar en cascada; otros roles siguen bloqueados ante seña/servicio.
+- [ ] El turno desaparece de la Agenda.
+- [ ] El servicio vinculado desaparece del Historial y sus pagos ya no figuran.
+- [ ] Se muestra el resumen (turno + N servicio(s) + M pago(s)).
+- [ ] No quedan registros huérfanos (servicio sin turno ni pagos del turno).
 
 ## 8. Registrar un gasto
 

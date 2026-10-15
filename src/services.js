@@ -19,7 +19,8 @@ export function normalizeServiceRecord(item) {
     const paymentMethodByKey = {
         efectivo: 'Efectivo',
         transferencia: 'Transferencia',
-        fiado: 'Fiado'
+        fiado: 'Fiado',
+        combinado: 'Combinado'
     };
 
     return {
@@ -32,6 +33,10 @@ export function normalizeServiceRecord(item) {
         metodoPago: paymentMethodByKey[rawPaymentMethod.toLowerCase()] || rawPaymentMethod || 'Transferencia',
         categoria: (item.categoria || 'Otro').toString().trim() || 'Otro',
         seña: Number(item.seña) || 0,
+        // Reparto del cobro combinado (0 cuando el método es único).
+        montoEfectivo: Number(item.montoEfectivo ?? item.monto_efectivo) || 0,
+        montoTransferencia: Number(item.montoTransferencia ?? item.monto_transferencia) || 0,
+        saldoPendiente: Number(item.saldoPendiente ?? item.saldo_pendiente) || 0,
         completado: item.completado || 'No'
     };
 }
@@ -59,6 +64,7 @@ export async function registerServiceDirectly(transaction) {
     }
 
     const turnoId = transaction.turno_id || transaction.turnoId || null;
+    const metodoPago = String(transaction.metodoPago || 'Transferencia').toLowerCase();
     const { data, error } = await supabase
         .from('servicios')
         .insert({
@@ -71,11 +77,15 @@ export async function registerServiceDirectly(transaction) {
             categoria: transaction.categoria || 'Otro',
             precio: Number(transaction.precio) || 0,
             sena: Number(transaction.seña) || 0,
-            metodo_pago: transaction.metodoPago.toLowerCase(),
+            metodo_pago: metodoPago,
+            // Reparto del cobro combinado; 0 en los métodos únicos.
+            monto_efectivo: Number(transaction.montoEfectivo) || 0,
+            monto_transferencia: Number(transaction.montoTransferencia) || 0,
+            saldo_pendiente: Number(transaction.saldoPendiente) || 0,
             completado: transaction.completado === true || ['sí', 'si', 'yes', 'true'].includes(String(transaction.completado).toLowerCase()),
             vuelto: Number(transaction.vuelto) || 0
         })
-        .select('id, legacy_id, turno_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
+        .select('id, legacy_id, turno_id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
         .single();
     if (error) throw error;
 
@@ -92,6 +102,9 @@ export async function registerServiceDirectly(transaction) {
             precio: data.precio,
             seña: data.sena,
             metodoPago: data.metodo_pago,
+            montoEfectivo: data.monto_efectivo,
+            montoTransferencia: data.monto_transferencia,
+            saldoPendiente: data.saldo_pendiente,
             completado: data.completado ? 'Sí' : 'No',
             vuelto: data.vuelto,
             usuario: data.perfiles?.nombre || data.perfiles?.email || null
@@ -133,7 +146,7 @@ export async function loadServicesFromDatabase() {
     if (!supabase) throw new Error('Supabase no está disponible.');
     const { data, error } = await supabase
         .from('servicios')
-        .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
+        .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
         .order('fecha', { ascending: false });
     if (error) throw error;
     return data || [];
@@ -142,7 +155,7 @@ export async function loadServicesFromDatabase() {
 export async function loadCashboxDataFromDatabase() {
     if (!supabase) throw new Error('Supabase no está disponible.');
     const [servicesResult, movementsResult, expensesResult] = await Promise.all([
-        supabase.from('servicios').select('precio, sena, metodo_pago, completado'),
+        supabase.from('servicios').select('precio, sena, metodo_pago, monto_efectivo, monto_transferencia, completado'),
         supabase.from('movimientos_caja').select('*').order('fecha', { ascending: false }).limit(50),
         supabase.from('gastos').select('monto, metodo_pago')
     ]);
@@ -342,7 +355,7 @@ export async function loadTurnoDetail(turnoId) {
             .order('fecha', { ascending: true }),
         supabase
             .from('servicios')
-            .select('id, fecha, servicio, categoria, precio, sena, metodo_pago, completado, vuelto, perfiles(nombre)')
+            .select('id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, completado, vuelto, perfiles(nombre)')
             .eq('turno_id', uuid)
             .maybeSingle()
     ]);
@@ -396,6 +409,111 @@ export async function deleteAppointmentFromDatabase(id) {
     }
     if (lastError) throw lastError;
     throw new Error('No se encontró el turno para eliminar. Puede que tu rol no tenga permiso (solo admin puede borrar) o la sesión expiró.');
+}
+
+/**
+ * Elimina un turno en cascada: pagos (señas y cobros) → servicio vinculado →
+ * turno. Solo para superadmin: borra datos de caja e historial, así que la UI
+ * lo ofrece únicamente con rol superadmin y confirmación explícita.
+ *
+ * Orden obligatorio (FKs sin ON DELETE CASCADE):
+ *  1. `pagos` por turno_id (señas) y por servicio_id (cobros del servicio).
+ *  2. `servicios` por turno_id (el cobro asociado al turno).
+ *  3. `turnos` por id/legacy_id.
+ *
+ * RLS: el borrado de pagos y servicios ya es admin-only
+ * (pagos_delete_admin / servicios_delete_admin, y es_admin_actual incluye al
+ * superadmin), así que no hace falta migración para esta función.
+ *
+ * @returns {Promise<{success: true, pagos: number, servicios: number}>}
+ */
+export async function deleteTurnoCascade(id) {
+    if (!supabase) throw new Error('Supabase no está disponible.');
+    if (!id) throw new Error('Falta el ID del turno.');
+    const uuid = await resolveTurnoUuid(id).catch(() => null);
+    // Intentar por UUID y por legacy_id para cubrir caché vieja.
+    const turnoKeys = [];
+    if (uuid) turnoKeys.push({ col: 'id', val: uuid });
+    if (!isUuid(id)) turnoKeys.push({ col: 'legacy_id', val: id });
+    if (turnoKeys.length === 0) turnoKeys.push({ col: 'id', val: id });
+
+    let servicioIds = [];
+    if (uuid) {
+        // Servicio(s) vinculados al turno: su borrado exige eliminar antes sus
+        // pagos (pagos.servicio_id tiene FK a servicios sin cascade, igual que
+        // ya hace deleteServiceFromDatabase).
+        const { data: vinculados, error: vinculadosError } = await supabase
+            .from('servicios')
+            .select('id')
+            .eq('turno_id', uuid);
+        if (vinculadosError) throw vinculadosError;
+        servicioIds = (vinculados || []).map((s) => s.id).filter(Boolean);
+    }
+
+    let pagosBorrados = 0;
+
+    // 1a) Pagos directos del turno (señas: tipo 'sena' con turno_id).
+    // turno_id es uuid: solo se usa el UUID resuelto, nunca el legacy_id
+    // (texto) para no provocar error de tipo en Postgres.
+    if (uuid) {
+        const { data, error } = await supabase
+            .from('pagos')
+            .delete()
+            .eq('turno_id', uuid)
+            .select('id');
+        if (error) throw error;
+        pagosBorrados += (data || []).length;
+    }
+
+    // 1b) Pagos de cada servicio vinculado (cobros con servicio_id).
+    for (const servicioId of servicioIds) {
+        const { data, error } = await supabase
+            .from('pagos')
+            .delete()
+            .eq('servicio_id', servicioId)
+            .select('id');
+        if (error) throw error;
+        pagosBorrados += (data || []).length;
+    }
+
+    // 2) Servicio(s) vinculado(s) al turno.
+    let serviciosBorrados = 0;
+    if (uuid) {
+        const { data, error } = await supabase
+            .from('servicios')
+            .delete()
+            .eq('turno_id', uuid)
+            .select('id');
+        if (error) {
+            const code = String(error.code || '');
+            if (code === '23503' || /violates foreign key constraint/i.test(error.message || '')) {
+                throw new Error('No se puede eliminar: el servicio del turno tiene datos asociados.');
+            }
+            throw error;
+        }
+        serviciosBorrados = (data || []).length;
+    }
+
+    // 3) El turno propiamente dicho.
+    let turnoBorrado = false;
+    let lastError = null;
+    for (const attempt of turnoKeys) {
+        const { data, error } = await supabase
+            .from('turnos')
+            .delete()
+            .eq(attempt.col, attempt.val)
+            .select('id');
+        if (!error && data && data.length > 0) {
+            turnoBorrado = true;
+            break;
+        }
+        if (error) lastError = error;
+    }
+    if (!turnoBorrado) {
+        if (lastError) throw lastError;
+        throw new Error('No se encontró el turno para eliminar. Puede que tu rol no tenga permiso (solo superadmin puede borrar en cascada) o la sesión expiró.');
+    }
+    return { success: true, pagos: pagosBorrados, servicios: serviciosBorrados };
 }
 
 
@@ -540,6 +658,16 @@ export async function registerPaymentRecord({
     return { success: true, payment: data };
 }
 
+/**
+ * Registra los cobros del servicio y marca el turno como completado.
+ *
+ * `payments` (array de {amount, method}) permite un cobro combinado: una fila
+ * en `pagos` por cada medio usado. Se mantiene `paymentAmount`/`paymentMethod`
+ * como atajo para el caso único (si `payments` no viene, se usa ese par).
+ * Importante: el cobro combinado solo genera filas en `pagos` cuando hay
+ * turno_id o servicio_id (requisito de la tabla); el reparto exacto vive en
+ * las columnas de `servicios`, que se guardan siempre en registerServiceDirectly.
+ */
 export async function finalizeRegisteredService({
     turnoId = null,
     turnoLegacyId = null,
@@ -547,18 +675,25 @@ export async function finalizeRegisteredService({
     serviceId = null,
     paymentAmount = 0,
     paymentMethod = 'transferencia',
+    payments = null,
     usuarioId = null
 }) {
     if (!supabase) throw new Error('Supabase no está disponible.');
 
-    await registerPaymentRecord({
-        serviceId,
-        turnoId,
-        usuarioId,
-        amount: paymentAmount,
-        paymentMethod,
-        type: 'cobro'
-    });
+    const plan = (Array.isArray(payments) && payments.length > 0)
+        ? payments
+        : [{ amount: paymentAmount, method: paymentMethod }];
+
+    for (const entry of plan) {
+        await registerPaymentRecord({
+            serviceId,
+            turnoId,
+            usuarioId,
+            amount: entry.amount,
+            paymentMethod: entry.method,
+            type: 'cobro'
+        });
+    }
 
     if (!turnoId && !turnoLegacyId) return { updated: true, turnoId: null };
 
@@ -577,10 +712,23 @@ export async function finalizeRegisteredService({
     return { updated: true, turnoId: turnoId || turnoLegacyId };
 }
 
+/**
+ * Completa un cobro pendiente (fiado puro o porción fiada de un combinado).
+ *
+ * - `amount`: monto a cobrar en este momento. Si no viene, se usa el precio
+ *   total (comportamiento clásico de los fiados).
+ * - `combined`: marca que el servicio es `combinado`; en ese caso NO se cambia
+ *   `metodo_pago` (sigue describiendo el reparto original), se decrementa
+ *   `saldo_pendiente` y la porción cobrada se suma al medio elegido
+ *   (`monto_efectivo` / `monto_transferencia`), para que la Caja refleje el
+ *   dinero real de cada medio.
+ */
 export async function completePendingPayment({
     serviceId,
     serviceOverride = null,
     paymentMethod = 'transferencia',
+    amount = null,
+    combined = false,
     vuelto = 0,
     finalizeTurno = true,
     usuarioId = null
@@ -591,7 +739,7 @@ export async function completePendingPayment({
     if (!serviceRecord) {
         const { data, error } = await supabase
             .from('servicios')
-            .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, precio, metodo_pago, completado')
+            .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, precio, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, completado')
             .or(`id.eq.${serviceId},legacy_id.eq.${serviceId}`)
             .maybeSingle();
         if (error) throw error;
@@ -601,11 +749,26 @@ export async function completePendingPayment({
     if (!serviceRecord) return { updated: false, reason: 'missing_service' };
 
     const servicePk = serviceRecord.id || serviceRecord.legacy_id || serviceId;
+    const paymentMethodValue = String(paymentMethod || 'transferencia').toLowerCase() === 'efectivo'
+        ? 'efectivo'
+        : 'transferencia';
+    const montoACobrar = Math.max(0, Number(amount ?? (Number(serviceRecord.precio) || 0)) || 0);
+
     const updatePayload = {
-        metodo_pago: String(paymentMethod || 'transferencia').toLowerCase(),
         completado: true,
         vuelto: Number(vuelto) || 0
     };
+    if (combined) {
+        const previo = Number(serviceRecord[`monto_${paymentMethodValue}`]) || 0;
+        updatePayload.metodo_pago = 'combinado';
+        updatePayload[`monto_${paymentMethodValue}`] = previo + montoACobrar;
+        updatePayload.saldo_pendiente = Math.max(
+            0,
+            (Number(serviceRecord.saldo_pendiente) || 0) - montoACobrar
+        );
+    } else {
+        updatePayload.metodo_pago = paymentMethodValue;
+    }
 
     const { error: serviceError } = await supabase
         .from('servicios')
@@ -615,14 +778,12 @@ export async function completePendingPayment({
 
     const finalizedTurnoId = serviceRecord.turno_id || null;
     if (serviceRecord.id) {
-        const paymentMonto = Number(serviceRecord.precio) || 0;
-        const paymentMethodValue = String(paymentMethod || 'transferencia').toLowerCase();
-        if (paymentMonto > 0 && ['efectivo', 'transferencia'].includes(paymentMethodValue)) {
+        if (montoACobrar > 0) {
             await registerPaymentRecord({
                 serviceId: serviceRecord.id,
                 turnoId: finalizedTurnoId,
                 usuarioId,
-                amount: paymentMonto,
+                amount: montoACobrar,
                 paymentMethod: paymentMethodValue,
                 type: 'cobro'
             });
@@ -726,10 +887,16 @@ export async function completePendingPayment({
 }
 
 export async function updateLinkedTurnoStatus(serviceId, serviceOverride = null) {
+    const metodo = String(serviceOverride?.metodo_pago || 'transferencia').toLowerCase();
+    const esCombinado = metodo === 'combinado';
     return completePendingPayment({
         serviceId,
         serviceOverride,
-        paymentMethod: serviceOverride?.metodo_pago || 'transferencia',
+        paymentMethod: esCombinado ? 'transferencia' : metodo,
+        // Un combinado ya cobrado no debe generar un cobro nuevo: solo se
+        // sincroniza el estado del turno (saldo 0, sin monto a registrar).
+        amount: esCombinado ? 0 : null,
+        combined: esCombinado,
         vuelto: 0,
         finalizeTurno: true
     });

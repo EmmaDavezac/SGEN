@@ -45,6 +45,7 @@ const formatMetodoPago = (value) => {
     const low = (value || '').toString().trim().toLowerCase();
     if (low === 'efectivo') return 'Efectivo';
     if (low === 'transferencia') return 'Transferencia';
+    if (low === 'combinado') return 'Combinado';
     if (low === 'fiado') return 'Fiado (pendiente)';
     return value || '—';
 };
@@ -139,6 +140,14 @@ function VentaDetalleModal({
     const vuelto = Number(service.vuelto) || Number(dbServicio?.vuelto) || 0;
     const hayCobro = Boolean(metodoPago) || cobros.length > 0;
     const esFiado = (metodoPago || '').toLowerCase() === 'fiado';
+    const esCombinado = (metodoPago || '').toLowerCase() === 'combinado';
+    // Deuda restante: en un combinado es su porción fiada; en un fiado puro,
+    // precio menos la seña (misma cuenta que Historial y Estadísticas).
+    const saldoPendiente = esCombinado
+        ? Math.max(0, Number(service.saldoPendiente ?? dbServicio?.saldo_pendiente) || 0)
+        : (esFiado ? Math.max(0, precio - senaDescontada) : 0);
+    const repartoEfectivo = Number(service.montoEfectivo ?? dbServicio?.monto_efectivo) || 0;
+    const repartoTransferencia = Number(service.montoTransferencia ?? dbServicio?.monto_transferencia) || 0;
     const estaPago = !esFiado && precio > 0;
     // En desktop no existe navigator.share: el ticket se descarga, no se comparte.
     const puedeCompartir = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
@@ -236,13 +245,19 @@ function VentaDetalleModal({
                                 <Fila label="Le devolvió">{formatPrice(vuelto)}</Fila>
                             </>
                         )}
-                        <Fila label="Cómo pagó">{formatMetodoPago(metodoPago)}</Fila>
+                        <Fila label="Cómo pagó">
+                            {esCombinado
+                                ? `Combinado · Efectivo $${formatPrice(repartoEfectivo)} + Transferencia $${formatPrice(repartoTransferencia)}`
+                                : formatMetodoPago(metodoPago)}
+                        </Fila>
                         <Fila label="Estado del pago">
                             {!hayCobro
                                 ? 'Pendiente de cobro'
                                 : esFiado
                                     ? (completadoResuelto ? 'Fiado saldado' : 'Fiado pendiente')
-                                    : 'Pago completo'}
+                                    : (saldoPendiente > 0
+                                        ? `Pago parcial · falta $${formatPrice(saldoPendiente)}`
+                                        : 'Pago completo')}
                         </Fila>
                     </div>
                 </div>
@@ -287,7 +302,7 @@ function VentaDetalleModal({
                         onClose={onClose}
                     >
                         {fichaSections}
-                        {(estaPago || (esFiado && onPay)) && (
+                        {(estaPago || (saldoPendiente > 0 && onPay)) && (
                             <div className="detail-window-footer">
                                 {estaPago && (
                                     <DetailActionButton
@@ -299,7 +314,7 @@ function VentaDetalleModal({
                                         onClick={compartirTicket}
                                     />
                                 )}
-                                {esFiado && onPay && (
+                                {saldoPendiente > 0 && onPay && (
                                     <DetailActionButton
                                         icon="fa-sack-dollar"
                                         variant="primary"
@@ -334,7 +349,7 @@ function VentaDetalleModal({
                                 {puedeCompartir ? 'Compartir comprobante' : 'Descargar comprobante'}
                             </ModalButton>
                         )}
-                        {esFiado && onPay && (
+                        {saldoPendiente > 0 && onPay && (
                             <ModalButton variant="primary" icon="fa-sack-dollar" onClick={onPay}>
                                 Cobrar
                             </ModalButton>
