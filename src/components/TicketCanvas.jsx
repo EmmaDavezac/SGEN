@@ -332,7 +332,7 @@ export async function shareServiceTicketAsImage(item, canvasRef, notify) {
                 }
             } else {
                 downloadTicketBlob(blob, fileName);
-                if (notify) notify('Ticket descargado como PNG. Compártelo desde tu galería 💖', 'success');
+                if (notify) notify('Ticket descargado como PNG. Compartilo desde tu galería.', 'success');
                 resolve({ success: true, downloaded: true });
             }
         }, 'image/png');
@@ -350,7 +350,7 @@ export async function downloadServiceTicketAsPng(item, canvasRef, notify) {
             }
             const fileName = `ticket_${(item.cliente || 'cliente').toString().replace(/\s+/g, '_')}.png`;
             downloadTicketBlob(blob, fileName);
-            if (notify) notify('¡Ticket descargado! 💖', 'success');
+            if (notify) notify('Ticket descargado.', 'success');
             resolve({ success: true });
         }, 'image/png');
     });

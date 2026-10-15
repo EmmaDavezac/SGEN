@@ -167,7 +167,7 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
             setExpenses((prev) => [newExpense, ...prev]);
             resetForm();
             setFormOpen(false);
-            if (notify) notify('Gasto registrado con éxito ✨', 'success');
+            if (notify) notify('Gasto registrado con éxito.', 'success');
         } catch (err) {
             console.error(err);
             if (notify) notify(err?.message || 'No se pudo guardar el gasto.', 'error');

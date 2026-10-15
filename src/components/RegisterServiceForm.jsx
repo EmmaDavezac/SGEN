@@ -434,7 +434,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                 if (notify) notify('Turno actualizado a completado.', 'success');
             }
             if (vueltoOk) {
-                if (notify) notify('Vuelto registrado correctamente.', 'success');
+                if (notify) notify('Vuelto registrado con éxito.', 'success');
             } else if (vueltoNum > 0 && vueltoReturn && vueltoReturn !== 'Efectivo') {
                 if (notify) notify('Se registró el servicio, pero falló el vuelto.', 'warning');
             }

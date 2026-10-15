@@ -202,7 +202,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
         try {
             await deleteServiceFromDatabase(serviceToDelete.id);
             setServices((prev) => prev.filter((x) => x.id !== serviceToDelete.id));
-            if (notify) notify('Registro eliminado con éxito ✨', 'success');
+            if (notify) notify('Registro eliminado con éxito.', 'success');
         } catch (err) {
             console.error(err);
             if (notify) notify('No se pudo eliminar el registro.', 'error');
@@ -275,7 +275,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
                     : x)
             );
             await loadServices();
-            if (notify) notify('Cobro registrado con éxito 💖', 'success');
+            if (notify) notify('Cobro registrado con éxito.', 'success');
         } catch (err) {
             console.error(err);
             if (notify) notify('No se pudo registrar el cobro.', 'error');
@@ -376,7 +376,7 @@ const HistoryPanel = ({ session, notify, showLoader, onBack, onVerCliente = null
             <div className="history-list unified-list list-scroll list-section-gap">
                 {(loading || isSearching) && <SkeletonList count={6} />}
                 {!loading && !isSearching && filtered.length === 0 && (
-                    <div className="list-empty-state"><p>No se encontraron registros 💔</p></div>
+                    <div className="list-empty-state"><p>{services.length === 0 ? 'No hay ventas registradas todavía.' : 'No se encontraron ventas que coincidan con la búsqueda.'}</p></div>
                 )}
 
                 {!loading && !isSearching && filtered.map((svc) => {

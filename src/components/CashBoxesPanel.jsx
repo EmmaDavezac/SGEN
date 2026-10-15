@@ -137,7 +137,7 @@ function CashBoxesPanel({ session, notify, showLoader }) {
                 destino
             });
 
-            notify && notify('Movimiento registrado con éxito', 'success');
+            notify && notify('Movimiento registrado con éxito.', 'success');
             setMonto('');
             setConcepto('');
             setFecha(todayISO());

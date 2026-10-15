@@ -877,7 +877,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
         try { localStorage.setItem(cacheKeyAppointments, JSON.stringify(next)); } catch (e) { /* ignore */ }
         return next;
       });
-      if (notify) notify('Turno reagendado correctamente.', 'success');
+      if (notify) notify('Turno reagendado con éxito.', 'success');
       setRescheduleOpen(false);
       setRescheduleTarget(null);
     } catch (error) {
@@ -1328,7 +1328,7 @@ function CalendarBoard({ session, notify, showLoader, runTask, onCheckoutFromApp
                   )}
                 </div>
 
-                <div className="form-row-2">
+                <div className="form-row-2 schedule-datetime-stack">
                   <div className="form-group">
                     <label htmlFor="schedule-date">
                       Fecha <span className="field-required">(obligatorio)</span>
