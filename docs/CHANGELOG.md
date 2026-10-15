@@ -1,5 +1,14 @@
 # Changelog — SGEN
 
+## v1.3.2 — 2026-10-15 (SW v34)
+
+### Cambios
+- Texto de pantalla de carga de sesión: "Verificando sesión…" → "Ingresando…" (aria-label y subtítulo en App.jsx).
+- Bump de `CACHE_VERSION` en `public/sw.js` (v33 → v34) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- fix(ui): cambiar texto de carga de sesión de "Verificando sesión" a "Ingresando" (SW v33 → v34)
+
 ## v1.3.1 — 2026-10-15 (SW v33)
 
 ### Cambios

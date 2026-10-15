@@ -279,7 +279,7 @@ function App() {
         //   limpia la sesión local para forzar un login fresco.
         const validateStoredSession = async () => {
             // Timeout de seguridad: si Supabase no responde en 10s, no dejamos
-            // la pantalla atascada en "Verificando sesión".
+            // la pantalla atascada en "Ingresando…".
             const timeout = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('timeout validando sesión')), 10000)
             );
@@ -780,7 +780,7 @@ function App() {
             {routeNotFound ? (
                 <RouteNotFound onGoHome={() => setActiveTab(DEFAULT_TAB)} />
             ) : !authReady ? (
-                <section className="login-screen active" aria-label="Verificando sesión">
+                <section className="login-screen active" aria-label="Ingresando…">
                     <div className="sparkles-bg" aria-hidden="true" />
                     <div className="login-card">
                         <div className="brand-logo-container">
@@ -789,7 +789,7 @@ function App() {
                             </div>
                         </div>
                         <h1>Evolet Studio</h1>
-                        <p className="subtitle">Verificando tu sesión…</p>
+                        <p className="subtitle">Ingresando…</p>
                     </div>
                 </section>
             ) : !session ? (
