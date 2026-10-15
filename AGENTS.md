@@ -9,9 +9,9 @@ Cada commit que cambie UI, lógica, estilos o el service worker **DEBE** subir
 la versión del service worker para forzar la actualización en los clientes
 instalados. Sin esto, la PWA sigue sirviendo la versión vieja cacheada.
 
-1. **Subir `CACHE_VERSION` en `public/sw.js`** (hoy `v22`):
+1. **Subir `CACHE_VERSION` en `public/sw.js`** (hoy `v23`):
    ```js
-   const CACHE_VERSION = 'v23'; // +1 en cada commit con cambios de app
+   const CACHE_VERSION = 'v24'; // +1 en cada commit con cambios de app
    ```
    - El nombre del caché runtime (`runtime-<versión>`) cambia, el `activate`
      borra el runtime viejo y `skipWaiting()` + `clients.claim()` toman el

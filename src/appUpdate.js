@@ -31,9 +31,11 @@ function storeVersion(version) {
     } catch (error) { /* ignore */ }
 }
 
-function reloadWithOverlay(showOverlay) {
+function reloadWithOverlay(showOverlay, version) {
+    // El callback puede ser setUpdating directo o una fn que recibe la versión.
     try {
-        showOverlay(true);
+        if (showOverlay.length > 0) showOverlay(version);
+        else showOverlay(true);
     } catch (error) { /* ignore */ }
     window.setTimeout(() => {
         window.location.reload();
@@ -43,50 +45,83 @@ function reloadWithOverlay(showOverlay) {
 export function initAppVersionWatcher(showOverlay) {
     if (!('serviceWorker' in navigator)) return () => {};
 
-    let handled = false;
-    const handleNewVersion = (version) => {
-        if (handled) return;
-        handled = true;
+    // Guardia anti-bucle: si ya recargamos por update hace <30s, no repetir.
+    const RELOAD_GUARD_MS = 30000;
+    const GUARD_KEY = 'evolet_update_reload_at';
+    try {
+        const last = Number(sessionStorage.getItem(GUARD_KEY) || 0);
+        if (last && Date.now() - last < RELOAD_GUARD_MS) return () => {};
+    } catch (error) { /* ignore */ }
+
+    let updateStarted = false;
+    const startUpdate = (version) => {
+        if (updateStarted) return;
+        updateStarted = true;
         if (version) storeVersion(version);
-        reloadWithOverlay(showOverlay);
+        try {
+            sessionStorage.setItem(GUARD_KEY, String(Date.now()));
+        } catch (error) { /* ignore */ }
+        reloadWithOverlay(showOverlay, version);
     };
 
+    // Un solo manejador: solo recarga si la versión entrante difiere de la
+    // guardada. La respuesta al GET_VERSION inicial ya no dispara reload en
+    // cada arranque (ese era el bucle: cada load recargaba).
     const handleMessage = (event) => {
-        if (event?.data?.type === 'APP_VERSION') {
-            handleNewVersion(event.data.version);
+        if (event?.data?.type !== 'APP_VERSION') return;
+        const incoming = event.data.version ? String(event.data.version) : null;
+        if (!incoming) return;
+        const stored = readStoredVersion();
+        if (!stored) {
+            storeVersion(incoming);
+            return;
+        }
+        if (stored !== incoming) {
+            startUpdate(incoming);
         }
     };
     navigator.serviceWorker.addEventListener('message', handleMessage);
 
-    // Respaldo: si el controller cambió (el SW nuevo tomó el control) y no
-    // llegó el mensaje de versión, igual mostramos el overlay y recargamos.
-    let reloaded = false;
+    // Respaldo: si el controller cambió (SW nuevo tomó el control), pedir la
+    // versión al controller nuevo y dejar que el comparador decida. No se
+    // recarga a ciegas: así se evita el bucle.
     const handleControllerChange = () => {
-        if (reloaded) return;
-        reloaded = true;
-        handleNewVersion(null);
+        try {
+            navigator.serviceWorker.controller?.postMessage({ type: 'GET_VERSION' });
+        } catch (error) { /* ignore */ }
     };
     navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
 
-    // Al arrancar: pedir la versión activa y compararla con la guardada.
-    if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'GET_VERSION' });
-        const stored = readStoredVersion();
-        const checkVersion = (event) => {
-            if (event?.data?.type !== 'APP_VERSION') return;
-            navigator.serviceWorker.removeEventListener('message', checkVersion);
-            if (stored && event.data.version && stored !== String(event.data.version)) {
-                handleNewVersion(event.data.version);
-            } else if (event.data.version) {
-                storeVersion(event.data.version);
-            }
-        };
-        navigator.serviceWorker.addEventListener('message', checkVersion);
-    }
+    // Al arrancar: pedir la versión activa para inicializar/comparar.
+    try {
+        navigator.serviceWorker.controller?.postMessage({ type: 'GET_VERSION' });
+    } catch (error) { /* ignore */ }
+
+    // Chequeo periódico por si la PWA queda abierta en segundo plano: fuerza
+    // al navegador a bajar el /sw.js nuevo sin esperar a cerrar la app.
+    const checkForUpdate = () => {
+        try {
+            navigator.serviceWorker.getRegistration().then((reg) => reg?.update?.().catch(() => {}));
+        } catch (error) { /* ignore */ }
+    };
+    const pollId = window.setInterval(checkForUpdate, 15 * 60 * 1000);
+
+    // Al volver a la app (visible o foco), chequear update de inmediato: es el
+    // caso típico "deployé y abro la PWA instalada" — sin esto el navegador
+    // solo chequeaba /sw.js al cerrar y reabrir.
+    const handleVisible = () => {
+        if (document.visibilityState === 'visible') checkForUpdate();
+    };
+    const handleFocus = () => checkForUpdate();
+    document.addEventListener('visibilitychange', handleVisible);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
         navigator.serviceWorker.removeEventListener('message', handleMessage);
         navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+        document.removeEventListener('visibilitychange', handleVisible);
+        window.removeEventListener('focus', handleFocus);
+        window.clearInterval(pollId);
     };
 }
 

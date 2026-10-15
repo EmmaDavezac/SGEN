@@ -12,13 +12,13 @@ import { createPortal } from 'react-dom';
  * Reutiliza `.loader-overlay` (z-index 150000, por encima de modales) y
  * `.heart-spinner` (latido de la marca). Sin emojis (GUIA_VISUAL).
  */
-function AppUpdateOverlay({ visible }) {
+function AppUpdateOverlay({ visible, version }) {
     if (!visible) return null;
     return createPortal(
         <div className="loader-overlay app-update-overlay" aria-live="polite" aria-busy="true">
             <div className="spinner-container">
                 <i className="fa-solid fa-heart heart-spinner" aria-hidden="true"></i>
-                <p>Actualizando a la nueva versión…</p>
+                <p>Actualizando a la nueva versión{version ? ` (${version})` : ''}…</p>
             </div>
         </div>,
         document.body
