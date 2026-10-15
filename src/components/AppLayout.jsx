@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import AppFooter from './AppFooter.jsx';
 import AboutModal from './AboutModal.jsx';
 import { usePullToRefreshGesture } from '../pullToRefresh.js';
+import { BUSINESS } from '../businessConfig.js';
 
 function AppLayout({ children, session, onLogout, activeTab, setActiveTab, settings = {} }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -25,7 +26,7 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
             <img className="mini-logo-image" src="/icons/favicon.svg?v=2" alt="Logo" />
           </div>
           <div className="header-business-block">
-            <h2 id="user-display-name" className="user-name">Evolet Studio</h2>
+            <h2 id="user-display-name" className="user-name">{BUSINESS.nombre}</h2>
           </div>
         </div>
         

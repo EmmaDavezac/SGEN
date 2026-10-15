@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/sync-version.mjs && vite",
-    "build": "node scripts/sync-version.mjs && vite build",
+    "build": "node scripts/sync-version.mjs && node scripts/generar-assets-negocio.mjs && vite build",
     "preview": "vite preview",
     "generar-importacion": "node scripts/preparar-importacion.mjs"
   },

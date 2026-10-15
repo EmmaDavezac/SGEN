@@ -5,6 +5,11 @@ import '../style.css';
 import App from './App.jsx';
 import AppUpdateOverlay from './components/AppUpdateOverlay.jsx';
 import { initAppVersionWatcher } from './appUpdate.js';
+// Inyecta las variables de color del tema activo en :root antes de montar React,
+// así no hay flash de colores y se puede cambiar de negocio/tema solo
+// editando src/businessConfig.js.
+import { inicializarTema } from './theme.js';
+inicializarTema();
 
 const rootElement = document.getElementById('react-root');
 

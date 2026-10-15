@@ -1,16 +1,21 @@
 /* =========================================================================
-   DISEÑO SISTEMA ESTÉTICO Y2K BARBIE - EVOLET STUDIO
+   DISEÑO SISTEMA - VARIABLES DE MARCA (TEMA POR DEFECTO: barbie)
+   =========================================================================
+   Estas variables definen la identidad visual del negocio. Los valores por
+   defecto corresponden al tema "barbie". Para cambiar de negocio o de tema,
+   edita src/businessConfig.js (BUSINESS.tema y TEMAS) y las nuevas propiedades
+   se inyectan en :root desde src/theme.js sin tocar esta hoja de estilos.
    ========================================================================= */
 
 :root {
-    /* Paleta de Colores Mágicos */
-    --barbie-pink: #FF69B4;
-    /* Rosa Chicle */
-    --barbie-dark: #FF1493;
-    /* Rosa Fucsia Profundo */
-    --barbie-light: #FFC0CB;
-    /* Rosa Bebé */
-    --barbie-pale: #FFF0F5;
+    /* Paleta de marca (genérica, aplicable a cualquier tema) */
+    --brand-primary: #FF69B4;
+    /* Color primario de marca */
+    --brand-dark: #FF1493;
+    /* Variante oscura del primario */
+    --brand-light: #FFC0CB;
+    /* Variante clara del primario */
+    --brand-pale: #FFF0F5;
     /* Lavanda / Rosa Ultra Claro */
     --cream-bg: #FCF9F5;
     /* Crema Cálido de Fondo */
@@ -115,7 +120,7 @@ h5,
 h6 {
     font-family: 'Comfortaa', 'Outfit', sans-serif;
     font-weight: 700;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 /* Habilitar selección de texto solo en campos de entrada */
@@ -198,7 +203,7 @@ button {
     margin-top: 15px;
     font-family: 'Comfortaa', sans-serif;
     font-weight: 600;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-size: 14px;
 }
 
@@ -213,7 +218,7 @@ button {
 
 .write-progress-card {
     background: #ffffff;
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     border-radius: 18px;
     box-shadow: none;
     padding: 28px 32px;
@@ -230,7 +235,7 @@ button {
     margin: 14px 0 18px;
     font-family: 'Comfortaa', sans-serif;
     font-weight: 700;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-size: 17px;
 }
 
@@ -274,11 +279,11 @@ button {
 
 .write-progress-step.is-running {
     font-weight: 600;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 .write-progress-step.is-running .write-progress-step-icon {
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
 }
 
 .write-progress-step.is-done .write-progress-step-icon {
@@ -314,7 +319,7 @@ button {
 
 .app-update-card {
     background: var(--white);
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     border-radius: var(--radius-lg);
     box-shadow: none;
     padding: 28px 32px;
@@ -325,21 +330,21 @@ button {
 
 .app-update-spinner {
     font-size: 44px;
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
 }
 
 .app-update-text {
     margin: 14px 0 18px;
     font-family: 'Comfortaa', sans-serif;
     font-weight: 600;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-size: 14px;
 }
 
 .app-update-bar {
     height: 8px;
     border-radius: var(--radius-sm);
-    background: var(--barbie-light);
+    background: var(--brand-light);
     overflow: hidden;
 }
 
@@ -347,7 +352,7 @@ button {
     height: 100%;
     width: 25%;
     border-radius: inherit;
-    background: linear-gradient(135deg, var(--barbie-pink) 0%, var(--barbie-dark) 100%);
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-dark) 100%);
     transition: width 0.4s ease;
 }
 
@@ -389,7 +394,7 @@ button {
     border-radius: var(--radius-md);
     margin-bottom: 10px;
     box-shadow: 0 10px 30px rgba(90, 61, 70, 0.2);
-    border-left: 5px solid var(--barbie-pink);
+    border-left: 5px solid var(--brand-primary);
     display: flex;
     align-items: center;
     font-weight: 500;
@@ -400,8 +405,8 @@ button {
 }
 
 .toast.success {
-    border-left-color: var(--barbie-pink);
-    background-color: var(--barbie-pale);
+    border-left-color: var(--brand-primary);
+    background-color: var(--brand-pale);
 }
 
 .toast.error {
@@ -426,7 +431,7 @@ button {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(155deg, var(--cream-bg) 0%, var(--barbie-pale) 100%);
+    background: linear-gradient(155deg, var(--cream-bg) 0%, var(--brand-pale) 100%);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -447,8 +452,8 @@ button {
     width: 100%;
     height: 100%;
     background-image:
-        radial-gradient(circle, var(--barbie-light) 1px, transparent 1px),
-        radial-gradient(circle, var(--barbie-light) 1.5px, transparent 1.5px);
+        radial-gradient(circle, var(--brand-light) 1px, transparent 1px),
+        radial-gradient(circle, var(--brand-light) 1.5px, transparent 1.5px);
     background-size: 40px 40px, 60px 60px;
     background-position: 0 0, 30px 30px;
     opacity: 0.18;
@@ -457,7 +462,7 @@ button {
 
 .login-card {
     background: var(--white);
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     padding: 36px 30px;
     border-radius: var(--radius-lg);
     width: 100%;
@@ -499,7 +504,7 @@ button {
 .logo-circle img {
     width: 100%;
     height: 100%;
-    background-color: var(--barbie-pink);
+    background-color: var(--brand-primary);
     border-radius: 50%;
     object-fit: cover;
     object-position: center;
@@ -559,7 +564,7 @@ button {
 .form-group select,
 .form-group textarea {
     background: var(--white);
-    border: 2px solid var(--barbie-light);
+    border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
     padding: 12px 16px;
     color: var(--text-color);
@@ -572,7 +577,7 @@ button {
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
-    border-color: var(--barbie-pink);
+    border-color: var(--brand-primary);
     box-shadow: var(--shadow-focus), var(--shadow-inset);
     outline: none;
 }
@@ -629,7 +634,7 @@ textarea:focus::placeholder {
 }
 
 .switch-toggle input:checked + .slider {
-    background: linear-gradient(135deg, var(--barbie-pink) 0%, var(--barbie-dark) 100%);
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-dark) 100%);
 }
 
 .switch-toggle input:checked + .slider:before {
@@ -695,29 +700,29 @@ button:disabled {
 }
 
 .btn-primary {
-    background: var(--barbie-pink);
+    background: var(--brand-primary);
     color: var(--white);
-    border-color: var(--barbie-pink);
+    border-color: var(--brand-primary);
 }
 
 .btn-primary:hover:not(:disabled),
 .btn-primary:active:not(:disabled) {
     background: var(--white);
-    color: var(--barbie-dark);
-    border-color: var(--barbie-pink);
+    color: var(--brand-dark);
+    border-color: var(--brand-primary);
     box-shadow: none;
 }
 
 .btn-secondary {
     background: var(--white);
-    border-color: var(--barbie-pink);
-    color: var(--barbie-dark);
+    border-color: var(--brand-primary);
+    color: var(--brand-dark);
 }
 
 .btn-secondary:hover:not(:disabled),
 .btn-secondary:active:not(:disabled) {
-    background: var(--barbie-pink);
-    border-color: var(--barbie-pink);
+    background: var(--brand-primary);
+    border-color: var(--brand-primary);
     color: var(--white);
     box-shadow: none;
 }
@@ -751,8 +756,8 @@ button:disabled {
 
 .btn-primary.is-pressed:not(:disabled) {
     background: var(--white);
-    color: var(--barbie-dark);
-    border-color: var(--barbie-pink);
+    color: var(--brand-dark);
+    border-color: var(--brand-primary);
 }
 
 .app-footer {
@@ -763,7 +768,7 @@ button:disabled {
     width: 100%;
     margin-top: 24px;
     padding: 12px 0 4px;
-    border-top: 1px dashed var(--barbie-pale);
+    border-top: 1px dashed var(--brand-pale);
     color: var(--text-muted);
     font-size: 11px;
     text-align: center;
@@ -775,7 +780,7 @@ button:disabled {
 }
 
 .app-footer i {
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
 }
 
 .route-not-found {
@@ -792,7 +797,7 @@ button:disabled {
 
 .route-not-found-eyebrow {
     margin: 0;
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
     font-size: 12px;
     font-weight: 700;
     letter-spacing: .08em;
@@ -805,7 +810,7 @@ button:disabled {
 }
 
 .route-not-found h1 {
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-family: 'Comfortaa', sans-serif;
     font-size: clamp(24px, 5vw, 36px);
 }
@@ -837,7 +842,7 @@ button:disabled {
 /* Header Superior */
 .app-header {
     background: var(--white);
-    border-bottom: 2px solid var(--barbie-pale);
+    border-bottom: 2px solid var(--brand-pale);
     padding: 15px 20px 10px 20px;
     display: flex;
     justify-content: space-between;
@@ -877,7 +882,7 @@ button:disabled {
     display: block;
     width: 100%;
     height: 100%;
-    background-color: var(--barbie-pink);
+    background-color: var(--brand-primary);
     border-radius: 50%;
     object-fit: cover;
     vertical-align: middle;
@@ -899,7 +904,7 @@ button:disabled {
 .user-name {
     margin: 0;
     font-size: 18px;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     line-height: 1.1;
     display: flex;
     align-items: center;
@@ -1018,11 +1023,11 @@ button:disabled {
 
 .card-meta-icon {
     margin-right: 3px;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 .history-card-price {
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-size: 18px;
 }
 
@@ -1134,21 +1139,21 @@ button:disabled {
     border-radius: 50px;
     background: var(--white);
     color: var(--text-color);
-    border: 2px solid var(--barbie-light);
+    border: 2px solid var(--brand-light);
     box-sizing: border-box;
     transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
 }
 
 .btn-cat:hover:not(.active) {
-    background: var(--barbie-pink);
+    background: var(--brand-primary);
     color: var(--white);
-    border-color: var(--barbie-pink);
+    border-color: var(--brand-primary);
 }
 
 .btn-cat.active {
-    background: var(--barbie-pink);
+    background: var(--brand-primary);
     color: var(--white);
-    border-color: var(--barbie-pink);
+    border-color: var(--brand-primary);
     box-shadow: 0 4px 10px rgba(90, 61, 70, 0.3);
 }
 
@@ -1162,7 +1167,7 @@ button:disabled {
 
 .btn-service {
     background: var(--white);
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     padding: 14px 10px;
     border-radius: var(--radius-md);
     text-align: center;
@@ -1181,14 +1186,14 @@ button:disabled {
 
 .btn-service .price-tag {
     font-family: 'Comfortaa', sans-serif;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-weight: 700;
     font-size: 14px;
 }
 
 .btn-service.active {
-    background: var(--barbie-pink);
-    border-color: var(--barbie-pink);
+    background: var(--brand-primary);
+    border-color: var(--brand-primary);
     color: var(--white);
     box-shadow: none;
 }
@@ -1199,8 +1204,8 @@ button:disabled {
 
 .btn-service:hover:not(.active) {
     background: var(--white);
-    border-color: var(--barbie-pink);
-    color: var(--barbie-dark);
+    border-color: var(--brand-primary);
+    color: var(--brand-dark);
     box-shadow: none;
 }
 
@@ -1225,7 +1230,7 @@ button:disabled {
 
 .pay-btn-content {
     background: var(--white);
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     padding: 10px 5px;
     border-radius: var(--radius-md);
     display: flex;
@@ -1245,9 +1250,9 @@ button:disabled {
 }
 
 .pay-btn input:checked+.pay-btn-content {
-    background: var(--barbie-pale);
-    border-color: var(--barbie-pink);
-    color: var(--barbie-dark);
+    background: var(--brand-pale);
+    border-color: var(--brand-primary);
+    color: var(--brand-dark);
 }
 
 /* =========================================================================
@@ -1265,7 +1270,7 @@ button:disabled {
     flex: 1;
     min-height: 42px;
     background: var(--white);
-    border: 1px solid var(--barbie-light);
+    border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
     padding: 10px 14px;
     color: var(--text-color);
@@ -1275,7 +1280,7 @@ button:disabled {
 .filter-select {
     width: auto;
     max-width: 140px;
-    border: 2px solid var(--barbie-light);
+    border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
     background-color: var(--white);
     color: var(--text-color);
@@ -1289,7 +1294,7 @@ button:disabled {
     flex: 0 0 42px;
     border-radius: 50%;
     color: var(--white);
-    background: linear-gradient(135deg, var(--barbie-pink), var(--barbie-dark));
+    background: linear-gradient(135deg, var(--brand-primary), var(--brand-dark));
     box-shadow: 0 4px 10px rgba(90, 61, 70, .24);
     cursor: pointer;
     transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
@@ -1306,7 +1311,7 @@ button:disabled {
 }
 
 .filter-toggle-btn:focus-visible {
-    outline: 3px solid var(--barbie-light);
+    outline: 3px solid var(--brand-light);
     outline-offset: 2px;
 }
 
@@ -1315,7 +1320,7 @@ button:disabled {
     gap: 10px;
     width: 100%;
     padding: 10px;
-    border: 1px solid var(--barbie-light);
+    border: 1px solid var(--brand-light);
     border-radius: var(--radius-md);
     background: var(--white);
 }
@@ -1325,7 +1330,7 @@ button:disabled {
     min-height: 72px;
     place-items: center;
     padding: 18px;
-    border: 1px dashed var(--barbie-light);
+    border: 1px dashed var(--brand-light);
     border-radius: var(--radius-md);
     background: var(--white);
     color: var(--text-muted);
@@ -1364,9 +1369,9 @@ button:disabled {
 .skeleton-action {
     background: linear-gradient(
         90deg,
-        var(--barbie-pale) 25%,
-        var(--barbie-light) 37%,
-        var(--barbie-pale) 63%
+        var(--brand-pale) 25%,
+        var(--brand-light) 37%,
+        var(--brand-pale) 63%
     );
     background-size: 400% 100%;
     animation: skeleton-shimmer 1.4s ease infinite;
@@ -1425,9 +1430,9 @@ button:disabled {
     border-radius: var(--radius-sm);
     background: linear-gradient(
         90deg,
-        var(--barbie-pale) 25%,
-        var(--barbie-light) 37%,
-        var(--barbie-pale) 63%
+        var(--brand-pale) 25%,
+        var(--brand-light) 37%,
+        var(--brand-pale) 63%
     );
     background-size: 400% 100%;
     animation: skeleton-shimmer 1.4s ease infinite;
@@ -1475,7 +1480,7 @@ button:disabled {
 
 .filter-choice {
     padding: 8px 11px;
-    border: 1px solid var(--barbie-light);
+    border: 1px solid var(--brand-light);
     border-radius: 999px;
     color: var(--text-color);
     background: var(--white);
@@ -1486,9 +1491,9 @@ button:disabled {
 .filter-choice.active,
 .filter-choice:hover,
 .filter-choice:focus-visible {
-    border-color: var(--barbie-pink);
+    border-color: var(--brand-primary);
     color: var(--white);
-    background: var(--barbie-pink);
+    background: var(--brand-primary);
 }
 
 .client-suggestions {
@@ -1501,7 +1506,7 @@ button:disabled {
     max-height: 180px;
     overflow-y: auto;
     padding: 5px;
-    border: 1px solid var(--barbie-light);
+    border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
     background: var(--white);
     box-shadow: 0 10px 24px rgba(90, 61, 70, .16);
@@ -1516,8 +1521,8 @@ button:disabled {
 
 .client-suggestion:hover,
 .client-suggestion:focus-visible {
-    background: var(--barbie-pale);
-    color: var(--barbie-dark);
+    background: var(--brand-pale);
+    color: var(--brand-dark);
 }
 
 .list-scroll {
@@ -1527,7 +1532,7 @@ button:disabled {
     /* Sin padding-right: el scroll real lo aporta .app-content, así que este
        padding solo desplazaba las cards a la izquierda y las desalineaba del
        borde derecho del buscador/filtro y del header. */
-    scrollbar-color: var(--barbie-pink) var(--barbie-pale);
+    scrollbar-color: var(--brand-primary) var(--brand-pale);
     scrollbar-width: thin;
     -webkit-overflow-scrolling: touch;
 }
@@ -1537,13 +1542,13 @@ button:disabled {
 }
 
 .list-scroll::-webkit-scrollbar-track {
-    background: var(--barbie-pale);
+    background: var(--brand-pale);
     border-radius: 8px;
 }
 
 .list-scroll::-webkit-scrollbar-thumb {
-    background: var(--barbie-pink);
-    border: 2px solid var(--barbie-pale);
+    background: var(--brand-primary);
+    border: 2px solid var(--brand-pale);
     border-radius: 8px;
 }
 
@@ -1551,7 +1556,7 @@ button:disabled {
     background: var(--white);
     border-radius: var(--radius-sm);
     padding: 12px;
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     box-shadow: none;
     position: relative;
     display: grid;
@@ -1589,7 +1594,7 @@ button:disabled {
 
 .card-service {
     font-size: 13px;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-weight: 600;
     word-break: break-word;
     white-space: nowrap;
@@ -1608,8 +1613,8 @@ button:disabled {
 }
 
 .pay-badge {
-    background-color: var(--barbie-pale);
-    color: var(--barbie-dark);
+    background-color: var(--brand-pale);
+    color: var(--brand-dark);
     padding: 1px 6px;
     border-radius: 4px;
     font-weight: 600;
@@ -1677,7 +1682,7 @@ button:disabled {
     width: 30px;
     height: 30px;
     padding: 0;
-    border: 1px solid var(--barbie-pale);
+    border: 1px solid var(--brand-pale);
     border-radius: 50%;
     background: var(--white);
     color: var(--text-light);
@@ -1689,14 +1694,14 @@ button:disabled {
 
 .card-icon-btn:hover,
 .card-icon-btn:active {
-    background: var(--barbie-pink);
-    border-color: var(--barbie-pink);
+    background: var(--brand-primary);
+    border-color: var(--brand-primary);
     color: var(--white);
 }
 
 .card-icon-btn--primary {
-    color: var(--barbie-pink);
-    border-color: var(--barbie-pink);
+    color: var(--brand-primary);
+    border-color: var(--brand-primary);
 }
 
 .card-icon-btn--danger {
@@ -1786,7 +1791,7 @@ button:disabled {
     opacity: 0.45;
     cursor: not-allowed;
     background: var(--white);
-    border-color: var(--barbie-pale);
+    border-color: var(--brand-pale);
     color: var(--text-light);
     transform: none;
 }
@@ -1806,7 +1811,7 @@ button:disabled {
     background: var(--white);
     border-radius: var(--radius-md);
     padding: 16px 12px;
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -1814,22 +1819,22 @@ button:disabled {
 }
 
 .stat-card.pink-glow {
-    border-color: var(--barbie-light);
-    background: linear-gradient(135deg, var(--white) 70%, var(--barbie-pale) 100%);
+    border-color: var(--brand-light);
+    background: linear-gradient(135deg, var(--white) 70%, var(--brand-pale) 100%);
     box-shadow: 0 6px 15px rgba(90, 61, 70, 0.1);
 }
 
 /* Estadísticas: mismos colores y bordes que las tarjetas de listado — fondo
-   blanco (sin degradado), borde 2px --barbie-pale, radius-sm y sin sombra.
+   blanco (sin degradado), borde 2px --brand-pale, radius-sm y sin sombra.
    Solo esta sección: Cajas reutiliza .pink-glow para su total y conserva
-   su estilo propio. La cifra mantiene el acento --barbie-dark. */
+   su estilo propio. La cifra mantiene el acento --brand-dark. */
 #tab-estadisticas .stat-card {
     border-radius: var(--radius-sm);
     box-shadow: none;
 }
 
 #tab-estadisticas .stat-card.pink-glow {
-    border-color: var(--barbie-pale);
+    border-color: var(--brand-pale);
     background: var(--white);
     box-shadow: none;
 }
@@ -1855,13 +1860,13 @@ button:disabled {
 }
 
 .stat-card.pink-glow .stat-info h2 {
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 .chart-section {
     background: var(--white);
     border-radius: var(--radius-lg);
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     padding: 18px;
     margin-bottom: 20px;
     box-shadow: 0 4px 12px rgba(90, 61, 70, 0.02);
@@ -1871,7 +1876,7 @@ button:disabled {
     font-size: 15px;
     color: var(--text-color);
     margin-bottom: 15px;
-    border-left: 3px solid var(--barbie-pink);
+    border-left: 3px solid var(--brand-primary);
     padding-left: 8px;
 }
 
@@ -1902,7 +1907,7 @@ button:disabled {
 }
 
 .payment-progress-bar {
-    background-color: var(--barbie-pale);
+    background-color: var(--brand-pale);
     height: 12px;
     border-radius: 50px;
     overflow: hidden;
@@ -1910,7 +1915,7 @@ button:disabled {
 }
 
 .payment-progress-bar .progress {
-    background: linear-gradient(90deg, var(--barbie-light) 0%, var(--barbie-pink) 100%);
+    background: linear-gradient(90deg, var(--brand-light) 0%, var(--brand-primary) 100%);
     height: 100%;
     border-radius: 50px;
     width: 0%;
@@ -1919,7 +1924,7 @@ button:disabled {
 }
 
 .payment-progress-bar .income-progress {
-    background: linear-gradient(90deg, var(--barbie-light) 0%, var(--barbie-pink) 100%);
+    background: linear-gradient(90deg, var(--brand-light) 0%, var(--brand-primary) 100%);
 }
 
 .payment-stat-val {
@@ -1931,8 +1936,8 @@ button:disabled {
 
 /* Info Boxes en Ajustes */
 .card-info-box {
-    background-color: var(--barbie-pale);
-    border: 2px solid var(--barbie-light);
+    background-color: var(--brand-pale);
+    border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
     padding: 15px;
     margin-top: 15px;
@@ -1950,10 +1955,10 @@ button:disabled {
 }
 
 /* Ajustes: la nota informativa comparte la superficie unificada de tarjetas
-   (blanco, borde --barbie-pale, radius-sm, sin sombra) en vez del fondo rosa. */
+   (blanco, borde --brand-pale, radius-sm, sin sombra) en vez del fondo rosa. */
 #tab-ajustes .card-info-box {
     background-color: var(--white);
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     border-radius: var(--radius-sm);
     box-shadow: none;
 }
@@ -1973,7 +1978,7 @@ button:disabled {
     width: 90%;
     height: 65px;
     background: var(--white);
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     border-radius: 50px;
     display: flex;
     justify-content: space-around;
@@ -2000,8 +2005,8 @@ button:disabled {
 
 .nav-item:hover,
 .nav-item:focus-visible {
-    color: var(--barbie-dark);
-    background: var(--barbie-pale);
+    color: var(--brand-dark);
+    background: var(--brand-pale);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(90, 61, 70, 0.12);
 }
@@ -2023,7 +2028,7 @@ button:disabled {
 }
 
 .nav-item.active {
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 .nav-item.active .nav-icon {
@@ -2042,8 +2047,8 @@ button:disabled {
     box-sizing: border-box;
     width: 1em;
     height: 1em;
-    border: 2px solid var(--barbie-pale);
-    border-top-color: var(--barbie-dark);
+    border: 2px solid var(--brand-pale);
+    border-top-color: var(--brand-dark);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
 }
@@ -2072,9 +2077,9 @@ button:disabled {
     justify-content: center;
     border-radius: 50%;
     background: var(--white);
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     box-shadow: var(--shadow-md);
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-size: 16px;
     pointer-events: none;
     opacity: 0;
@@ -2240,7 +2245,7 @@ button:disabled {
     height: 36px;
     place-items: center;
     padding: 0;
-    border: 1px solid var(--barbie-pale);
+    border: 1px solid var(--brand-pale);
     border-radius: 50%;
     color: var(--text-muted);
     background: var(--white);
@@ -2249,8 +2254,8 @@ button:disabled {
 
 .modal-close-button:hover,
 .modal-close-button:focus-visible {
-    border-color: var(--barbie-pink);
-    color: var(--barbie-dark);
+    border-color: var(--brand-primary);
+    color: var(--brand-dark);
     outline: 2px solid rgba(255, 105, 180, 0.2);
     outline-offset: 1px;
 }
@@ -2270,7 +2275,7 @@ button:disabled {
 
 .modal-body {
     background: var(--white);
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     border-radius: var(--radius-md);
     padding: 16px;
     margin-bottom: 20px;
@@ -2329,7 +2334,7 @@ button:disabled {
 
 .confirm-item:not(:last-child),
 .detail-row:not(:last-child) {
-    border-bottom: 1px dashed var(--barbie-pale);
+    border-bottom: 1px dashed var(--brand-pale);
 }
 
 .confirm-label,
@@ -2412,8 +2417,8 @@ button:disabled {
     padding: 0;
     border: none;
     border-radius: 50%;
-    background: var(--barbie-pale);
-    color: var(--barbie-dark);
+    background: var(--brand-pale);
+    color: var(--brand-dark);
     font-size: 13px;
     line-height: 1;
     cursor: pointer;
@@ -2425,8 +2430,8 @@ button:disabled {
        translateY(-50%) y el botón saltaría fuera del input; lo restauramos aquí
        (mayor especificidad por la clase, con !important para ganar el conflicto). */
     transform: translateY(-50%) !important;
-    background: var(--barbie-light);
-    color: var(--barbie-dark);
+    background: var(--brand-light);
+    color: var(--brand-dark);
 }
 
 /* Campo de teléfono de la ficha de cliente: input + botón de WhatsApp en fila. */
@@ -2449,7 +2454,7 @@ button:active {
 
 /* Estilo para los spinner de FontAwesome */
 .heart-spinner i {
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
     font-size: 50px;
     animation: heartBeat 1.2s infinite;
 }
@@ -2506,7 +2511,7 @@ button:active {
     gap: 10px;
     margin-bottom: 16px;
     padding: 14px;
-    border: 1px solid var(--barbie-pale);
+    border: 1px solid var(--brand-pale);
     border-radius: var(--radius-md);
     background: var(--white);
     box-shadow: 0 2px 8px rgba(90, 61, 70, 0.02);
@@ -2527,7 +2532,7 @@ button:active {
     width: 100%;
     height: 42px;
     padding: 8px 12px;
-    border: 1px solid var(--barbie-light);
+    border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
     background: var(--white);
     color: var(--text-color);
@@ -2542,7 +2547,7 @@ button:active {
 .catalog-category-form-row input:focus,
 .price-item-row .price-input-wrapper input:focus {
     outline: none;
-    border-color: var(--barbie-pink);
+    border-color: var(--brand-primary);
     box-shadow: var(--shadow-focus);
 }
 
@@ -2775,7 +2780,7 @@ button:active {
 }
 
 .price-item-row:not(:last-child) {
-    border-bottom: 1px dashed var(--barbie-pale);
+    border-bottom: 1px dashed var(--brand-pale);
 }
 
 .price-item-name {
@@ -2827,7 +2832,7 @@ button:active {
     font-size: 14px;
     font-weight: 700;
     color: var(--text-color);
-    background-color: var(--barbie-pale);
+    background-color: var(--brand-pale);
     padding: 6px 12px;
     border-radius: var(--radius-sm);
     border: 2px solid transparent;
@@ -2838,7 +2843,7 @@ button:active {
    ========================================================================= */
 .calendar-card {
     background: var(--white);
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     border-radius: var(--radius-md);
     padding: 18px;
     box-shadow: 0 4px 12px rgba(90, 61, 70, 0.02);
@@ -2856,15 +2861,15 @@ button:active {
 .calendar-header h4 {
     font-family: 'Comfortaa', sans-serif;
     font-size: 16px;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     margin: 0;
     text-transform: capitalize;
 }
 
 .btn-cal-nav {
-    background: var(--barbie-pale);
-    border: 1px solid var(--barbie-light);
-    color: var(--barbie-dark);
+    background: var(--brand-pale);
+    border: 1px solid var(--brand-light);
+    color: var(--brand-dark);
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -2879,8 +2884,8 @@ button:active {
 .btn-cal-nav:hover,
 .btn-cal-nav:active {
     background: var(--white);
-    color: var(--barbie-dark);
-    border-color: var(--barbie-pink);
+    color: var(--brand-dark);
+    border-color: var(--brand-primary);
 }
 
 .calendar-weekdays {
@@ -2918,8 +2923,8 @@ button:active {
 }
 
 .calendar-day:hover:not(.empty) {
-    background: var(--barbie-pale);
-    border-color: var(--barbie-light);
+    background: var(--brand-pale);
+    border-color: var(--brand-light);
 }
 
 .calendar-day.empty {
@@ -2929,14 +2934,14 @@ button:active {
 }
 
 .calendar-day.today {
-    background: var(--barbie-pale);
-    color: var(--barbie-dark);
+    background: var(--brand-pale);
+    color: var(--brand-dark);
     font-weight: 700;
-    border-color: var(--barbie-pink);
+    border-color: var(--brand-primary);
 }
 
 .calendar-day.selected {
-    background: var(--barbie-pink);
+    background: var(--brand-primary);
     color: var(--white);
     font-weight: 700;
     box-shadow: 0 4px 8px rgba(90, 61, 70, 0.3);
@@ -2964,12 +2969,12 @@ button:active {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    background-color: var(--barbie-light);
-    color: var(--barbie-dark);
+    background-color: var(--brand-light);
+    color: var(--brand-dark);
     padding: 1px 3px;
     border-radius: 3px;
     text-align: left;
-    border-left: 2px solid var(--barbie-pink);
+    border-left: 2px solid var(--brand-primary);
 }
 
 .calendar-day.selected .event-preview-pill {
@@ -2979,7 +2984,7 @@ button:active {
 }
 
 .event-preview-pill.more {
-    background-color: var(--barbie-pale);
+    background-color: var(--brand-pale);
     color: var(--text-muted);
     border-left: none;
     text-align: center;
@@ -3114,7 +3119,7 @@ button:active {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
 }
 
 .detail-block--cancel > h4 {
@@ -3155,7 +3160,7 @@ button:active {
     align-items: center;
     gap: 2px 8px;
     padding: 8px 10px;
-    border: 1px solid var(--barbie-pale);
+    border: 1px solid var(--brand-pale);
     border-radius: 10px;
     background: var(--white);
     font-size: 13px;
@@ -3234,7 +3239,7 @@ button:active {
     font-size: 13px;
     background: var(--cream-bg);
     border-radius: var(--radius-sm);
-    border: 1px dashed var(--barbie-light);
+    border: 1px dashed var(--brand-light);
 }
 
 .appointment-card {
@@ -3349,7 +3354,7 @@ button:active {
     align-items: center;
     justify-content: center;
     padding-right: 12px;
-    border-right: 2px dashed var(--barbie-pale);
+    border-right: 2px dashed var(--brand-pale);
     text-align: center;
 }
 
@@ -3357,7 +3362,7 @@ button:active {
     font-family: 'Comfortaa', sans-serif;
     font-size: 14px;
     font-weight: 700;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 .appointment-time-duration {
@@ -3441,9 +3446,9 @@ button:active {
     width: 42px;
     height: 42px;
     border-radius: 50%;
-    background: var(--barbie-pink);
+    background: var(--brand-primary);
     color: var(--white);
-    border: 2px solid var(--barbie-pink);
+    border: 2px solid var(--brand-primary);
     box-sizing: border-box;
     box-shadow: none;
     display: flex;
@@ -3458,8 +3463,8 @@ button:active {
 .calendar-add-btn:hover,
 .calendar-add-btn:active {
     background: var(--white);
-    color: var(--barbie-dark);
-    border-color: var(--barbie-pink);
+    color: var(--brand-dark);
+    border-color: var(--brand-primary);
     box-shadow: none;
 }
 
@@ -3472,7 +3477,7 @@ button:active {
     align-items: center;
     gap: 6px;
     padding: 7px 9px;
-    border: 1px solid var(--barbie-light);
+    border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
     color: var(--text-muted);
     font-size: 11px;
@@ -3482,8 +3487,8 @@ button:active {
 
 .header-action-btn:active,
 .header-action-btn:hover {
-    color: var(--barbie-dark);
-    background-color: var(--barbie-pale);
+    color: var(--brand-dark);
+    background-color: var(--brand-pale);
 }
 
 .avatar-menu-btn {
@@ -3501,10 +3506,10 @@ button:active {
     width: 30px;
     height: 30px;
     place-items: center;
-    border: 2px solid var(--barbie-pink);
+    border: 2px solid var(--brand-primary);
     border-radius: 50%;
-    color: var(--barbie-dark);
-    background: var(--barbie-pale);
+    color: var(--brand-dark);
+    background: var(--brand-pale);
     font-size: 13px;
     overflow: hidden;
 }
@@ -3528,7 +3533,7 @@ button:active {
     padding: 12px 14px;
     margin-top: 10px;
     background: var(--white);
-    border: 2px solid var(--barbie-light);
+    border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
     color: var(--text-color);
     font-size: 13px;
@@ -3575,7 +3580,7 @@ button:active {
     z-index: 100;
     min-width: 200px;
     padding: 8px;
-    border: 1px solid var(--barbie-light);
+    border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
     background: var(--white);
     box-shadow: 0 12px 28px rgba(90, 61, 70, .18);
@@ -3587,7 +3592,7 @@ button:active {
     gap: 10px;
     padding: 8px 10px 12px;
     margin-bottom: 4px;
-    border-bottom: 1px solid var(--barbie-pale);
+    border-bottom: 1px solid var(--brand-pale);
 }
 
 .account-menu-avatar {
@@ -3596,8 +3601,8 @@ button:active {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    color: var(--barbie-dark);
-    background: var(--barbie-pale);
+    color: var(--brand-dark);
+    background: var(--brand-pale);
     font-size: 12px;
 }
 
@@ -3639,8 +3644,8 @@ button:active {
 
 .account-menu-item:hover,
 .account-menu-item:focus-visible {
-    background: var(--barbie-pale);
-    color: var(--barbie-dark);
+    background: var(--brand-pale);
+    color: var(--brand-dark);
 }
 
 .account-menu-item--danger:hover,
@@ -3661,7 +3666,7 @@ button:active {
     display: grid;
     gap: 18px;
     padding: 20px;
-    border: 1px solid var(--barbie-pale);
+    border: 1px solid var(--brand-pale);
     border-radius: var(--radius-md);
     background: var(--white);
     box-shadow: var(--shadow-md);
@@ -3673,7 +3678,7 @@ button:active {
     justify-content: space-between;
     gap: 12px;
     padding-bottom: 14px;
-    border-bottom: 1px solid var(--barbie-pale);
+    border-bottom: 1px solid var(--brand-pale);
 }
 
 .client-registration-heading h4 {
@@ -3715,7 +3720,7 @@ button:active {
 }
 
 .field-required {
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 .client-registration-form .input-wrapper .input-icon {
@@ -3753,7 +3758,7 @@ button:active {
 
 .client-contact-icon {
     margin-right: 4px;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 .client-avatar {
@@ -3763,8 +3768,8 @@ button:active {
     flex: 0 0 42px;
     place-items: center;
     border-radius: 50%;
-    color: var(--barbie-dark);
-    background: var(--barbie-pale);
+    color: var(--brand-dark);
+    background: var(--brand-pale);
     font-size: 16px;
 }
 
@@ -3807,14 +3812,14 @@ button:active {
 .quick-client-panel {
     margin: -4px 0 18px;
     padding: 14px;
-    border: 2px solid var(--barbie-light);
+    border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
     background: #fff8fa;
 }
 
 .quick-client-panel > strong {
     display: block;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 .quick-client-panel > p {
@@ -3826,7 +3831,7 @@ button:active {
 .client-card-details {
     grid-column: 1 / -1;
     padding-top: 14px;
-    border-top: 1px solid var(--barbie-pale);
+    border-top: 1px solid var(--brand-pale);
 }
 
 .client-history-list {
@@ -3837,7 +3842,7 @@ button:active {
     max-height: min(32vh, 300px);
     overflow-y: auto;
     padding: 4px 8px 4px 0;
-    scrollbar-color: var(--barbie-pink) var(--barbie-pale);
+    scrollbar-color: var(--brand-primary) var(--brand-pale);
     scrollbar-width: thin;
 }
 
@@ -3846,13 +3851,13 @@ button:active {
 }
 
 .client-history-list::-webkit-scrollbar-track {
-    background: var(--barbie-pale);
+    background: var(--brand-pale);
     border-radius: 8px;
 }
 
 .client-history-list::-webkit-scrollbar-thumb {
-    background: var(--barbie-pink);
-    border: 2px solid var(--barbie-pale);
+    background: var(--brand-primary);
+    border: 2px solid var(--brand-pale);
     border-radius: 8px;
 }
 
@@ -3862,7 +3867,7 @@ button:active {
     gap: 10px;
     padding: 9px 10px;
     border-radius: var(--radius-sm);
-    background: var(--barbie-pale);
+    background: var(--brand-pale);
     font-size: 12px;
 }
 
@@ -3881,7 +3886,7 @@ button:active {
     padding: 2px 0;
     border: 0;
     background: transparent;
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
     font: inherit;
     font-size: 11px;
     font-weight: 700;
@@ -3889,7 +3894,7 @@ button:active {
 }
 
 .client-history-more:active {
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 .detail-fields-stack {
@@ -3938,7 +3943,7 @@ button:active {
 .client-history-heading {
     margin-top: 22px;
     padding-top: 14px;
-    border-top: 1px solid var(--barbie-pale);
+    border-top: 1px solid var(--brand-pale);
 }
 
 .checkout-sena-banner {
@@ -3966,7 +3971,7 @@ button:active {
 }
 
 .history-card:hover {
-    border-color: var(--barbie-light);
+    border-color: var(--brand-light);
 }
 
 .stats-distribution-section {
@@ -3993,7 +3998,7 @@ button:active {
 
 .stats-panel {
     border-radius: var(--radius-lg);
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     background: var(--white);
     box-shadow: 0 4px 12px rgba(90, 61, 70, 0.02);
 }
@@ -4049,12 +4054,12 @@ button:active {
 .route-not-found-copy { max-width: 510px; color: #5a3d46; }
 .route-not-found-eyebrow {
     display: inline-flex; align-items: center; gap: 9px;
-    color: var(--barbie-pink); font-size: 13px; font-weight: 700;
+    color: var(--brand-primary); font-size: 13px; font-weight: 700;
     letter-spacing: .12em; text-transform: uppercase;
 }
 .route-not-found-eyebrow::before { content: '✦'; color: #e6b800; font-size: 18px; }
 .route-not-found-code {
-    margin: 12px 0 4px; color: var(--barbie-pink);
+    margin: 12px 0 4px; color: var(--brand-primary);
     font-family: 'Comfortaa', sans-serif;
     font-size: clamp(78px, 15vw, 158px); line-height: .88;
 }
@@ -4081,20 +4086,20 @@ button:active {
     padding: 0 20px;
     border-radius: var(--radius-md);
     color: var(--white);
-    background: linear-gradient(135deg, var(--barbie-pink) 0%, var(--barbie-dark) 100%);
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-dark) 100%);
     box-shadow: 0 5px 15px rgba(90, 61, 70, 0.3);
     font-family: 'Comfortaa', sans-serif;
     font-weight: 700;
     text-decoration: none;
-    border: 2px solid var(--barbie-pink);
+    border: 2px solid var(--brand-primary);
     box-sizing: border-box;
     transition: color 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
 }
 .route-not-found-copy .home-link:hover,
 .route-not-found-copy .home-link:active {
     background: var(--white);
-    color: var(--barbie-dark);
-    border-color: var(--barbie-pink);
+    color: var(--brand-dark);
+    border-color: var(--brand-primary);
 }
 .route-not-found-page > .app-footer {
     width: min(920px, 100%);
@@ -4122,13 +4127,13 @@ button:active {
 }
 
 .route-not-found-inline-icon i {
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
     font-size: 42px;
 }
 
 .route-not-found-inline-title {
     margin: 0;
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
     font-family: 'Comfortaa', sans-serif;
     font-size: 22px;
 }
@@ -4173,7 +4178,7 @@ button:active {
 }
 
 .client-history-price {
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-weight: 700;
 }
 
@@ -4219,7 +4224,7 @@ button:active {
     gap: 12px;
     margin-bottom: 18px;
     padding: 20px;
-    border: 1px solid var(--barbie-pale);
+    border: 1px solid var(--brand-pale);
     border-radius: var(--radius-md);
     background: var(--white);
     box-shadow: var(--shadow-md);
@@ -4264,7 +4269,7 @@ button:active {
     display: grid;
     gap: 12px;
     padding-top: 16px;
-    border-top: 1px solid var(--barbie-pale);
+    border-top: 1px solid var(--brand-pale);
 }
 
 .detail-advanced h4 {
@@ -4307,7 +4312,7 @@ button:active {
     padding-top: 6px;
     padding-bottom: 6px;
     font-size: 12px;
-    border: 2px solid var(--barbie-light);
+    border: 2px solid var(--brand-light);
     border-radius: 10px;
 }
 
@@ -4327,7 +4332,7 @@ button:active {
     min-width: 120px;
     min-height: 36px;
     padding: 6px 32px 6px 10px;
-    border: 2px solid var(--barbie-light);
+    border: 2px solid var(--brand-light);
     border-radius: 10px;
     color: var(--text-color);
     background: var(--white);
@@ -4335,14 +4340,14 @@ button:active {
     font-size: 12px;
     cursor: pointer;
     appearance: none;
-    background-image: linear-gradient(45deg, transparent 50%, var(--barbie-pink) 50%), linear-gradient(135deg, var(--barbie-pink) 50%, transparent 50%);
+    background-image: linear-gradient(45deg, transparent 50%, var(--brand-primary) 50%), linear-gradient(135deg, var(--brand-primary) 50%, transparent 50%);
     background-position: calc(100% - 15px) calc(50% - 2px), calc(100% - 10px) calc(50% - 2px);
     background-size: 5px 5px, 5px 5px;
     background-repeat: no-repeat;
 }
 
 .user-role-select:focus {
-    outline: 2px solid var(--barbie-pink);
+    outline: 2px solid var(--brand-primary);
     outline-offset: 2px;
 }
 
@@ -4378,14 +4383,14 @@ button:active {
 .cash-change-note {
     display: block;
     margin-top: 2px;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-size: 12px;
 }
 
 .combined-service-builder {
     margin-bottom: 15px;
     padding: 14px;
-    border: 2px solid var(--barbie-light);
+    border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
     background: #fff8f9;
 }
@@ -4395,13 +4400,13 @@ button:active {
     align-items: center;
     gap: 8px;
     margin-bottom: 12px;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-size: 13px;
     font-weight: 700;
 }
 
 .combined-service-icon {
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
 }
 
 .combined-service-row--first {
@@ -4437,7 +4442,7 @@ button:active {
     align-items: center;
     justify-content: space-between;
     padding: 12px 14px;
-    border: 2px solid var(--barbie-light);
+    border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
     background: var(--white);
 }
@@ -4479,7 +4484,7 @@ button:active {
 }
 
 .deposit-amount {
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
 }
 
 .cash-payment-section {
@@ -4496,7 +4501,7 @@ button:active {
 
 .cash-payment-icon {
     margin-right: 4px;
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
 }
 
 .cash-helper-text--spaced {
@@ -4514,7 +4519,7 @@ button:active {
 /* Reparto del cobro combinado (Registrar Servicio) */
 .combined-split-box {
     background: var(--soft-bg, #fdf3f8);
-    border: 1px solid var(--barbie-pink, #ff6fb5);
+    border: 1px solid var(--brand-primary, #ff6fb5);
     border-radius: 14px;
     padding: 14px;
     margin-bottom: 16px;
@@ -4574,7 +4579,7 @@ button:active {
 }
 
 .cash-return-method-grid .pay-btn.is-selected {
-    border-color: var(--barbie-pink);
+    border-color: var(--brand-primary);
     background: rgba(255, 105, 180, 0.08);
 }
 
@@ -4631,14 +4636,14 @@ button:active {
 .calendar-empty-icon {
     display: block;
     margin-bottom: 8px;
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
     font-size: 24px;
 }
 
 .calendar-empty-action {
     display: block;
     margin-top: 4px;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-size: 11px;
     font-weight: 700;
 }
@@ -4983,7 +4988,7 @@ button:active {
 .appointment-card,
 .price-category-group {
     padding: 14px;
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     border-radius: var(--radius-md);
     background: var(--white);
     box-shadow: var(--shadow-md);
@@ -4997,7 +5002,7 @@ button:active {
 .expense-card:hover,
 .appointment-card:hover,
 .price-category-group:hover {
-    border-color: var(--barbie-light);
+    border-color: var(--brand-light);
     transform: none;
 }
 
@@ -5017,7 +5022,7 @@ button:active {
 }
 
 .expense-category {
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     font-weight: 600;
 }
 
@@ -5041,7 +5046,7 @@ button:active {
 .history-card,
 .user-card {
     padding: 12px;
-    border: 2px solid var(--barbie-pale);
+    border: 2px solid var(--brand-pale);
     border-radius: var(--radius-sm);
     background: var(--white);
     box-shadow: none;
@@ -5061,7 +5066,7 @@ button:active {
 .client-card:hover,
 .history-card:hover,
 .user-card:hover {
-    border-color: var(--barbie-light);
+    border-color: var(--brand-light);
     transform: none;
 }
 
@@ -5098,7 +5103,7 @@ button:active {
     font-family: 'Comfortaa', sans-serif;
     font-size: 18px;
     font-weight: 700;
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
     white-space: nowrap;
 }
 
@@ -5107,13 +5112,13 @@ button:active {
 }
 
 /* Avatar del gasto (icono de categoría): mismo círculo que Clientes/Usuarios y
-   misma paleta de iconos (color: var(--barbie-dark) sobre background: var(--barbie-pale)) */
+   misma paleta de iconos (color: var(--brand-dark) sobre background: var(--brand-pale)) */
 .expense-avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: var(--barbie-pale);
-    color: var(--barbie-dark);
+    background: var(--brand-pale);
+    color: var(--brand-dark);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -5243,7 +5248,7 @@ button:active {
     min-height: 44px;
     padding: 10px 14px 10px 40px;
     background: var(--white);
-    border: 1px solid var(--barbie-light);
+    border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
     color: var(--text-color);
     font-size: 14px;
@@ -5260,7 +5265,7 @@ button:active {
 
 #expense-registration-form .input-wrapper input:focus,
 #expense-registration-form .input-wrapper select:focus {
-    border-color: var(--barbie-pink);
+    border-color: var(--brand-primary);
     box-shadow: var(--shadow-focus);
     outline: none;
 }
@@ -5288,7 +5293,7 @@ button:active {
     justify-content: center;
     gap: 10px;
     padding: 12px 14px;
-    border: 1px solid var(--barbie-light);
+    border: 1px solid var(--brand-light);
     border-radius: var(--radius-sm);
     background: var(--white);
     cursor: pointer;
@@ -5299,7 +5304,7 @@ button:active {
 
 .payment-method-selector .pay-btn:hover,
 .payment-method-selector .pay-btn:focus-visible {
-    border-color: var(--barbie-pink);
+    border-color: var(--brand-primary);
     box-shadow: var(--shadow-focus);
     outline: none;
 }
@@ -5335,9 +5340,9 @@ button:active {
 
 /* Resaltado de selección sobre la caja .pay-btn (no sobre el content). */
 .payment-method-selector .pay-btn:has(input:checked) {
-    border-color: var(--barbie-pink);
-    background: var(--barbie-pale);
-    color: var(--barbie-dark);
+    border-color: var(--brand-primary);
+    background: var(--brand-pale);
+    color: var(--brand-dark);
 }
 
 /* Neutraliza el resaltado viejo de .pay-btn-content (ahora transparente). */
@@ -5354,7 +5359,7 @@ button:active {
     gap: 10px;
     margin-top: 20px;
     padding-top: 16px;
-    border-top: 1px solid var(--barbie-light);
+    border-top: 1px solid var(--brand-light);
 }
 
 /* En móvil, las acciones se estiran para aprovechar el ancho: los
@@ -5400,12 +5405,12 @@ button:active {
 
 .prices-access-icon {
     margin-bottom: 12px;
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
     font-size: 48px;
 }
 
 .prices-access-title {
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 .prices-access-description {
@@ -5431,7 +5436,7 @@ button:active {
 .cash-pink-icon,
 .panel-heading-icon {
     margin-right: 6px;
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
 }
 
 .cash-breakdown-label {
@@ -5479,14 +5484,14 @@ button:active {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: var(--barbie-pale);
+    background: var(--brand-pale);
     font-size: 16px;
 }
 
 /* Iconos de listado: paleta unificada (mismo tono que los avatares) */
 .cash-movement-icon.is-deposit,
 .cash-movement-icon.is-withdrawal {
-    color: var(--barbie-dark);
+    color: var(--brand-dark);
 }
 
 .cash-movement-separator {
@@ -5506,7 +5511,7 @@ button:active {
 }
 
 .setting-icon {
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
     font-size: 16px;
 }
 
@@ -5549,7 +5554,7 @@ button:active {
 }
 
 .stats-kpi-icon {
-    color: var(--barbie-pink);
+    color: var(--brand-primary);
 }
 
 .stats-kpi-icon.kpi-pending,
@@ -5675,8 +5680,8 @@ button:active {
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: var(--barbie-pale);
-    color: var(--barbie-pink);
+    background: var(--brand-pale);
+    color: var(--brand-primary);
     font-size: 28px;
     display: flex;
     align-items: center;
@@ -5713,7 +5718,7 @@ button:active {
     justify-content: space-between;
     align-items: center;
     padding: 8px 0;
-    border-bottom: 1px solid var(--barbie-light);
+    border-bottom: 1px solid var(--brand-light);
 }
 
 .about-row:last-child {

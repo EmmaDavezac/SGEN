@@ -1,12 +1,13 @@
 import React from 'react';
 import { APP_VERSION } from '../version.js';
+import { BUSINESS } from '../businessConfig.js';
 import Modal from './Modal.jsx';
 
 function AboutModal({ open, onClose }) {
   return (
     <Modal
       open={open}
-      title="Acerca de Evolet Studio"
+      title={`Acerca de ${BUSINESS.nombre}`}
       subtitle={`Versión ${APP_VERSION}`}
       onClose={onClose}
       showCloseButton
@@ -24,8 +25,8 @@ function AboutModal({ open, onClose }) {
           Información
         </h4>
         <div className="about-row">
-          <span className="about-label">Desarrollado por</span>
-          <span className="about-value">Emmanuel Davezac</span>
+          <span className="about-label">{BUSINESS.textos.developedBy}</span>
+          <span className="about-value">{BUSINESS.textos.desarrolladoPor}</span>
         </div>
       </div>
     </Modal>

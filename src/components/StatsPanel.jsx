@@ -496,7 +496,7 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
         {
             id: 'kpi-month-income',
             icon: 'fa-arrow-trend-up',
-            iconColor: 'var(--barbie-pink)',
+            iconColor: 'var(--brand-primary)',
             label: 'Recaudado últimos 30 días',
             numeric: Number(stats.recentIncome) || 0,
             prefix: '$'
@@ -528,7 +528,7 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
         {
             id: 'kpi-week-income',
             icon: 'fa-regular fa-calendar',
-            iconColor: 'var(--barbie-pink)',
+            iconColor: 'var(--brand-primary)',
             label: 'Ingresos últimos 30 días',
             numeric: Number(stats.recentIncome) || 0,
             prefix: '$'
@@ -552,7 +552,7 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
         {
             id: 'kpi-average-ticket',
             icon: 'fa-hand-holding-dollar',
-            iconColor: 'var(--barbie-pink)',
+            iconColor: 'var(--brand-primary)',
             label: 'Ticket Promedio',
             numeric: Number(stats.avgTicket) || 0,
             prefix: '$'

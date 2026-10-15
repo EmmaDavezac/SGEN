@@ -10,6 +10,7 @@ import { estadoBadgeClass, estadoLabel } from '../appointmentActions.js';
 import SkeletonList, { useSearching } from './SkeletonList.jsx';
 import { useFormGuard } from '../formGuard.js';
 import { usePullToRefreshHandler } from '../pullToRefresh.js';
+import { BUSINESS } from '../businessConfig.js';
 
 function normalizeClientRecord(client) {
   if (!client || typeof client !== 'object') return null;
@@ -535,7 +536,7 @@ function ClientsPanel({ session, notify, showLoader }) {
       <div className={`section-title ${registrationOpen ? 'section-title-with-back' : 'section-title-with-action'}`}>
         <div className="section-title-text">
           <h3>Clientes</h3>
-          <p>Consultá y agregá las clientes de Evolet Studio.</p>
+          <p>Consultá y agregá las clientes de {BUSINESS.nombre}.</p>
         </div>
         <button
           type="button"

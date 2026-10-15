@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { signInWithSupabase, supabase } from './supabase.js';
 import AppLayout from './components/AppLayout.jsx';
+import { BUSINESS } from './businessConfig.js';
 import Button, { DetailActionButton, PanelCancelButton, PanelSaveButton } from './components/Button.jsx';
 import WriteProgressOverlay from './components/WriteProgressOverlay.jsx';
 import { runSteps, createSteps } from './progressTask.js';
@@ -45,7 +46,7 @@ function RouteNotFound({ onGoHome }) {
                     <img src="/icons/favicon.svg?v=2" alt="" />
                 </div>
                 <section className="route-not-found-copy" aria-labelledby="route-not-found-title">
-                    <div className="route-not-found-eyebrow">Evolet Studio</div>
+                    <div className="route-not-found-eyebrow">{BUSINESS.nombre}</div>
                     <h1 className="route-not-found-code">404</h1>
                     <h2 id="route-not-found-title">Página no encontrada</h2>
                     <p>No encontramos la página que buscabas. Volvé al inicio para continuar.</p>
@@ -785,15 +786,15 @@ function App() {
                     <div className="login-card">
                         <div className="brand-logo-container">
                             <div className="logo-circle">
-                                <img id="logo-img" src="/icons/favicon.svg" alt="Evolet Studio" />
+                                <img id="logo-img" src="/icons/favicon.svg" alt={BUSINESS.nombre} />
                             </div>
                         </div>
-                        <h1>Evolet Studio</h1>
+                        <h1>{BUSINESS.nombre}</h1>
                         <p className="subtitle">Ingresando…</p>
                     </div>
                 </section>
             ) : !session ? (
-                <section className="login-screen active" aria-label="Login de Evolet Studio">
+                <section className="login-screen active" aria-label={`Login de ${BUSINESS.nombre}`}>
                     <div className="sparkles-bg" aria-hidden="true" />
                     <div className="login-card">
                         <div className="brand-logo-container">
@@ -801,13 +802,16 @@ function App() {
                                 <img
                                     id="logo-img"
                                     src="/icons/favicon.svg"
-                                    alt="Evolet Studio"
+                                    alt={BUSINESS.nombre}
                                     onError={(e) => {
                                         const target = e.currentTarget;
                                         if (target && target.parentNode) {
                                             const fallback = document.createElement('i');
                                             fallback.className = 'fa-solid fa-crown logo-fallback';
-                                            fallback.style.color = 'var(--barbie-pink)';
+                                            const colorPrimario = getComputedStyle(document.documentElement)
+                                                .getPropertyValue('--brand-primary')
+                                                .trim();
+                                            fallback.style.color = colorPrimario || '#FF69B4';
                                             fallback.setAttribute('aria-hidden', 'true');
                                             target.parentNode.replaceChild(fallback, target);
                                         }
@@ -816,7 +820,7 @@ function App() {
                             </div>
                         </div>
 
-                        <h1>Evolet Studio</h1>
+                        <h1>{BUSINESS.nombre}</h1>
                         <p className="subtitle">Sistema de Contabilidad</p>
 
                         {passwordResetMode === true ? (

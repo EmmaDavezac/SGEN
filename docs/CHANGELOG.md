@@ -1,5 +1,18 @@
 # Changelog — SGEN
 
+## v1.3.4 — 2026-10-15 (SW v36)
+
+### Cambios
+- White-label / multi-negocio: nombre del negocio, logo, moneda, textos del negocio y colores de marca dejan de estar hardcodeados. Se configuran en `src/businessConfig.js` (BUSINESS + TEMAS).
+- `src/theme.js`: inyecta las CSS custom properties del tema activo en `:root`, permitiendo cambiar de tema sin recargar y añadir temas nuevos sumando entradas al diccionario `TEMAS`.
+- `style.css`: variables de marca renombradas de `--barbie-*` a `--brand-*` (genéricas), con valores por defecto del tema actual. Los temas las sobrescriben desde JS sin tocar la hoja de estilos.
+- `scripts/generar-assets-negocio.mjs`: regenera `index.html`, `404.html` y `public/manifest.json` con el nombre del negocio activo al hacer build.
+- Pantalla de login, header, footer, About, tickets y paneles usan `BUSINESS.nombre` en lugar de "Evolet Studio" hardcodeado.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v35 → v36) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- (hash se completa tras el commit)
+
 ## v1.3.3 — 2026-10-15 (SW v35)
 
 ### Cambios

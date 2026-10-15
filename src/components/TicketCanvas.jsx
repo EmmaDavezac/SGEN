@@ -1,4 +1,5 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { BUSINESS } from '../businessConfig.js';
 
 function normalizeDateValue(fechaValue) {
     if (!fechaValue) return null;
@@ -319,7 +320,7 @@ export async function shareServiceTicketAsImage(item, canvasRef, notify) {
                 try {
                     await navigator.share({
                         files: [file],
-                        title: 'Ticket Evolet Studio',
+                        title: `Ticket ${BUSINESS.nombre}`,
                         text: `Ticket de ${item.cliente} - ${item.servicio}`
                     });
                     resolve({ success: true });
