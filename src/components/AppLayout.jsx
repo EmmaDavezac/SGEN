@@ -1,9 +1,11 @@
 import React, { useRef, useState } from 'react';
 import AppFooter from './AppFooter.jsx';
+import AboutModal from './AboutModal.jsx';
 import { usePullToRefreshGesture } from '../pullToRefresh.js';
 
 function AppLayout({ children, session, onLogout, activeTab, setActiveTab, settings = {} }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const isAdmin = session && (session.rol === 'admin' || session.rol === 'superadmin');
   const isSuperadmin = session && session.rol === 'superadmin';
   const { allowCajasTab = false } = settings;
@@ -62,9 +64,20 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
               >
                 <i className="fa-solid fa-user-gear"></i> Mi cuenta
               </button>
-              <button 
-                id="menu-logout" 
-                className="account-menu-item account-menu-item--danger" 
+              <button
+                id="menu-about"
+                className="account-menu-item"
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setAboutOpen(true);
+                }}
+              >
+                <i className="fa-solid fa-circle-info"></i> Acerca de
+              </button>
+              <button
+                id="menu-logout"
+                className="account-menu-item account-menu-item--danger"
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
@@ -174,6 +187,7 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
         )}
 
       </nav>
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </section>
   );
 }
