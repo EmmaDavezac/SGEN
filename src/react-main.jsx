@@ -1,7 +1,6 @@
 import React, { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fortawesome/fontawesome-free/css/all.min.css';
-import '../style.css';
 import App from './App.jsx';
 import AppUpdateOverlay from './components/AppUpdateOverlay.jsx';
 import { initAppVersionWatcher } from './appUpdate.js';

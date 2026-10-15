@@ -1,4 +1,4 @@
-import { obtenerTema } from './businessConfig.js';
+import { BUSINESS, obtenerTema } from './businessConfig.js';
 
 // Claves de localStorage para recordar el tema y el modo elegido por dispositivo.
 const TEMA_STORAGE_KEY = 'sgen_tema';
