@@ -1,5 +1,14 @@
 # Changelog — SGEN
 
+## v1.3.1 — 2026-10-15 (SW v33)
+
+### Cambios
+- Fix crítico: `Toast.jsx` se importaba a sí mismo (recursión infinita) provocando pantalla blanca al cargar la app. Ahora es solo el componente visual que consume `ToastContext` (que `App.jsx` ya provee mediante `ToastProvider`).
+- Bump de `CACHE_VERSION` en `public/sw.js` (v32 → v33) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- fix(ui): arreglar importación recursiva en Toast.jsx que causaba pantalla blanca (SW v32 → v33)
+
 ## v1.3.0 — 2026-10-15 (SW v32)
 
 ### Cambios

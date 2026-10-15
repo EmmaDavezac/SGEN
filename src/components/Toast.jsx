@@ -1,10 +1,7 @@
 import React from 'react';
-import Toast from './Toast.jsx';
-import { ToastProvider } from './ToastContext.jsx';
 import { ToastContext } from './ToastContext.jsx';
 
-export default function ToastContainer() {
-  return <ToastProvider><Toast /></ToastProvider>;
+export default function Toast() {
   const ctx = React.useContext(ToastContext);
   if (!ctx || !ctx.toasts || ctx.toasts.length === 0) return null;
 
