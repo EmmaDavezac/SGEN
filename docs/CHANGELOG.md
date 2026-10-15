@@ -9,4 +9,4 @@
 - Bump de `CACHE_VERSION` en `public/sw.js` (v31 → v32) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
-- (pendiente de commit al cerrar la versión)
+- 1887e7c feat(turnos): bloquear creación y reagendamiento de turnos solapados para el mismo usuario (SW v31 → v32)
