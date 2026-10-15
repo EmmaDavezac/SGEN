@@ -279,6 +279,41 @@ export async function saveCashMovementToDatabase(payload) {
 
 export async function saveAppointmentToDatabase(payload) {
     if (!supabase) throw new Error('Supabase no está disponible.');
+
+    const usuarioId = payload.usuario_id;
+    const fecha = payload.fecha;
+    const horaInicio = payload.hora_inicio;
+    const horaFin = payload.hora_fin;
+
+    // Regla de negocio: un usuario no puede crear dos turnos al mismo tiempo.
+    // Si ya existe un turno (no cancelado) del mismo usuario en la misma fecha
+    // cuyos horarios se solapan, se rechaza la creación.
+    if (usuarioId && fecha && horaInicio && horaFin) {
+        const { data: solapados, error: solapError } = await supabase
+            .from('turnos')
+            .select('id, hora_inicio, hora_fin, servicio')
+            .eq('usuario_id', usuarioId)
+            .eq('fecha', fecha)
+            .neq('estado', 'cancelado')
+            .lt('hora_inicio', horaFin)
+            .gt('hora_fin', horaInicio);
+
+        if (solapError) throw solapError;
+
+        if (solapados && solapados.length > 0) {
+            const conflicto = solapados[0];
+            const hi = new Date(conflicto.hora_inicio).toLocaleTimeString('es-AR', {
+                hour: '2-digit', minute: '2-digit', hour12: false
+            });
+            const hf = new Date(conflicto.hora_fin).toLocaleTimeString('es-AR', {
+                hour: '2-digit', minute: '2-digit', hour12: false
+            });
+            throw new Error(
+                `Ya tenés un turno agendado para el ${fecha} de ${hi} a ${hf} (${conflicto.servicio}). No se pueden crear dos turnos al mismo tiempo.`
+            );
+        }
+    }
+
     const { data, error } = await supabase
         .from('turnos')
         .insert(payload)
@@ -303,6 +338,61 @@ export async function updateAppointmentStatusInDatabase(id, updates) {
 
 export async function updateAppointmentInDatabase({ id = null, legacyId = null, updates = {} } = {}) {
     if (!supabase) throw new Error('Supabase no está disponible.');
+
+    const tocaHorario = Boolean(updates.hora_inicio || updates.hora_fin || updates.fecha);
+    let turnoActual = null;
+    let usuarioId = null;
+
+    // Si se toca fecha/horario, necesitamos el turno actual para obtener
+    // usuario_id y los valores actuales (fallback cuando no se pasan todos).
+    if (tocaHorario) {
+        const columna = id ? 'id' : 'legacy_id';
+        const valor = id || legacyId;
+        const { data: existente, error: errExistente } = await supabase
+            .from('turnos')
+            .select('id, usuario_id, fecha, hora_inicio, hora_fin, estado')
+            .eq(columna, valor)
+            .maybeSingle();
+        if (errExistente) throw errExistente;
+        if (!existente) throw new Error('No se encontró el turno para actualizar.');
+        turnoActual = existente;
+        usuarioId = existente.usuario_id;
+    }
+
+    // Regla de negocio: un usuario no puede tener dos turnos solapados.
+    // Al reagendar, se excluye el turno que se está editando para que no
+    // choque consigo mismo. Los turnos cancelados no bloquean el horario.
+    if (tocaHorario && usuarioId && turnoActual) {
+        const nuevaFecha = updates.fecha || turnoActual.fecha;
+        const nuevaHoraInicio = updates.hora_inicio || turnoActual.hora_inicio;
+        const nuevaHoraFin = updates.hora_fin || turnoActual.hora_fin;
+
+        const { data: solapados, error: solapError } = await supabase
+            .from('turnos')
+            .select('id, hora_inicio, hora_fin, servicio')
+            .eq('usuario_id', usuarioId)
+            .eq('fecha', nuevaFecha)
+            .neq('estado', 'cancelado')
+            .neq('id', turnoActual.id)
+            .lt('hora_inicio', nuevaHoraFin)
+            .gt('hora_fin', nuevaHoraInicio);
+
+        if (solapError) throw solapError;
+
+        if (solapados && solapados.length > 0) {
+            const conflicto = solapados[0];
+            const hi = new Date(conflicto.hora_inicio).toLocaleTimeString('es-AR', {
+                hour: '2-digit', minute: '2-digit', hour12: false
+            });
+            const hf = new Date(conflicto.hora_fin).toLocaleTimeString('es-AR', {
+                hour: '2-digit', minute: '2-digit', hour12: false
+            });
+            throw new Error(
+                `Ya tenés un turno agendado para el ${nuevaFecha} de ${hi} a ${hf} (${conflicto.servicio}). No se pueden crear dos turnos al mismo tiempo.`
+            );
+        }
+    }
+
     let query = supabase.from('turnos').update(updates);
     query = id ? query.eq('id', id) : query.eq('legacy_id', legacyId);
     const { data, error } = await query
