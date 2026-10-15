@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase } from '../supabase.js';
+import { ensureAuthSession, supabase } from '../supabase.js';
+import { notifySessionExpired } from '../services.js';
 import { ListIconButton, PanelCancelButton, PanelSaveButton } from './Button.jsx';
 import { ConfirmModal } from './Modal.jsx';
 import {
@@ -42,6 +43,14 @@ function PricesPanel({ session, notify, showLoader }) {
     const loadCatalog = useCallback(async () => {
         if (!supabase) return;
         try {
+            // Con el JWT vencido RLS devuelve [] sin error: validar antes para
+            // no mostrar el catálogo por defecto como si fuera el real.
+            try {
+                await ensureAuthSession();
+            } catch (authError) {
+                notifySessionExpired();
+                throw authError;
+            }
             const [categoryResult, priceResult] = await Promise.all([
                 supabase.from('categorias_servicio').select('clave, nombre, activo').order('nombre'),
                 supabase.from('precios').select('categoria, nombre, precio, activo').order('categoria').order('nombre')

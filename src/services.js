@@ -1,4 +1,24 @@
-import { supabase } from './supabase.js';
+import { ensureAuthSession, supabase } from './supabase.js';
+
+// Aviso global cuando una consulta detecta sesión expirada: App lo escucha
+// para cerrar la sesión local y llevar al login (evita listados vacíos).
+export function notifySessionExpired() {
+    try {
+        window.dispatchEvent(new CustomEvent('evolet:sesion-expirada'));
+    } catch (error) { /* ignore */ }
+}
+
+// Las lecturas con RLS devuelven `[]` SIN error cuando el JWT expiró (la
+// consulta corre como anónima). Validar la sesión antes evita pisar el caché
+// local con vacíos y deja que App fuerce un login fresco.
+async function requireAuthForRead() {
+    try {
+        await ensureAuthSession();
+    } catch (error) {
+        notifySessionExpired();
+        throw error;
+    }
+}
 
 export function normalizeServiceRecord(item) {
     if (!item || typeof item !== 'object') {
@@ -114,6 +134,7 @@ export async function registerServiceDirectly(transaction) {
 
 export async function loadClientsFromDatabase() {
     if (!supabase) throw new Error('Supabase no está disponible.');
+    await requireAuthForRead();
     const { data, error } = await supabase
         .from('clientes')
         .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
@@ -124,6 +145,7 @@ export async function loadClientsFromDatabase() {
 
 export async function loadAppointmentsFromDatabase() {
     if (!supabase) throw new Error('Supabase no está disponible.');
+    await requireAuthForRead();
     const { data, error } = await supabase
         .from('turnos')
         .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, motivo_cancelacion, event_id, cliente_id')
@@ -134,6 +156,7 @@ export async function loadAppointmentsFromDatabase() {
 
 export async function loadExpensesFromDatabase() {
     if (!supabase) throw new Error('Supabase no está disponible.');
+    await requireAuthForRead();
     const { data, error } = await supabase
         .from('gastos')
         .select('id, fecha, concepto, categoria, monto, metodo_pago')
@@ -144,6 +167,7 @@ export async function loadExpensesFromDatabase() {
 
 export async function loadServicesFromDatabase() {
     if (!supabase) throw new Error('Supabase no está disponible.');
+    await requireAuthForRead();
     const { data, error } = await supabase
         .from('servicios')
         .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
@@ -154,6 +178,7 @@ export async function loadServicesFromDatabase() {
 
 export async function loadCashboxDataFromDatabase() {
     if (!supabase) throw new Error('Supabase no está disponible.');
+    await requireAuthForRead();
     const [servicesResult, movementsResult, expensesResult] = await Promise.all([
         supabase.from('servicios').select('precio, sena, metodo_pago, monto_efectivo, monto_transferencia, completado'),
         supabase.from('movimientos_caja').select('*').order('fecha', { ascending: false }).limit(50),
@@ -342,6 +367,7 @@ export async function hasLinkedServiceForTurno(turnoId) {
  */
 export async function loadTurnoDetail(turnoId) {
     if (!supabase) throw new Error('Supabase no está disponible.');
+    await requireAuthForRead();
     const empty = { pagos: [], servicio: null };
     if (!turnoId) return empty;
     const uuid = await resolveTurnoUuid(turnoId).catch(() => null);

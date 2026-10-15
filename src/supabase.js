@@ -29,6 +29,23 @@ export async function signInWithSupabase(email, password) {
     return { ...profile, authId: data.user.id };
 }
 
+/**
+ * Valida que haya un token de Supabase Auth utilizable antes de consultar.
+ * Lanza `Error('SESIÓN_EXPIRADA')` si no hay sesión o el refresh falla: así
+ * los paneles NO pisan el caché local con el `[]` que RLS devuelve como
+ * anónimo y App puede forzar el logout/login en vez de mostrar todo vacío.
+ */
+export async function ensureAuthSession() {
+    if (!supabase) throw new Error('Supabase no está configurado.');
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session?.user) {
+        const expired = new Error('Tu sesión expiró. Volvé a iniciar sesión.');
+        expired.code = 'SESION_EXPIRADA';
+        throw expired;
+    }
+    return data.session;
+}
+
 export async function getValidSession() {
     if (!supabase) throw new Error('Supabase no está configurado.');
 

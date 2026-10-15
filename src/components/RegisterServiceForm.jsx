@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { supabase } from '../supabase.js';
-import { finalizeRegisteredService, registerServiceDirectly, saveExpenseToDatabase } from '../services.js';
+import { ensureAuthSession, supabase } from '../supabase.js';
+import { finalizeRegisteredService, notifySessionExpired, registerServiceDirectly, saveExpenseToDatabase } from '../services.js';
 import { cloneServiceCatalog, DEFAULT_SERVICE_CATEGORIES, DEFAULT_SERVICE_CATALOG, sortCategoriesForDisplay } from '../serviceCatalog.js';
 import { computeCombinedSplit } from '../paymentSplit.js';
 import Button, { DetailActionButton } from './Button.jsx';
@@ -64,6 +64,11 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     useEffect(() => {
         async function fetchClients() {
             try {
+                // Evita autocompletado vacío por JWT vencido (RLS -> []).
+                await ensureAuthSession().catch((authError) => {
+                    notifySessionExpired();
+                    throw authError;
+                });
                 const { data, error } = await supabase
                     .from('clientes')
                     .select('nombre')
@@ -81,6 +86,11 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     useEffect(() => {
         async function fetchPrices() {
             try {
+                // Evita catálogo por defecto por JWT vencido (RLS -> []).
+                await ensureAuthSession().catch((authError) => {
+                    notifySessionExpired();
+                    throw authError;
+                });
                 const [categoryResult, priceResult] = await Promise.all([
                     supabase.from('categorias_servicio').select('clave, nombre, activo').eq('activo', true).order('nombre'),
                     supabase.from('precios').select('categoria, nombre, precio, activo').eq('activo', true).order('categoria').order('nombre')

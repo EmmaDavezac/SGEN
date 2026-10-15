@@ -128,6 +128,9 @@ function ToastBridge({ notifyRef }) {
 
 function App() {
     const [session, setSession] = useState(() => readStoredSession());
+    // `false` hasta validar la sesión guardada contra Supabase Auth. Evita que
+    // los paneles monten (y pisen el caché con []) con una sesión rancia.
+    const [authReady, setAuthReady] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     // Tarea de escritura en curso para la pantalla de progreso unificada.
@@ -260,24 +263,72 @@ function App() {
     }, [session]);
 
     useEffect(() => {
-        if (!supabase) return undefined;
+        if (!supabase) {
+            setAuthReady(true);
+            return undefined;
+        }
 
         let isActive = true;
-        supabase.auth.getSession().then(({ data, error }) => {
-            if (!isActive || error || !data.session?.user) return;
 
-            supabase
-                .from('perfiles')
-                .select('id, email, nombre, rol')
-                .eq('id', data.session.user.id)
-                .maybeSingle()
-                .then(({ data: profile, error: profileError }) => {
-                    if (!isActive || profileError || !profile) return;
-                    setSession({ ...profile, authId: data.session.user.id });
-                });
-        });
+        // Al abrir la PWA (también al volver tras horas en segundo plano) se
+        // valida la sesión guardada contra Supabase Auth:
+        // - Sin sesión de Supabase -> se limpia la sesión local (la UI vuelve
+        //   al login en vez de mostrar listados vacíos que no se recuperan).
+        // - Con sesión -> se intenta renovar el token (puede haber expirado) y
+        //   se rehidrata el perfil. Si el perfil ya no es legible (RLS), se
+        //   limpia la sesión local para forzar un login fresco.
+        const validateStoredSession = async () => {
+            try {
+                const { data, error } = await supabase.auth.getSession();
+                if (!isActive) return;
+                const authUser = error ? null : data.session?.user;
+                if (!authUser) {
+                    if (readStoredSession()) setSession(null);
+                    return;
+                }
+                try {
+                    const refreshed = await supabase.auth.refreshSession();
+                    if (!isActive) return;
+                    if (refreshed.error || !refreshed.data.session?.user) {
+                        setSession(null);
+                        return;
+                    }
+                } catch (refreshError) {
+                    // Sin red (PWA offline): se conserva la sesión guardada y
+                    // los paneles muestran su caché; no se cierra sesión.
+                    console.warn('No se pudo renovar la sesión (posible offline):', refreshError);
+                    return;
+                }
+                const { data: profile, error: profileError } = await supabase
+                    .from('perfiles')
+                    .select('id, email, nombre, rol')
+                    .eq('id', authUser.id)
+                    .maybeSingle();
+                if (!isActive) return;
+                if (profileError || !profile) {
+                    setSession(null);
+                    return;
+                }
+                setSession({ ...profile, authId: authUser.id });
+            } finally {
+                if (isActive) setAuthReady(true);
+            }
+        };
+
+        validateStoredSession();
 
         const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+            if (event === 'SIGNED_OUT') {
+                if (isActive) {
+                    setSession(null);
+                    setAuthReady(true);
+                }
+                return;
+            }
+            if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                validateStoredSession();
+                return;
+            }
             if (event === 'PASSWORD_RECOVERY') {
                 setSession(null);
                 setPasswordResetMode(true);
@@ -288,9 +339,18 @@ function App() {
                 window.history.replaceState({}, document.title, `${callbackUrl.pathname}${callbackUrl.search}`);
             }
         });
+
+        // La PWA puede volver del segundo plano con el JWT ya vencido: al
+        // hacerse visible se revalida la sesión (renueva el token) en vez de
+        // dejar los listados consultando como anónimo (RLS -> [] en caché).
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') validateStoredSession();
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
         return () => {
             isActive = false;
             authListener.subscription.unsubscribe();
+            document.removeEventListener('visibilitychange', handleVisibility);
         };
     }, []);
 
@@ -411,6 +471,18 @@ function App() {
             setTask(null);
         }
     }, []);
+
+    useEffect(() => {
+        // Cuando una consulta detecta sesión expirada (RLS devolvía [] sin
+        // error), se limpia la sesión local y la UI vuelve al login con aviso.
+        const handleSessionExpired = () => {
+            setSession(null);
+            setAuthReady(true);
+            notify('Tu sesión expiró. Volvé a iniciar sesión.', 'error');
+        };
+        window.addEventListener('evolet:sesion-expirada', handleSessionExpired);
+        return () => window.removeEventListener('evolet:sesion-expirada', handleSessionExpired);
+    }, [notify]);
 
     const handleLogin = async (event) => {
         event.preventDefault();
@@ -692,6 +764,19 @@ function App() {
 
             {routeNotFound ? (
                 <RouteNotFound onGoHome={() => setActiveTab(DEFAULT_TAB)} />
+            ) : !authReady ? (
+                <section className="login-screen active" aria-label="Verificando sesión">
+                    <div className="sparkles-bg" aria-hidden="true" />
+                    <div className="login-card">
+                        <div className="brand-logo-container">
+                            <div className="logo-circle">
+                                <img id="logo-img" src="/icons/favicon.svg" alt="Evolet Studio" />
+                            </div>
+                        </div>
+                        <h1>Evolet Studio</h1>
+                        <p className="subtitle">Verificando tu sesión…</p>
+                    </div>
+                </section>
             ) : !session ? (
                 <section className="login-screen active" aria-label="Login de Evolet Studio">
                     <div className="sparkles-bg" aria-hidden="true" />
