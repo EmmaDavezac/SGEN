@@ -1,5 +1,15 @@
 # Changelog — SGEN
 
+## v1.3.6 — 2026-10-15 (SW v39)
+
+### Cambios
+- Modo oscuro ahora aplica correctamente a contenedores y cards: el tema `barbie` en modo oscuro define todas las variables que el CSS usa (`--text-color`, `--text-muted`, `--text-light`, `--white`, `--color-danger`, `--color-focus`, `--color-danger-dark`, `--shadow-focus`) con los nombres exactos, y las sombras (`--shadow-md`, `--shadow-inset`) usan formato completo (offsets + color).
+- `background: #ffffff` hardcodeado en `.write-progress-card` cambiado a `var(--cream-bg)` para que responda al tema activo.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v38 → v39) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- (hash se completa tras el commit)
+
 ## v1.3.5 — 2026-10-15 (SW v37)
 
 ### Cambios

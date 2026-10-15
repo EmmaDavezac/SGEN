@@ -62,24 +62,31 @@ export const TEMAS = {
       '--cream-bg': '#FFF0F5',
     },
     oscuro: {
+      /* Paleta de marca (mismos tonos barbie, fondos oscuros) */
       '--brand-primary': '#FF69B4',
       '--brand-dark': '#FF1493',
       '--brand-light': '#FFB7D1',
       '--brand-pale': '#1a141a',
-      '--brand-text': '#e8e0e6',
-      '--brand-text-muted': '#b8a8b0',
-      '--brand-text-light': '#a090a0',
-      '--brand-bg': '#121016',
-      '--brand-accent': '#FFD700',
-      '--brand-accent-dark': '#E6B800',
-      '--brand-danger': '#FF4D4D',
-      '--brand-focus': '#7A4DFF',
+      '--cream-bg': '#121016',
+      '--white': '#1a141a',
+      '--gold': '#FFD700',
+      '--gold-dark': '#E6B800',
+
+      /* Textos (nombres que usa el CSS: --text-color, --text-muted, --text-light) */
+      '--text-color': '#e8e0e6',
+      '--text-muted': '#b8a8b0',
+      '--text-light': '#a090a0',
+      '--color-danger': '#FF4D4D',
+      '--color-danger-dark': '#E63B3B',
+      '--color-focus': '#7A4DFF',
+
+      /* Efectos & Bordes (sombras con formato completo: offsets + color) */
       '--glass-bg': 'rgba(20, 14, 20, 0.55)',
       '--glass-border': 'rgba(255, 105, 180, 0.18)',
-      '--shadow-md': 'rgba(0, 0, 0, 0.35)',
-      '--shadow-inset': 'rgba(0, 0, 0, 0.25)',
+      '--shadow-md': '0 8px 24px rgba(0, 0, 0, 0.35)',
+      '--shadow-inset': 'inset 0 2px 4px rgba(0, 0, 0, 0.25)',
+      '--shadow-focus': '0 0 0 3px rgba(255, 255, 255, 0.2)',
       '--border-neutral': 'rgba(255, 255, 255, 0.08)',
-      '--cream-bg': '#1a141a',
     },
   },
   // Ejemplo de tema adicional (descomentar y usar en BUSINESS.tema):

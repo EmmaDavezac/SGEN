@@ -8,7 +8,7 @@ import { precacheAndRoute } from 'workbox-precaching';
 // network-first de abajo: un rebuild nunca llegaba al navegador hasta que
 // este service worker se actualizara, y la UI seguía con la versión vieja
 // (p. ej. el overlay de progreso quedaba con z-index bajo los modales).
-const CACHE_VERSION = 'v38';
+const CACHE_VERSION = 'v39';
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
 // Guardamos el manifest antes de consumirlo para saber qué requests cubre

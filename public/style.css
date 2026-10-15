@@ -217,7 +217,7 @@ button {
 }
 
 .write-progress-card {
-    background: #ffffff;
+    background: var(--cream-bg);
     border: 2px solid var(--brand-pale);
     border-radius: 18px;
     box-shadow: none;
