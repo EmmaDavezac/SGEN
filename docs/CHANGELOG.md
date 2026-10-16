@@ -32,6 +32,7 @@
 - 62994ae fix(buttons): hover de primary como secondary y hover de secondary como primary (SW v47 → v48)
 - b9b9780 feat(pwa): theme-color dinamico y ajustes responsive en mobile (SW v48 → v49)
 - baeed7d fix(android-nav): barra inferior visible en modo oscuro (SW v49 → v50)
+- 3c77eea fix(theme-color): theme-color por modo oscuro y barra de direcciones PWA (SW v50 → v51)
 
 ## v1.3.7 — 2026-10-15 (SW v41)
 
