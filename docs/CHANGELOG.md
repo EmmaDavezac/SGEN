@@ -1,5 +1,16 @@
 # Changelog — SGEN
 
+
+## v1.3.9 — 2026-10-15 (SW v54)
+
+### Cambios
+- Splash screen de la PWA en modo oscuro: `public/manifest-dark.json` ahora define `background_color: #1a141a` para que el fondo del splash sea oscuro en lugar de blanco (antes, sin `background_color`, Android usaba blanco por defecto).
+- `index.html`: script temprano en `<head>` que ajusta el manifiesto y el `theme-color` según `prefers-color-scheme: dark` antes de cargar React, evitando el flash de barra rosa y el splash blanco al abrir la PWA.
+- Barra de direcciones de Android y PWA instalada: `theme-color` y `theme_color` del manifiesto oscuro en `#1a141a` en modo oscuro.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v53 → v54) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- 4782a38 fix(pwa): fondo oscuro en splash y theme-color en modo oscuro (SW v53 → v54)
 ## v1.3.8 — 2026-10-15 (SW v53)
 
 ### Cambios
