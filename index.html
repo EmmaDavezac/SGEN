@@ -35,6 +35,25 @@
 
 
     <link rel="manifest" id="dynamic-manifest" href="/manifest.json">
+
+    <!-- Ajuste temprano del manifiesto y el theme-color para que el splash
+         screen y la barra de direcciones de Android respeten el modo oscuro
+         del dispositivo tan pronto como se abre la PWA, antes de cargar React. -->
+    <script>
+      (function () {
+        try {
+          var esOscuro = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var manifestLink = document.getElementById('dynamic-manifest');
+          if (manifestLink) {
+            manifestLink.href = esOscuro ? '/manifest-dark.json' : '/manifest.json';
+          }
+          var themeMeta = document.getElementById('theme-color-meta');
+          if (themeMeta) {
+            themeMeta.setAttribute('content', esOscuro ? '#1a141a' : '#FF69B4');
+          }
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
 </head>
 
 <body>
