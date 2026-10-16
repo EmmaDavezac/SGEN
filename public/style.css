@@ -1699,7 +1699,8 @@ button:disabled {
 }
 
 .card-icon-btn--primary {
-    color: var(--brand-primary);
+    background: var(--brand-primary);
+    color: var(--white);
     border-color: var(--brand-primary);
 }
 
