@@ -1,6 +1,16 @@
 # Changelog — SGEN
 
 
+
+## v1.3.10 — 2026-10-15 (SW v55)
+
+### Cambios
+- Loader de "Verificando credenciales": `.loader-overlay` ahora usa `var(--surface-bg)` en lugar de `rgba(252, 249, 245, 0.9)` hardcodeado, así el fondo del overlay es oscuro en modo oscuro en lugar de quedar blanco con texto blanco.
+- Botón "Cobrar" de las tarjetas de deudores (panel Estadísticas): pasa de `variant="success"` a `variant="primary"` para que sea la acción principal visible y coherente con el resto de la app.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v54 → v55) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- 80f2c4c fix(ui): loader respeta modo oscuro y boton cobrar deudores es primary (SW v54 → v55)
 ## v1.3.9 — 2026-10-15 (SW v54)
 
 ### Cambios
