@@ -1702,12 +1702,21 @@ button:disabled {
     background: var(--brand-primary);
     color: var(--white);
     border-color: var(--brand-primary);
+    transition: var(--transition);
+}
+
+.card-icon-btn--primary:hover,
+.card-icon-btn--primary:active {
+    background: var(--brand-dark);
+    border-color: var(--brand-dark);
+    color: var(--white);
 }
 
 .card-icon-btn--secondary {
     background: transparent;
-    border-color: transparent;
+    border-color: var(--brand-primary);
     color: var(--brand-primary);
+    transition: var(--transition);
 }
 
 .card-icon-btn--secondary:hover,
