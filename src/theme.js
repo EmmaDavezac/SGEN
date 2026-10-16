@@ -66,6 +66,11 @@ export function aplicarTema(nombreTema, modo = 'claro') {
       iosStyleMeta.setAttribute('content', esOscuro ? 'black' : 'default');
     }
 
+    // Marca el <html> con data-theme para que el CSS pueda forzar colores oscuros
+    // con mayor especificidad que las variables inyectadas (útil para .app-nav,
+    // .login-screen, etc. cuando el SW sirve CSS cacheado).
+    root.setAttribute('data-theme', esOscuro ? 'oscuro' : 'claro');
+
     // Cambia el manifest de la PWA (splash screen y barra de direcciones instalada)
     // para que use colores oscuros en modo oscuro y claros en modo claro.
     const manifestLink = document.getElementById('dynamic-manifest');

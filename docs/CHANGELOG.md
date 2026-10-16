@@ -1,6 +1,6 @@
 # Changelog — SGEN
 
-## v1.3.8 — 2026-10-15 (SW v52)
+## v1.3.8 — 2026-10-15 (SW v53)
 
 ### Cambios
 - Inputs legibles en modo oscuro: `input::placeholder` usa `var(--text-muted)` en lugar de `#aaaaaa` hardcodeado; fondos hardcodeados (`#fff4f5`, `#fff1f1`, `#fff8fa`, `#fff0f0`, `#fff8f9`, `var(--white, #fff)`) reemplazados por `var(--surface-bg)` para que respondan al tema activo.

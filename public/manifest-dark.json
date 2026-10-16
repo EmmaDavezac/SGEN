@@ -31,7 +31,6 @@
     "id": "/agenda",
     "start_url": "/agenda",
     "scope": "/",
-    "background_color": "#1a141a",
     "theme_color": "#1a141a",
     "display": "standalone",
     "orientation": "any"

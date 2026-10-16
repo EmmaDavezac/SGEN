@@ -441,6 +441,10 @@ button {
     overflow: hidden;
 }
 
+  [data-theme="oscuro"] .login-screen {
+    background: linear-gradient(155deg, #121016 0%, #1a141a 100%) !important;
+  }
+
 .login-screen:not(.active) {
     transform: translateY(-100%);
 }
@@ -2008,6 +2012,11 @@ button:disabled {
     box-shadow: var(--shadow-md);
     z-index: 1000;
 }
+
+  [data-theme="oscuro"] .app-nav {
+    background: #1a141a !important;
+    border-color: #FF69B4 !important;
+  }
 
 .nav-item {
     display: flex;
