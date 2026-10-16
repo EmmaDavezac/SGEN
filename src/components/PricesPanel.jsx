@@ -674,7 +674,7 @@ function PricesPanel({ session, notify, showLoader }) {
                                         <ListIconButton
                                             icon={category.active === false ? 'fa-rotate-left' : 'fa-box-archive'}
                                             label={category.active === false ? 'Reactivar' : 'Archivar'}
-                                            variant={category.active === false ? 'success' : 'danger'}
+                                            variant='secondary'
                                             title={category.active === false ? `Reactivar ${category.name}` : `Dar de baja ${category.name}`}
                                             onClick={() => toggleCategory(category.key)}
                                         />
@@ -831,7 +831,7 @@ function PricesPanel({ session, notify, showLoader }) {
                                     <ListIconButton
                                         icon={service.active === false ? 'fa-rotate-left' : 'fa-box-archive'}
                                         label={service.active === false ? 'Reactivar' : 'Archivar'}
-                                        variant={service.active === false ? 'success' : 'danger'}
+                                        variant='secondary'
                                         title={service.active === false ? `Reactivar ${service.name}` : `Archivar ${service.name}`}
                                         onClick={() => toggleService(index)}
                                     />

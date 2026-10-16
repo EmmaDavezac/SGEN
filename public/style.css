@@ -585,7 +585,7 @@ button {
 input::placeholder,
 select::placeholder,
 textarea::placeholder {
-    color: #aaaaaa;
+    color: var(--text-muted);
     opacity: 0.8;
     transition: opacity 0.2s ease, color 0.2s ease;
 }
@@ -2222,7 +2222,7 @@ button:disabled {
 }
 
 .modal-card {
-    background: var(--glass-bg);
+    background: var(--surface-bg);
     border: 2px solid var(--border-neutral);
     border-radius: var(--radius-lg);
     width: 90%;
@@ -2475,7 +2475,7 @@ button:active {
 }
 
 .btn-danger:active {
-    background: #fff4f5;
+    background: var(--surface-bg);
     color: #b92d43 !important;
     border-color: #dc3f55;
 }
@@ -2539,6 +2539,13 @@ button:active {
     font: inherit;
     font-size: 14px;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.catalog-service-form-grid .form-actions .btn {
+    height: 42px;
+    min-height: 42px;
+    padding: 8px 16px;
+    font-size: 14px;
 }
 
 .catalog-management-form input:focus,
@@ -2692,7 +2699,7 @@ button:active {
 /* El nombre arranca en solo lectura hasta pulsar "Editar": fondo grisáceo y
    cursor normal para que se note que no se escribe directamente. */
 .catalog-category-form-row input[readonly] {
-    background: #faf7f8;
+    background: var(--surface-bg);
     cursor: default;
 }
 
@@ -3673,7 +3680,7 @@ button:active {
 
 .account-menu-item--danger:hover,
 .account-menu-item--danger:focus-visible {
-    background: #fff1f1;
+    background: var(--brand-pale);
     color: var(--color-danger-dark);
 }
 
@@ -3837,7 +3844,7 @@ button:active {
     padding: 14px;
     border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
-    background: #fff8fa;
+    background: var(--surface-bg);
 }
 
 .quick-client-panel > strong {
@@ -3966,7 +3973,7 @@ button:active {
 .client-history-heading {
     margin-top: 22px;
     padding-top: 14px;
-    border-top: 1px solid var(--brand-pale);
+    border-top: 1px solid var(--border-neutral);
 }
 
 .checkout-sena-banner {
@@ -4233,7 +4240,7 @@ button:active {
     border: 1px solid var(--color-danger);
     border-radius: var(--radius-sm);
     /* Mismo fondo de error que .toast.error, ya usado en el sistema. */
-    background: #fff0f0;
+    background: var(--surface-bg);
     color: var(--color-danger);
     font-size: 12px;
     font-weight: 600;
@@ -4415,7 +4422,7 @@ button:active {
     padding: 14px;
     border: 2px solid var(--brand-light);
     border-radius: var(--radius-md);
-    background: #fff8f9;
+    background: var(--surface-bg);
 }
 
 .combined-service-heading {
@@ -4557,7 +4564,7 @@ button:active {
 }
 
 .combined-split-summary {
-    background: var(--white, #fff);
+    background: var(--surface-bg);
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 10px;
     padding: 8px 12px;
