@@ -714,7 +714,7 @@ button:disabled {
 }
 
 .btn-secondary {
-    background: var(--surface-bg);
+    background: transparent;
     border-color: var(--brand-primary);
     color: var(--brand-dark);
 }
@@ -1702,6 +1702,19 @@ button:disabled {
     background: var(--brand-primary);
     color: var(--white);
     border-color: var(--brand-primary);
+}
+
+.card-icon-btn--secondary {
+    background: transparent;
+    border-color: transparent;
+    color: var(--brand-primary);
+}
+
+.card-icon-btn--secondary:hover,
+.card-icon-btn--secondary:active {
+    background: var(--brand-pale);
+    border-color: var(--brand-primary);
+    color: var(--brand-dark);
 }
 
 .card-icon-btn--danger {

@@ -94,6 +94,7 @@ export function PanelSaveButton({
  */
 const LIST_VARIANT_CLASS = {
   primary: 'card-icon-btn--primary',
+  secondary: 'card-icon-btn--secondary',
   danger: 'card-icon-btn--danger',
   success: 'card-icon-btn--success',
   warning: 'card-icon-btn--warning',
