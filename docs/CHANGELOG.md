@@ -7,13 +7,14 @@
 - AboutModal con estilo flat: `.modal-card` usa `var(--surface-bg)` en lugar de `var(--glass-bg)` (fondo blanco semi-transparente que no se veía bien en modo oscuro).
 - Línea divisoria en historial de turnos cobrados: `border-top` de `.client-history-heading` usa `var(--border-neutral)` en lugar de `var(--brand-pale)` para no destacar en modo oscuro.
 - Input de nombre de categoría readonly usa `var(--surface-bg)` en lugar de `#faf7f8` hardcodeado (modo oscuro).
-- Botones de acciones de turno por estado: `confirmar` y `cobrar` pasan a `variant='primary'` (jerarquía visual correcta); `consultar` ya era primary.
 - Botones archivar/reactivar de categoría y servicio pasan a `variant='secondary'`; editar categoría y editar servicio se mantienen en `primary`.
+- `confirmar` y `cobrar` mantienen sus variantes originales (`info` y `success`); no se aplica `primary` a botones de turno.
 - Altura uniforme (42px) entre inputs y botones del formulario de editar servicio en catálogo de precios.
 - Bump de `CACHE_VERSION` en `public/sw.js` (v42 → v43) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
-- 1e612af fix(dark-mode): category input bg, turno button hierarchy, archive secondary, service form height (SW v42 → v43)
+- 2823624 fix(dark-mode): category input bg, turno button hierarchy, archive secondary, service form height (SW v42 → v43)
+- 1ac36f5 fix(turnos): no aplica variant primary a confirmar/cobrar; mantienen info y success (SW v43)
 
 ## v1.3.7 — 2026-10-15 (SW v41)
 

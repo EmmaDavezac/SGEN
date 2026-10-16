@@ -72,7 +72,7 @@ export const ACTION_META = {
         iconStyle: 'solid',
         label: 'Confirmar',
         title: 'Cargar seña y confirmar',
-        variant: 'primary'
+        variant: 'info'
     },
     [APPOINTMENT_ACTIONS.REAGENDAR]: {
         icon: 'fa-calendar-plus',
@@ -86,7 +86,7 @@ export const ACTION_META = {
         iconStyle: 'solid',
         label: 'Cobrar',
         title: 'Cobrar turno',
-        variant: 'primary'
+        variant: 'success'
     },
     [APPOINTMENT_ACTIONS.CANCELAR]: {
         icon: 'fa-ban',
