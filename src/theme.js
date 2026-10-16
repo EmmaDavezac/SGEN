@@ -65,8 +65,15 @@ export function aplicarTema(nombreTema, modo = 'claro') {
     if (iosStyleMeta) {
       iosStyleMeta.setAttribute('content', esOscuro ? 'black' : 'default');
     }
+
+    // Cambia el manifest de la PWA (splash screen y barra de direcciones instalada)
+    // para que use colores oscuros en modo oscuro y claros en modo claro.
+    const manifestLink = document.getElementById('dynamic-manifest');
+    if (manifestLink) {
+      manifestLink.href = esOscuro ? '/manifest-dark.json' : '/manifest.json';
+    }
   } catch (e) {
-    // Si falla la actualización del meta, se ignora silenciosamente.
+    // Si falla la actualización del meta o del manifest, se ignora silenciosamente.
   }
 
   return { nombreTema, modo };

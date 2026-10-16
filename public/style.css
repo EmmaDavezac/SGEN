@@ -462,7 +462,7 @@ button {
 
 .login-card {
     background: var(--surface-bg);
-    border: 2px solid var(--brand-pale);
+    border: 2px solid var(--brand-primary);
     padding: 36px 30px;
     border-radius: var(--radius-lg);
     width: 100%;
