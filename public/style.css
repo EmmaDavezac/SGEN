@@ -5787,3 +5787,60 @@ button:active {
     color: var(--text-color);
     font-weight: 600;
 }
+
+/* =========================================================================
+   RESPONSIVE — Ajustes (SettingsPanel) en móvil
+   ========================================================================= */
+@media (max-width: 480px) {
+    #tab-ajustes .setting-row {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 8px;
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    #tab-ajustes .setting-row > span {
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+    }
+
+    #tab-ajustes .setting-select {
+        min-width: auto;
+        width: 100%;
+        margin-left: 0;
+        margin-top: 6px;
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+
+    #tab-ajustes .switch-toggle {
+        width: 44px;
+        height: 24px;
+    }
+
+    #tab-ajustes .switch-toggle .slider:before {
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+    }
+
+    #tab-ajustes .switch-toggle input:checked + .slider:before {
+        transform: translateX(20px);
+    }
+
+    #tab-ajustes .card-info-box {
+        max-width: 100%;
+        box-sizing: border-box;
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+        padding: 12px;
+    }
+
+    #tab-ajustes .card-info-box p {
+        font-size: 11.5px;
+        line-height: 1.4;
+    }
+}

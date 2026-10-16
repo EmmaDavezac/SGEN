@@ -1,6 +1,6 @@
 # Changelog — SGEN
 
-## v1.3.8 — 2026-10-15 (SW v48)
+## v1.3.8 — 2026-10-15 (SW v49)
 
 ### Cambios
 - Inputs legibles en modo oscuro: `input::placeholder` usa `var(--text-muted)` en lugar de `#aaaaaa` hardcodeado; fondos hardcodeados (`#fff4f5`, `#fff1f1`, `#fff8fa`, `#fff0f0`, `#fff8f9`, `var(--white, #fff)`) reemplazados por `var(--surface-bg)` para que respondan al tema activo.
@@ -15,7 +15,9 @@
 - Botones `primary` (`.card-icon-btn--primary`) en hover/active se ven como `secondary`: fondo transparente, borde `var(--brand-primary)`, texto `var(--brand-primary)`.
 - Botones `secondary` (`.btn-secondary` y `.card-icon-btn--secondary`) en hover/active se ven como `primary`: fondo sólido `var(--brand-primary)`, texto blanco.
 - Estilo consistente: al hacer hover, ambos variantes intercambian apariencia.
-- Bump de `CACHE_VERSION` en `public/sw.js` (v47 → v48) para forzar la actualización del service worker en clientes instalados.
+- `theme-color` dinámico: se agregó `<meta name="theme-color">` al HTML y se actualiza desde `theme.js` cuando cambia el modo claro/oscuro, así la barra de direcciones de Android y la PWA instalada cambian con el tema.
+- Ajustes responsive en móvil: `.setting-row`, `.setting-select`, `.switch-toggle` y `.card-info-box` se adaptan a pantallas estrechas (max-width: 480px) para evitar desbordamiento horizontal.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v48 → v49) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
 - 2823624 fix(dark-mode): category input bg, turno button hierarchy, archive secondary, service form height (SW v42 → v43)

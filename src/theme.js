@@ -48,6 +48,22 @@ export function aplicarTema(nombreTema, modo = 'claro') {
     // localStorage no disponible en entornos privados/incógnito: se ignora silenciosamente.
   }
 
+  // Actualiza el theme-color del navegador (barra de direcciones Android y PWA instalada)
+  // para que coincida con el color de marca del tema activo.
+  try {
+    const brandPrimary = root.style.getPropertyValue('--brand-primary') || getComputedStyle(root).getPropertyValue('--brand-primary');
+    const themeMeta = document.getElementById('theme-color-meta');
+    if (themeMeta && brandPrimary) {
+      themeMeta.setAttribute('content', brandPrimary);
+    }
+    const iosStyleMeta = document.getElementById('ios-status-bar-style');
+    if (iosStyleMeta) {
+      iosStyleMeta.setAttribute('content', brandPrimary === '#000000' || brandPrimary === '#121016' ? 'black' : 'default');
+    }
+  } catch (e) {
+    // Si falla la actualización del meta, se ignora silenciosamente.
+  }
+
   return { nombreTema, modo };
 }
 
