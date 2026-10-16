@@ -2000,7 +2000,7 @@ button:disabled {
     width: 90%;
     height: 65px;
     background: var(--surface-bg);
-    border: 2px solid var(--brand-pale);
+    border: 2px solid var(--brand-primary);
     border-radius: 50px;
     display: flex;
     justify-content: space-around;
@@ -2027,8 +2027,8 @@ button:disabled {
 
 .nav-item:hover,
 .nav-item:focus-visible {
-    color: var(--brand-dark);
-    background: var(--brand-pale);
+    color: var(--white);
+    background: var(--brand-primary);
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
 }
