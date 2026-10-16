@@ -1567,9 +1567,8 @@ button:disabled {
 }
 
 .history-card.card-pending {
-    border-color: #FFE4B5;
-    /* Borde naranja/seña pendiente */
-    background: linear-gradient(135deg, var(--white) 90%, #FFFDF0 100%);
+    border-color: var(--brand-pale);
+    background: var(--surface-bg);
 }
 
 
@@ -5498,8 +5497,8 @@ button:active {
 }
 
 .pending-debtor-card {
-    border-color: #FFE4B5;
-    background: linear-gradient(135deg, var(--white) 90%, #FFFDF0 100%);
+    border-color: var(--brand-pale);
+    background: var(--surface-bg);
 }
 
 .pending-debtor-amount {

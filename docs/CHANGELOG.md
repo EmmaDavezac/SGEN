@@ -1,6 +1,6 @@
 # Changelog — SGEN
 
-## v1.3.8 — 2026-10-15 (SW v43)
+## v1.3.8 — 2026-10-15 (SW v44)
 
 ### Cambios
 - Inputs legibles en modo oscuro: `input::placeholder` usa `var(--text-muted)` en lugar de `#aaaaaa` hardcodeado; fondos hardcodeados (`#fff4f5`, `#fff1f1`, `#fff8fa`, `#fff0f0`, `#fff8f9`, `var(--white, #fff)`) reemplazados por `var(--surface-bg)` para que respondan al tema activo.
@@ -10,11 +10,13 @@
 - Botones archivar/reactivar de categoría y servicio pasan a `variant='secondary'`; editar categoría y editar servicio se mantienen en `primary`.
 - Botones de acciones de turno por estado: `confirmar` y `cobrar` usan `variant='primary'` (relleno, acción principal); `consultar` ya era `primary`.
 - Altura uniforme (42px) entre inputs y botones del formulario de editar servicio en catálogo de precios.
-- Bump de `CACHE_VERSION` en `public/sw.js` (v42 → v43) para forzar la actualización del service worker en clientes instalados.
+- Cards de clientes con pagos pendientes (`.pending-debtor-card` y `.history-card.card-pending`) usan `var(--surface-bg)` y `var(--brand-pale)` en lugar de colores hardcodeados (`#FFE4B5`, `#FFFDF0`, `var(--white)`) para responder al modo oscuro.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v43 → v44) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
 - 2823624 fix(dark-mode): category input bg, turno button hierarchy, archive secondary, service form height (SW v42 → v43)
 - c54e164 fix(turnos): confirmar y cobrar usan variant primary (relleno, accion principal) (SW v43)
+- 016b86a fix(dark-mode): cards de clientes con pagos pendientes responden al modo oscuro (SW v43 → v44)
 
 ## v1.3.7 — 2026-10-15 (SW v41)
 
