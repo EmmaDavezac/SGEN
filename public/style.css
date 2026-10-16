@@ -151,7 +151,7 @@ button {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(252, 249, 245, 0.9);
+    background-color: var(--surface-bg);
     /* Debe quedar SOBRE .modal-overlay (z-index 100000): los ConfirmModal de
        eliminación permanecen abiertos (busy) mientras corre la operación y,
        con el overlay debajo, no se vería la animación de progreso. */

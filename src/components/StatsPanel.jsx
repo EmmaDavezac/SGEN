@@ -671,7 +671,7 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                                                 icon="fa-sack-dollar"
                                                 label="Cobrar"
                                                 title={`Cobrar a ${d.cliente}`}
-                                                variant="success"
+                                                variant="primary"
                                                 onClick={() => requestPayDebtor(d)}
                                                 aria-label={`Cobrar a ${d.cliente}`}
                                             />
