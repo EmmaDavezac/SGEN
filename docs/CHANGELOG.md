@@ -24,6 +24,7 @@
 - 2d1b9c9 fix(turnos): botones de accion usan variant primary con relleno solido (SW v44 → v45)
 - aa21f6c fix(buttons): primary con relleno solido, secondary inline (SW v45 → v46)
 - 7b8cd93 fix(buttons): primary con hover animado, secondary outline (SW v46 → v47)
+- 62994ae fix(buttons): hover de primary como secondary y hover de secondary como primary (SW v47 → v48)
 
 ## v1.3.7 — 2026-10-15 (SW v41)
 
