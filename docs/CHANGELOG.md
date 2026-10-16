@@ -1,6 +1,6 @@
 # Changelog — SGEN
 
-## v1.3.8 — 2026-10-15 (SW v47)
+## v1.3.8 — 2026-10-15 (SW v48)
 
 ### Cambios
 - Inputs legibles en modo oscuro: `input::placeholder` usa `var(--text-muted)` en lugar de `#aaaaaa` hardcodeado; fondos hardcodeados (`#fff4f5`, `#fff1f1`, `#fff8fa`, `#fff0f0`, `#fff8f9`, `var(--white, #fff)`) reemplazados por `var(--surface-bg)` para que respondan al tema activo.
@@ -12,10 +12,10 @@
 - Altura uniforme (42px) entre inputs y botones del formulario de editar servicio en catálogo de precios.
 - Cards de clientes con pagos pendientes (`.pending-debtor-card` y `.history-card.card-pending`) usan `var(--surface-bg)` y `var(--brand-pale)` en lugar de colores hardcodeados (`#FFE4B5`, `#FFFDF0`, `var(--white)`) para responder al modo oscuro.
 - Botones de acción de turno (confirmar, cobrar, consultar) usan `variant='primary'` y ahora `.card-icon-btn--primary` tiene fondo sólido (`var(--brand-primary)`, texto blanco), cumpliendo la regla: primary = relleno sólido.
-- Botones `primary` (`.card-icon-btn--primary`) tienen animación hover: fondo y borde pasan de `var(--brand-primary)` a `var(--brand-dark)` al pasar el mouse.
-- Botones `secondary` (`.btn-secondary` y `.card-icon-btn--secondary`) ahora son outline: `background: transparent`, `border-color: var(--brand-primary)`, color de texto `var(--brand-primary)`; al hover fondo sutil `var(--brand-pale)`.
-- `ListIconButton` soporta ahora `variant='secondary'` (clase `card-icon-btn--secondary`) para archive/reactivar de categoría y servicio en catálogo de precios.
-- Bump de `CACHE_VERSION` en `public/sw.js` (v46 → v47) para forzar la actualización del service worker en clientes instalados.
+- Botones `primary` (`.card-icon-btn--primary`) en hover/active se ven como `secondary`: fondo transparente, borde `var(--brand-primary)`, texto `var(--brand-primary)`.
+- Botones `secondary` (`.btn-secondary` y `.card-icon-btn--secondary`) en hover/active se ven como `primary`: fondo sólido `var(--brand-primary)`, texto blanco.
+- Estilo consistente: al hacer hover, ambos variantes intercambian apariencia.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v47 → v48) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
 - 2823624 fix(dark-mode): category input bg, turno button hierarchy, archive secondary, service form height (SW v42 → v43)
