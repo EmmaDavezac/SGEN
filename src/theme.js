@@ -50,15 +50,20 @@ export function aplicarTema(nombreTema, modo = 'claro') {
 
   // Actualiza el theme-color del navegador (barra de direcciones Android y PWA instalada)
   // para que coincida con el color de marca del tema activo.
+  // En modo oscuro se usa --surface-bg para que la barra se mezcle con el fondo oscuro
+  // del modo oscuro en lugar de forzar el rosa de marca en ambos temas.
   try {
-    const brandPrimary = root.style.getPropertyValue('--brand-primary') || getComputedStyle(root).getPropertyValue('--brand-primary');
+    const esOscuro = modoResuelto === 'oscuro';
+    const themeColor = esOscuro
+      ? (root.style.getPropertyValue('--surface-bg') || getComputedStyle(root).getPropertyValue('--surface-bg'))
+      : (root.style.getPropertyValue('--brand-primary') || getComputedStyle(root).getPropertyValue('--brand-primary'));
     const themeMeta = document.getElementById('theme-color-meta');
-    if (themeMeta && brandPrimary) {
-      themeMeta.setAttribute('content', brandPrimary);
+    if (themeMeta && themeColor) {
+      themeMeta.setAttribute('content', themeColor);
     }
     const iosStyleMeta = document.getElementById('ios-status-bar-style');
     if (iosStyleMeta) {
-      iosStyleMeta.setAttribute('content', brandPrimary === '#000000' || brandPrimary === '#121016' ? 'black' : 'default');
+      iosStyleMeta.setAttribute('content', esOscuro ? 'black' : 'default');
     }
   } catch (e) {
     // Si falla la actualización del meta, se ignora silenciosamente.

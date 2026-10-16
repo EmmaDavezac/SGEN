@@ -1,6 +1,6 @@
 # Changelog — SGEN
 
-## v1.3.8 — 2026-10-15 (SW v50)
+## v1.3.8 — 2026-10-15 (SW v51)
 
 ### Cambios
 - Inputs legibles en modo oscuro: `input::placeholder` usa `var(--text-muted)` en lugar de `#aaaaaa` hardcodeado; fondos hardcodeados (`#fff4f5`, `#fff1f1`, `#fff8fa`, `#fff0f0`, `#fff8f9`, `var(--white, #fff)`) reemplazados por `var(--surface-bg)` para que respondan al tema activo.
@@ -18,7 +18,9 @@
 - `theme-color` dinámico: se agregó `<meta name="theme-color">` al HTML y se actualiza desde `theme.js` cuando cambia el modo claro/oscuro, así la barra de direcciones de Android y la PWA instalada cambian con el tema.
 - Ajustes responsive en móvil: `.setting-row`, `.setting-select`, `.switch-toggle` y `.card-info-box` se adaptan a pantallas estrechas (max-width: 480px) para evitar desbordamiento horizontal.
 - Barra de navegación inferior (`.app-nav`) en modo oscuro: el borde ahora usa `var(--brand-primary)` en lugar de `var(--brand-pale)` (que en oscuro era igual al fondo y se volvía invisible). Los `.nav-item` en hover ahora usan fondo `var(--brand-primary)` y texto `var(--white)` en lugar de `var(--brand-pale)` / `var(--brand-dark)`, para tener contraste en ambos temas.
-- Bump de `CACHE_VERSION` en `public/sw.js` (v49 → v50) para forzar la actualización del service worker en clientes instalados.
+- `theme-color` dinámico por modo: en modo claro usa `--brand-primary` (rosa); en modo oscuro usa `--surface-bg` para que la barra de direcciones de Android y la PWA instalada se mezcle con el fondo oscuro en lugar de forzar rosa en ambos temas.
+- iOS status bar style: `black` en modo oscuro, `default` en modo claro.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v50 → v51) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
 - 2823624 fix(dark-mode): category input bg, turno button hierarchy, archive secondary, service form height (SW v42 → v43)
