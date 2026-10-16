@@ -23,6 +23,11 @@
 - Manifest de PWA dinámico: se agregó `public/manifest-dark.json` con colores oscuros y el `<link rel="manifest">` ahora cambia vía JS entre `/manifest.json` (claro) y `/manifest-dark.json` (oscuro) al alternar el tema, así el splash screen y la barra de direcciones de la PWA instalada respetan el modo activo.
 - Barra inferior de Android (`.app-nav`) y tarjeta de login (`.login-card`) ahora usan `var(--brand-primary)` para el borde en lugar de `var(--brand-pale)`, que en modo oscuro era igual al fondo y se volvía invisible.
 - Bump de `CACHE_VERSION` en `public/sw.js` (v51 → v52) para forzar la actualización del service worker en clientes instalados.
+- Se agregó `data-theme="oscuro"` al `<html>` desde `theme.js` para forzar colores oscuros con mayor especificidad en `.app-nav` y `.login-screen` cuando el SW sirve CSS cacheado.
+- `[data-theme="oscuro"] .app-nav` fuerza `background: #1a141a !important` y `border-color: #FF69B4 !important` para que la barra inferior de Android sea visible en modo oscuro.
+- `[data-theme="oscuro"] .login-screen` fuerza gradiente oscuro (`#121016` → `#1a141a`) `!important` para que la pantalla de login responda al modo oscuro.
+- Se quitó `background_color` de `public/manifest-dark.json` para que el splash screen de la PWA instalada no force un color blanco.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v52 → v53) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
 - 2823624 fix(dark-mode): category input bg, turno button hierarchy, archive secondary, service form height (SW v42 → v43)
@@ -36,6 +41,7 @@
 - baeed7d fix(android-nav): barra inferior visible en modo oscuro (SW v49 → v50)
 - 3c77eea fix(theme-color): theme-color por modo oscuro y barra de direcciones PWA (SW v50 → v51)
 - 7bb09c0 fix(pwa): manifest oscuro, login-card y app-nav borde visible en modo oscuro (SW v51 → v52)
+- b1800a2 fix(pwa): forzar modo oscuro en app-nav, login-screen y splash screen (SW v52 → v53)
 
 ## v1.3.7 — 2026-10-15 (SW v41)
 
