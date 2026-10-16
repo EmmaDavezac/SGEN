@@ -21,6 +21,7 @@
 - c54e164 fix(turnos): confirmar y cobrar usan variant primary (relleno, accion principal) (SW v43)
 - 016b86a fix(dark-mode): cards de clientes con pagos pendientes responden al modo oscuro (SW v43 → v44)
 - 2d1b9c9 fix(turnos): botones de accion usan variant primary con relleno solido (SW v44 → v45)
+- aa21f6c fix(buttons): primary con relleno solido, secondary inline (SW v45 → v46)
 
 ## v1.3.7 — 2026-10-15 (SW v41)
 
