@@ -2,6 +2,15 @@
 
 
 
+## v1.3.13 — 2026-10-18 (SW v60)
+
+### Cambios
+- Registrar Servicio: el contenedor de reparto del cobro combinado (método "Combinado") ahora responde al modo oscuro: el fondo usa `var(--cream-bg)` en lugar de `var(--soft-bg)` (variable inexistente que siempre caía al rosa claro `#fdf3f8`); el resumen usa `var(--border-neutral)`, y los acentos de pendiente fiado y error usan `var(--color-danger)` en lugar de hex fijos.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v59 → v60) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- 48d19e4 fix(registro): reparto del cobro combinado responde al modo oscuro (SW v59 → v60)
+
 ## v1.3.12 — 2026-10-18 (SW v59)
 
 ### Cambios
