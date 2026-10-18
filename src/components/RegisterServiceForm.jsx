@@ -13,6 +13,11 @@ function hasSuspiciousPrice(rawValue) {
     return num > 0 && num < 1000;
 }
 
+// Nombre exacto del servicio de remoción que se cobra $0 (retiro del
+// servicio propio): única excepción que admite precio 0 y no pregunta
+// método de pago porque no hay dinero que mover.
+const OWN_REMOVAL_SERVICE_NAME = 'Retiro Servicio Propio';
+
 function RegisterServiceForm({ session, onBack, initialAppointment = null, onRegisterSuccess, allowFiado: allowFiadoProp = true, settings = null, notify, showLoader, runTask }) {
     // App entrega `settings` (no `allowFiado`): el toggle de Ajustes gobierna
     // tanto el botón "Pendiente de pago" como la porción fiada del combinado.
@@ -137,8 +142,10 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         return list;
     }, [catalog]);
 
+    // La combinación se arma igual venga desde un turno o un registro
+    // directo: los defaults y el cálculo no dependen del origen del formulario.
     useEffect(() => {
-        if (!initialAppointment && allBasicOptions.length > 0) {
+        if (allBasicOptions.length > 0) {
             setCombinedService1(allBasicOptions[0].name);
             if (allBasicOptions.length > 1) {
                 setCombinedService2(allBasicOptions[1].name);
@@ -149,7 +156,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     }, [allBasicOptions]);
 
     useEffect(() => {
-        if (!initialAppointment && selectedCategory === 'personalizado' && useCombinedService && combinedService1 && combinedService2) {
+        if (selectedCategory === 'personalizado' && useCombinedService && combinedService1 && combinedService2) {
             const count1 = Number(combinedCount1) || 7;
             const count2 = 10 - count1;
 
@@ -167,7 +174,16 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     }, [selectedCategory, useCombinedService, combinedService1, combinedService2, combinedCount1, allBasicOptions]);
 
     useEffect(() => {
-        if (!initialAppointment && (selectedCategory !== 'personalizado' || !useCombinedService)) {
+        if (selectedCategory === 'personalizado') {
+            // Personalizado usa nombre libre (o la combinación del builder):
+            // al entrar o volver del builder se arranca de cero.
+            if (!useCombinedService) {
+                setSelectedSubService(null);
+                setServiceName('');
+                setServicePrice(0);
+            }
+        } else if (!initialAppointment) {
+            // Turno: no se preasume servicio ni precio; se elige a mano.
             const subservices = (catalog[selectedCategory] || []).filter(service => service.active !== false);
             if (subservices.length > 0) {
                 setSelectedSubService(subservices[0]);
@@ -201,6 +217,11 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         setServicePrice(service.price);
     };
 
+    // Retiro del servicio propio: cobro $0 (excepción a la regla de
+    // precio > 0) y sin pregunta de método de pago.
+    const isOwnRemoval = selectedCategory === 'remocion'
+        && selectedSubService?.name === OWN_REMOVAL_SERVICE_NAME;
+
     const finalPrice = useMemo(() => {
         let base = Number(servicePrice) || 0;
         if (hasExternalRemoval && selectedRemoval) {
@@ -219,6 +240,15 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
             setSelectedRemoval(removalOptions[0]);
         }
     }, [hasExternalRemoval, removalOptions, selectedRemoval]);
+
+    // Retiro propio: sin cobro no se pregunta medio de pago. Se registra con
+    // el método por defecto y sin fila en `pagos` (el monto 0 se omite).
+    useEffect(() => {
+        if (!isOwnRemoval) return;
+        setPaymentMethod('Transferencia');
+        setSplitEfectivo('');
+        setSplitTransferencia('');
+    }, [isOwnRemoval]);
 
     const handlePriceBlur = (e) => {
         const input = e.target;
@@ -263,7 +293,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         if (loading) return;
 
         const client = clientName.trim();
-        if (!client || !serviceName || finalPrice <= 0) {
+        // El retiro del servicio propio es la única excepción que admite $0.
+        if (!client || !serviceName || (finalPrice <= 0 && !isOwnRemoval)) {
             if (notify) notify('Completá los datos del cliente y precio correctamente.', 'error');
             return;
         }
@@ -280,7 +311,9 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
             servicio: serviceName,
             categoria: selectedCategory,
             precio: finalPrice,
-            seña: Number(sena) || 0,
+            // La base exige seña <= precio (ej: turno con seña cobrado como
+            // retiro propio $0); se limita al total registrado.
+            seña: Math.min(Number(sena) || 0, finalPrice),
             metodoPago: paymentMethod
         };
 
@@ -298,7 +331,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
 
         setPendingSubmitData(submitPayload);
 
-        if (paymentMethod === 'Efectivo') {
+        // $0 (retiro propio): no hay nada que cobrar, se confirma directo.
+        if (paymentMethod === 'Efectivo' && netoACobrar > 0) {
             setAmountGiven(String(netoACobrar));
             cashInitialRef.current = JSON.stringify({ amount: String(netoACobrar), returnMethod: 'Efectivo' });
             setShowCashModal(true);
@@ -489,7 +523,9 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         splitEfectivo ||
         splitTransferencia ||
         hasExternalRemoval ||
-        selectedRemoval
+        selectedRemoval ||
+        useCombinedService ||
+        (selectedCategory === 'personalizado' && !useCombinedService && serviceName.trim())
     );
     useFormGuard(hasUnsavedChanges);
 
@@ -530,12 +566,18 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
             <div className="confirm-item">
                 <span className="confirm-label">Método</span>
                 <strong>
-                    {pendingSubmitData.metodoPago === 'Fiado' ? 'Pendiente de pago' : pendingSubmitData.metodoPago}
-                    {pendingSubmitData.metodoPago === 'Efectivo' && cashVuelto > 0 && (
-                        <span className="cash-change-note">
-                            (Vuelto: ${Number(cashVuelto).toLocaleString("es-AR")}{vueltoReturnMethod && vueltoReturnMethod !== 'Efectivo' ? ` · ${vueltoReturnMethod}` : ''})
-                        </span>
-                    )}
+                    {Number(pendingSubmitData.precio) === 0
+                        ? 'Sin cobro'
+                        : (
+                            <>
+                                {pendingSubmitData.metodoPago === 'Fiado' ? 'Pendiente de pago' : pendingSubmitData.metodoPago}
+                                {pendingSubmitData.metodoPago === 'Efectivo' && cashVuelto > 0 && (
+                                    <span className="cash-change-note">
+                                        (Vuelto: ${Number(cashVuelto).toLocaleString("es-AR")}{vueltoReturnMethod && vueltoReturnMethod !== 'Efectivo' ? ` · ${vueltoReturnMethod}` : ''})
+                                    </span>
+                                )}
+                            </>
+                        )}
                 </strong>
             </div>
             {pendingSubmitData.metodoPago === 'Combinado' && pendingSubmitData.reparto && (
@@ -616,7 +658,15 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                                 key={category.key}
                                 type="button"
                                 className={`btn-cat ${selectedCategory === category.key ? 'active' : ''}`}
-                                onClick={() => setSelectedCategory(category.key)}
+                                onClick={() => {
+                                    if (category.key === selectedCategory) return;
+                                    setSelectedCategory(category.key);
+                                    // Evita arrastrar el servicio/nombre/precio de la
+                                    // categoría anterior (p. ej. un retiro propio $0).
+                                    setSelectedSubService(null);
+                                    setServiceName('');
+                                    setServicePrice(0);
+                                }}
                             >
                                 {category.name}
                             </button>
@@ -625,16 +675,33 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                 </div>
 
                 {selectedCategory === 'personalizado' && !useCombinedService && (
-                    <div className="form-group service-choice-row">
-                        <DetailActionButton
-                            icon="fa-puzzle-piece"
-                            label="Armar combinación"
-                            onClick={() => setUseCombinedService(true)}
-                        />
-                    </div>
+                    <>
+                        <div className="form-group service-choice-row">
+                            <DetailActionButton
+                                icon="fa-puzzle-piece"
+                                label="Armar combinación"
+                                onClick={() => setUseCombinedService(true)}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label htmlFor="custom-service-name">Servicio Personalizado <span className="field-required">(obligatorio)</span></label>
+                            <div className="input-wrapper">
+                                <i className="fa-solid fa-pen input-icon" />
+                                <input
+                                    id="custom-service-name"
+                                    type="text"
+                                    value={serviceName}
+                                    onChange={(e) => setServiceName(e.target.value)}
+                                    placeholder="Ej. Retiro + diseño especial"
+                                    autoComplete="off"
+                                    required
+                                />
+                            </div>
+                        </div>
+                    </>
                 )}
 
-                {(selectedCategory !== 'personalizado' || !useCombinedService) ? (
+                {selectedCategory !== 'personalizado' ? (
                     <div className="form-group" id="services-grid-wrapper">
                         <label id="services-grid-label">Servicio Específico <span className="field-required">(obligatorio)</span></label>
                         <div id="services-grid" className="services-grid">
@@ -654,7 +721,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                             <p className="catalog-empty-note">No hay servicios activos en esta categoría.</p>
                         )}
                     </div>
-                ) : (
+                ) : useCombinedService ? (
                     <div id="combined-service-builder" className="combined-service-builder">
                         <div className="combined-service-heading">
                             <i className="fa-solid fa-puzzle-piece combined-service-icon"></i>
@@ -722,7 +789,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                             onClick={() => setUseCombinedService(false)}
                         />
                     </div>
-                )}
+                ) : null}
 
                 <div className="form-group">
                     <label>Precio Total ($) <span className="field-required">(obligatorio)</span></label>
@@ -783,6 +850,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                     </>
                 )}
 
+                {!isOwnRemoval && (
                 <div className="form-group">
                     <label>Método de Pago</label>
                     <div className="payment-method-selector">
@@ -812,8 +880,15 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                         ))}
                     </div>
                 </div>
+                )}
 
-                {paymentMethod === 'Combinado' && (
+                {isOwnRemoval && (
+                    <p className="catalog-empty-note">
+                        <i className="fa-solid fa-circle-info"></i> Retiro del servicio propio: sin cobro y sin método de pago.
+                    </p>
+                )}
+
+                {!isOwnRemoval && paymentMethod === 'Combinado' && (
                     <div className="combined-split-box">
                         <div className="combined-split-title">
                             <i className="fa-solid fa-layer-group"></i>
