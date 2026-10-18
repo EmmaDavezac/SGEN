@@ -2,11 +2,11 @@
 
 
 
-## v1.3.11 — 2026-10-18 (SW v57)
+## v1.3.11 — 2026-10-18 (SW v58)
 
 ### Cambios
 - Registrar Servicio: el "Retiro Servicio Propio" admite precio $0, la única excepción a la regla de precio mayor a 0.
-- Al elegir Retiro Servicio Propio ya no se pregunta el método de pago: se registra sin cobro (sin fila en `pagos` porque el monto es 0, comportamiento ya existente en `registerPaymentRecord`) y aparece el aviso "Retiro del servicio propio: sin cobro y sin método de pago".
+- Al elegir Retiro Servicio Propio ya no se pregunta el método de pago y se oculta el input de "Precio Total": el total siempre es $0 (`finalPrice` lo fuerza, sin consultar el catálogo) y aparece el aviso "Retiro del servicio propio: sin cobro y sin método de pago".
 - El modal "Cobro en Efectivo" no se abre cuando el neto a cobrar es $0; se confirma directo.
 - El modal de confirmación muestra "Sin cobro" cuando el total es $0.
 - La seña del payload se limita al total registrado (`min(seña, precio)`) para respetar la restricción `sena <= precio` de la base (caso turno con seña cobrado como retiro propio $0).
@@ -14,11 +14,12 @@
 - La combinación de 2 servicios calcula nombre y precio también al cobrar desde un turno (antes los efectos estaban guardados con `!initialAppointment` y no calculaban nada en ese flujo).
 - Cambiar de categoría limpia el servicio, nombre y precio elegidos, evitando arrastrar un servicio viejo (p. ej. un retiro propio $0) a otra categoría al cobrar un turno.
 - Inputs numéricos (montos, precios, cantidades) sin flechas incrementales en toda la app; la regla que aplicaba solo en la sección Precios ahora es global (`public/style.css`).
-- Bump de `CACHE_VERSION` en `public/sw.js` (v55 → v57) para forzar la actualización del service worker en clientes instalados.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v55 → v58) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
 - 663ceeb fix(registro): retiro propio $0 sin metodo de pago y personalizado con nombre libre (SW v55 → v56)
 - cff3c33 fix(registro): personalizado es directamente el combo de 10 uñas y inputs monto sin flechas (SW v56 → v57)
+- 080d0e8 fix(registro): retiro propio oculta el input de precio porque siempre es $0 (SW v57 → v58)
 
 ## v1.3.10 — 2026-10-15 (SW v55)
 
