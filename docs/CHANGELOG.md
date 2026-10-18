@@ -2,6 +2,15 @@
 
 
 
+## v1.3.14 — 2026-10-18 (SW v61)
+
+### Cambios
+- Registrar Servicio: combos del Personalizado (combo de 10 uñas) anchos y legibles en todos los dispositivos: los selects heredaban `max-width: 140px` de `.filter-select` y quedaban angostos; ahora el servicio ocupa todo el ancho restante (`max-width: none`) y la columna de uñas queda fija y angosta (`minmax(88px, 110px)`), con `min-width: 0` para que el grid no los comprima.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v60 → v61) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- 2b8f235 fix(registro): combos del personalizado anchos y legibles en todos los dispositivos (SW v60 → v61)
+
 ## v1.3.13 — 2026-10-18 (SW v60)
 
 ### Cambios
