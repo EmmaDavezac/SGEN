@@ -213,12 +213,14 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         && selectedSubService?.name === OWN_REMOVAL_SERVICE_NAME;
 
     const finalPrice = useMemo(() => {
+        // El retiro del servicio propio siempre es $0, no se consulta el catálogo.
+        if (isOwnRemoval) return 0;
         let base = Number(servicePrice) || 0;
         if (hasExternalRemoval && selectedRemoval) {
             base += Number(selectedRemoval.price) || 0;
         }
         return base;
-    }, [servicePrice, hasExternalRemoval, selectedRemoval]);
+    }, [isOwnRemoval, servicePrice, hasExternalRemoval, selectedRemoval]);
 
     const removalOptions = useMemo(() => {
         const rems = catalog.remocion || [];
@@ -746,6 +748,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                     </div>
                 )}
 
+                {!isOwnRemoval && (
                 <div className="form-group">
                     <label>Precio Total ($) <span className="field-required">(obligatorio)</span></label>
                         <div className="input-wrapper">
@@ -763,6 +766,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                             />
                     </div>
                 </div>
+                )}
 
                 {selectedCategory !== 'remocion' && (
                     <>
