@@ -42,6 +42,11 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     const [hasExternalRemoval, setHasExternalRemoval] = useState(false);
     const [selectedRemoval, setSelectedRemoval] = useState(null);
 
+    // Descuento del cobro (toggle 10% / 20%): el sistema calcula el total
+    // y el input de precio pasa a ser de solo lectura.
+    const [hasDiscount, setHasDiscount] = useState(false);
+    const [discountPct, setDiscountPct] = useState(10);
+
     const [paymentMethod, setPaymentMethod] = useState('Transferencia');
     // Reparto del cobro combinado: qué parte se cobra en efectivo y qué parte
     // en transferencia. El resto del neto queda como porción fiada (si los
@@ -212,7 +217,9 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     const isOwnRemoval = selectedCategory === 'remocion'
         && selectedSubService?.name === OWN_REMOVAL_SERVICE_NAME;
 
-    const finalPrice = useMemo(() => {
+    // Precio base: lo que vale el servicio (o la combinación) más un retiro
+    // previo externo, antes de descuentos.
+    const basePrice = useMemo(() => {
         // El retiro del servicio propio siempre es $0, no se consulta el catálogo.
         if (isOwnRemoval) return 0;
         let base = Number(servicePrice) || 0;
@@ -221,6 +228,19 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         }
         return base;
     }, [isOwnRemoval, servicePrice, hasExternalRemoval, selectedRemoval]);
+
+    // Descuento activo (0 cuando no corresponde: sin toggle o retiro propio).
+    const appliedDiscountPct = (!isOwnRemoval && hasDiscount)
+        ? (Number(discountPct) || 0)
+        : 0;
+
+    // Total final con descuento, redondeado al peso: el input de precio solo
+    // lo muestra, no se edita.
+    const finalPrice = useMemo(
+        () => Math.round(basePrice * (100 - appliedDiscountPct) / 100),
+        [basePrice, appliedDiscountPct]
+    );
+    const discountAmount = Math.max(0, basePrice - finalPrice);
 
     const removalOptions = useMemo(() => {
         const rems = catalog.remocion || [];
@@ -306,7 +326,9 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
             // La base exige seña <= precio (ej: turno con seña cobrado como
             // retiro propio $0); se limita al total registrado.
             seña: Math.min(Number(sena) || 0, finalPrice),
-            metodoPago: paymentMethod
+            metodoPago: paymentMethod,
+            descuentoPct: appliedDiscountPct,
+            descuentoMonto: discountAmount
         };
 
         if (paymentMethod === 'Combinado') {
@@ -477,6 +499,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
             setSelectedCategory(categories.find(category => category.active)?.key || 'semi');
             setHasExternalRemoval(false);
             setSelectedRemoval(null);
+            setHasDiscount(false);
+            setDiscountPct(10);
             setPaymentMethod('Transferencia');
             setSplitEfectivo('');
             setSplitTransferencia('');
@@ -514,7 +538,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         splitEfectivo ||
         splitTransferencia ||
         hasExternalRemoval ||
-        selectedRemoval
+        selectedRemoval ||
+        hasDiscount
     );
     useFormGuard(hasUnsavedChanges);
 
@@ -540,6 +565,12 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                 <span className="confirm-label">Precio total</span>
                 <strong>${Number(pendingSubmitData.precio).toLocaleString("es-AR")}</strong>
             </div>
+            {Number(pendingSubmitData.descuentoPct) > 0 && (
+                <div className="confirm-item">
+                    <span className="confirm-label">Descuento {pendingSubmitData.descuentoPct}%</span>
+                    <strong>−${Number(pendingSubmitData.descuentoMonto).toLocaleString("es-AR")}</strong>
+                </div>
+            )}
             {(pendingSubmitData.seña || 0) > 0 && (
                 <div className="confirm-item">
                     <span className="confirm-label">Seña</span>
@@ -756,8 +787,10 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                             <input
                                 ref={priceInputRef}
                                 type="number"
+                                className="price-computed"
                                 value={finalPrice}
-                                onChange={(e) => setServicePrice(Number(e.target.value))}
+                                readOnly
+                                aria-readonly="true"
                                 onBlur={handlePriceBlur}
                                 onFocus={handlePriceFocus}
                                 placeholder="0"
@@ -801,6 +834,47 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                                         >
                                             <span>{rem.name}</span>
                                             <span className="price-tag">+${rem.price.toLocaleString("es-AR")}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {!isOwnRemoval && (
+                    <>
+                        <div className="form-group external-removal-group">
+                            <div className="cute-toggle-card external-removal-card">
+                                <span className="external-removal-label">
+                                    ¿Tiene descuento?
+                                </span>
+                                <label className="switch-toggle external-removal-toggle">
+                                    <input
+                                        type="checkbox"
+                                        checked={hasDiscount}
+                                        onChange={(e) => setHasDiscount(e.target.checked)}
+                                    />
+                                    <span className="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {hasDiscount && (
+                            <div className="sub-services-section">
+                                <span className="sub-services-label">Descuento:</span>
+                                <div className="sub-services-grid">
+                                    {[10, 20].map((pct) => (
+                                        <button
+                                            key={pct}
+                                            type="button"
+                                            className={`btn-service ${discountPct === pct ? 'active' : ''}`}
+                                            onClick={() => setDiscountPct(pct)}
+                                        >
+                                            <span>Descuento {pct}%</span>
+                                            <span className="price-tag">
+                                                −${Math.round(basePrice * pct / 100).toLocaleString("es-AR")}
+                                            </span>
                                         </button>
                                     ))}
                                 </div>

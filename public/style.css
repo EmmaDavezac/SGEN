@@ -4478,19 +4478,39 @@ input[type="number"] {
     margin-bottom: 0;
 }
 
-.combined-service-label {
-    font-size: 11px;
+.combined-service-builder .combined-service-label {
+    font-size: 13px;
 }
 
-.combined-service-select {
+/* Selects del combo de 10 uñas legibles en mobile: 16px evita el auto-zoom
+   de iOS y el texto de las opciones entra sin recortarse. Van con la clase
+   compuesta para ganarle a las reglas genéricas de .filter-select. */
+.combined-service-builder .combined-service-select {
     width: 100%;
-    height: 40px;
-    padding: 4px 8px;
-    font-size: 12px;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 16px;
 }
 
 .combined-service-select--disabled {
     background: #f3f4f6;
+}
+
+/* En mobile las dos filas del combo se apilan: cada select toma todo el
+   ancho para que se lea el contenido completo. */
+@media (max-width: 560px) {
+    .combined-service-builder .form-row-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Precio Total calculado por el sistema (base + retiro externo − descuento):
+   de solo lectura, con fondo sutil para que se note que no se edita. */
+input.price-computed[readonly] {
+    background: var(--surface-bg);
+    color: var(--text-color);
+    cursor: default;
+    opacity: 1;
 }
 
 .external-removal-group {

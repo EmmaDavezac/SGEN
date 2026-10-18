@@ -57,6 +57,9 @@ export function normalizeServiceRecord(item) {
         montoEfectivo: Number(item.montoEfectivo ?? item.monto_efectivo) || 0,
         montoTransferencia: Number(item.montoTransferencia ?? item.monto_transferencia) || 0,
         saldoPendiente: Number(item.saldoPendiente ?? item.saldo_pendiente) || 0,
+        // Descuento aplicado al cobro (0 = sin descuento).
+        descuentoPct: Number(item.descuentoPct ?? item.descuento_pct) || 0,
+        descuentoMonto: Number(item.descuentoMonto ?? item.descuento_monto) || 0,
         completado: item.completado || 'No'
     };
 }
@@ -102,10 +105,13 @@ export async function registerServiceDirectly(transaction) {
             monto_efectivo: Number(transaction.montoEfectivo) || 0,
             monto_transferencia: Number(transaction.montoTransferencia) || 0,
             saldo_pendiente: Number(transaction.saldoPendiente) || 0,
+            // Descuento aplicado (0 = sin descuento).
+            descuento_pct: Number(transaction.descuentoPct) || 0,
+            descuento_monto: Number(transaction.descuentoMonto) || 0,
             completado: transaction.completado === true || ['sí', 'si', 'yes', 'true'].includes(String(transaction.completado).toLowerCase()),
             vuelto: Number(transaction.vuelto) || 0
         })
-        .select('id, legacy_id, turno_id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
+        .select('id, legacy_id, turno_id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, descuento_pct, descuento_monto, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
         .single();
     if (error) throw error;
 
@@ -125,6 +131,8 @@ export async function registerServiceDirectly(transaction) {
             montoEfectivo: data.monto_efectivo,
             montoTransferencia: data.monto_transferencia,
             saldoPendiente: data.saldo_pendiente,
+            descuentoPct: data.descuento_pct,
+            descuentoMonto: data.descuento_monto,
             completado: data.completado ? 'Sí' : 'No',
             vuelto: data.vuelto,
             usuario: data.perfiles?.nombre || data.perfiles?.email || null
@@ -170,7 +178,7 @@ export async function loadServicesFromDatabase() {
     await requireAuthForRead();
     const { data, error } = await supabase
         .from('servicios')
-        .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
+        .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, descuento_pct, descuento_monto, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
         .order('fecha', { ascending: false });
     if (error) throw error;
     return data || [];
@@ -471,7 +479,7 @@ export async function loadTurnoDetail(turnoId) {
             .order('fecha', { ascending: true }),
         supabase
             .from('servicios')
-            .select('id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, completado, vuelto, perfiles(nombre)')
+            .select('id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, descuento_pct, descuento_monto, completado, vuelto, perfiles(nombre)')
             .eq('turno_id', uuid)
             .maybeSingle()
     ]);

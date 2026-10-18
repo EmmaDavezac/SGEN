@@ -138,6 +138,9 @@ function VentaDetalleModal({
         ? Number(service.sena)
         : (Number(dbServicio?.sena) > 0 ? Number(dbServicio.sena) : totalSena);
     const vuelto = Number(service.vuelto) || Number(dbServicio?.vuelto) || 0;
+    // Descuento aplicado al cobro: de la fila del servicio o de la ficha.
+    const descuentoPct = Number(service.descuentoPct ?? dbServicio?.descuento_pct) || 0;
+    const descuentoMonto = Number(service.descuentoMonto ?? dbServicio?.descuento_monto) || 0;
     const hayCobro = Boolean(metodoPago) || cobros.length > 0;
     const esFiado = (metodoPago || '').toLowerCase() === 'fiado';
     const esCombinado = (metodoPago || '').toLowerCase() === 'combinado';
@@ -232,6 +235,11 @@ function VentaDetalleModal({
                 <div className="detail-block">
                     <h4>Cobro</h4>
                     <div className="detail-block-rows">
+                        {descuentoPct > 0 && (
+                            <Fila label="Descuento aplicado">
+                                {descuentoPct}% (−{formatPrice(descuentoMonto)})
+                            </Fila>
+                        )}
                         <Fila label="Precio total">{formatPrice(precio)}</Fila>
                         {senaDescontada > 0 && <Fila label="Seña descontada">{formatPrice(senaDescontada)}</Fila>}
                         {/* Sobrepago: cuánto entregó (resto después de la seña + vuelto)

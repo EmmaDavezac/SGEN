@@ -70,6 +70,8 @@ const normalizeServiceRecord = (item) => {
         montoEfectivo: Number(item?.monto_efectivo ?? item?.montoEfectivo) || 0,
         montoTransferencia: Number(item?.monto_transferencia ?? item?.montoTransferencia) || 0,
         saldoPendiente: Number(item?.saldo_pendiente ?? item?.saldoPendiente) || 0,
+        descuentoPct: Number(item?.descuento_pct ?? item?.descuentoPct) || 0,
+        descuentoMonto: Number(item?.descuento_monto ?? item?.descuentoMonto) || 0,
         completado: item?.completado ? 'Sí' : 'No',
         vuelto: Number(item?.vuelto) || 0
     };
