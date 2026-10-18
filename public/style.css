@@ -4484,12 +4484,27 @@ input[type="number"] {
 
 /* Selects del combo de 10 uñas legibles en mobile: 16px evita el auto-zoom
    de iOS y el texto de las opciones entra sin recortarse. Van con la clase
-   compuesta para ganarle a las reglas genéricas de .filter-select. */
+   compuesta para ganarle a las reglas genéricas de .filter-select (incluido
+   su max-width: 140px, que los dejaba angostos e ilegibles). */
 .combined-service-builder .combined-service-select {
     width: 100%;
+    max-width: none;
+    min-width: 0;
     min-height: 44px;
     padding: 8px 10px;
     font-size: 16px;
+    text-overflow: ellipsis;
+}
+
+/* Filas del combo: el servicio ocupa todo el ancho restante y la cantidad
+   de uñas queda fija y angosta ("9 uñas" es texto corto). Sin esto, la regla
+   genérica .custom-service-row le daba hasta 1fr a la columna de uñas. */
+.combined-service-builder .custom-service-row {
+    grid-template-columns: minmax(0, 1fr) minmax(88px, 110px);
+}
+
+.combined-service-builder .combined-service-field {
+    min-width: 0;
 }
 
 .combined-service-select--disabled {
