@@ -2849,19 +2849,18 @@ button:active {
     text-align: right;
 }
 
-/* Inputs numéricos de la sección Precios sin flechitas. */
-#tab-precios input[type="number"]::-webkit-outer-spin-button,
-#tab-precios input[type="number"]::-webkit-inner-spin-button {
+/* Inputs numéricos (montos, precios, cantidades) sin flechitas incrementales:
+   el valor se tipea o se ajusta con las flechas del teclado. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
 
-#tab-precios input[type="number"] {
+input[type="number"] {
     appearance: textfield;
     -moz-appearance: textfield;
 }
-
-/* Ocultar flechas de tipo número */
 
 /* Estilos para el refinamiento del editor de precios */
 

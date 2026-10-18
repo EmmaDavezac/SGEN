@@ -3,7 +3,7 @@ import { ensureAuthSession, supabase } from '../supabase.js';
 import { finalizeRegisteredService, notifySessionExpired, registerServiceDirectly, saveExpenseToDatabase } from '../services.js';
 import { cloneServiceCatalog, DEFAULT_SERVICE_CATEGORIES, DEFAULT_SERVICE_CATALOG, sortCategoriesForDisplay } from '../serviceCatalog.js';
 import { computeCombinedSplit } from '../paymentSplit.js';
-import Button, { DetailActionButton } from './Button.jsx';
+import Button from './Button.jsx';
 import Modal, { ConfirmModal, ModalCancelButton, ModalConfirmButton } from './Modal.jsx';
 import { useFormGuard } from '../formGuard.js';
 
@@ -31,7 +31,6 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
 
     const [selectedCategory, setSelectedCategory] = useState('semi');
     const [selectedSubService, setSelectedSubService] = useState(null);
-    const [useCombinedService, setUseCombinedService] = useState(false);
 
     const [combinedService1, setCombinedService1] = useState('');
     const [combinedCount1, setCombinedCount1] = useState(7);
@@ -156,7 +155,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     }, [allBasicOptions]);
 
     useEffect(() => {
-        if (selectedCategory === 'personalizado' && useCombinedService && combinedService1 && combinedService2) {
+        if (selectedCategory === 'personalizado' && combinedService1 && combinedService2) {
             const count1 = Number(combinedCount1) || 7;
             const count2 = 10 - count1;
 
@@ -171,18 +170,10 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                 setServicePrice(combinedPrice);
             }
         }
-    }, [selectedCategory, useCombinedService, combinedService1, combinedService2, combinedCount1, allBasicOptions]);
+    }, [selectedCategory, combinedService1, combinedService2, combinedCount1, allBasicOptions]);
 
     useEffect(() => {
-        if (selectedCategory === 'personalizado') {
-            // Personalizado usa nombre libre (o la combinación del builder):
-            // al entrar o volver del builder se arranca de cero.
-            if (!useCombinedService) {
-                setSelectedSubService(null);
-                setServiceName('');
-                setServicePrice(0);
-            }
-        } else if (!initialAppointment) {
+        if (selectedCategory !== 'personalizado' && !initialAppointment) {
             // Turno: no se preasume servicio ni precio; se elige a mano.
             const subservices = (catalog[selectedCategory] || []).filter(service => service.active !== false);
             if (subservices.length > 0) {
@@ -195,12 +186,11 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                 setServicePrice(0);
             }
         }
-        if (selectedCategory !== 'personalizado') setUseCombinedService(false);
         if (selectedCategory === 'remocion') {
             setHasExternalRemoval(false);
             setSelectedRemoval(null);
         }
-    }, [selectedCategory, catalog, useCombinedService]);
+    }, [selectedCategory, catalog]);
 
     useEffect(() => {
         if (initialAppointment?.cliente) {
@@ -483,7 +473,6 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
             setClientName('');
             setSena('');
             setSelectedCategory(categories.find(category => category.active)?.key || 'semi');
-            setUseCombinedService(false);
             setHasExternalRemoval(false);
             setSelectedRemoval(null);
             setPaymentMethod('Transferencia');
@@ -523,9 +512,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
         splitEfectivo ||
         splitTransferencia ||
         hasExternalRemoval ||
-        selectedRemoval ||
-        useCombinedService ||
-        (selectedCategory === 'personalizado' && !useCombinedService && serviceName.trim())
+        selectedRemoval
     );
     useFormGuard(hasUnsavedChanges);
 
@@ -674,33 +661,6 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                     </div>
                 </div>
 
-                {selectedCategory === 'personalizado' && !useCombinedService && (
-                    <>
-                        <div className="form-group service-choice-row">
-                            <DetailActionButton
-                                icon="fa-puzzle-piece"
-                                label="Armar combinación"
-                                onClick={() => setUseCombinedService(true)}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="custom-service-name">Servicio Personalizado <span className="field-required">(obligatorio)</span></label>
-                            <div className="input-wrapper">
-                                <i className="fa-solid fa-pen input-icon" />
-                                <input
-                                    id="custom-service-name"
-                                    type="text"
-                                    value={serviceName}
-                                    onChange={(e) => setServiceName(e.target.value)}
-                                    placeholder="Ej. Retiro + diseño especial"
-                                    autoComplete="off"
-                                    required
-                                />
-                            </div>
-                        </div>
-                    </>
-                )}
-
                 {selectedCategory !== 'personalizado' ? (
                     <div className="form-group" id="services-grid-wrapper">
                         <label id="services-grid-label">Servicio Específico <span className="field-required">(obligatorio)</span></label>
@@ -721,7 +681,7 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                             <p className="catalog-empty-note">No hay servicios activos en esta categoría.</p>
                         )}
                     </div>
-                ) : useCombinedService ? (
+                ) : (
                     <div id="combined-service-builder" className="combined-service-builder">
                         <div className="combined-service-heading">
                             <i className="fa-solid fa-puzzle-piece combined-service-icon"></i>
@@ -783,13 +743,8 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
                                 </select>
                             </div>
                         </div>
-                        <DetailActionButton
-                            icon="fa-arrow-left"
-                            label="Elegir servicio"
-                            onClick={() => setUseCombinedService(false)}
-                        />
                     </div>
-                ) : null}
+                )}
 
                 <div className="form-group">
                     <label>Precio Total ($) <span className="field-required">(obligatorio)</span></label>
