@@ -2,6 +2,19 @@
 
 
 
+## v1.3.12 — 2026-10-18 (SW v59)
+
+### Cambios
+- Registrar Servicio: nuevo toggle "¿Tiene descuento?" (mismo estilo que "¿Tiene retiro previo externo?") con opciones de 10% o 20%, que muestra el monto descontado en cada botón. El sistema calcula el total (base + retiro externo − descuento) y el input "Precio Total" pasa a ser de solo lectura.
+- El descuento se registra en `servicios` y aparece en la ficha "Consultar" de turno/venta, sección Cobro: "Descuento aplicado: 10% (−$…)". El modal de confirmación del cobro también muestra la fila "Descuento 10%".
+- El descuento no se aplica al Retiro Servicio Propio (su total siempre es $0) y se limpia al registrar un servicio.
+- Combos del builder de 10 uñas legibles: selects con fuente 16px (sin auto-zoom en iOS), alto mínimo 44px, padding amplio y labels de 13px; en mobile (≤560px) las dos filas del combo se apilan a ancho completo para que el contenido no se corte.
+- **Requiere aplicar la migración `20260823000031_add_servicio_descuento.sql`** (agrega `descuento_pct` y `descuento_monto` a `servicios` con sus checks; la RLS existente alcanza).
+- Bump de `CACHE_VERSION` en `public/sw.js` (v58 → v59) para forzar la actualización del service worker en clientes instalados.
+
+### Commits
+- c5b777f feat(descuento): toggle 10/20% con precio de solo lectura, detalle en ficha de turno y combo de uñas legible (SW v58 → v59)
+
 ## v1.3.11 — 2026-10-18 (SW v58)
 
 ### Cambios
