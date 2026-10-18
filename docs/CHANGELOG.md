@@ -2,7 +2,7 @@
 
 
 
-## v1.3.11 — 2026-10-18 (SW v56)
+## v1.3.11 — 2026-10-18 (SW v57)
 
 ### Cambios
 - Registrar Servicio: el "Retiro Servicio Propio" admite precio $0, la única excepción a la regla de precio mayor a 0.
@@ -10,14 +10,15 @@
 - El modal "Cobro en Efectivo" no se abre cuando el neto a cobrar es $0; se confirma directo.
 - El modal de confirmación muestra "Sin cobro" cuando el total es $0.
 - La seña del payload se limita al total registrado (`min(seña, precio)`) para respetar la restricción `sena <= precio` de la base (caso turno con seña cobrado como retiro propio $0).
-- Personalizado (Otro): campo de texto libre "Servicio Personalizado" para escribir el nombre del servicio a mano; el precio se tipea en "Precio Total" como en el resto de las categorías. Se reemplaza la grilla que solo ofrecía "Servicio Personalizado" $0. "Armar combinación" sigue disponible como opción extra.
-- La combinación de 2 servicios ahora calcula nombre y precio también al cobrar desde un turno (antes los efectos estaban guardados con `!initialAppointment` y no calculaban nada en ese flujo).
+- Personalizado (Otro): muestra directamente el builder del combo de 2 servicios / 10 uñas (antes solo ofrecía "Servicio Personalizado" $0); se quitaron el campo de nombre libre, el botón "Armar combinación" y el botón "Elegir servicio" que ya no tienen sentido.
+- La combinación de 2 servicios calcula nombre y precio también al cobrar desde un turno (antes los efectos estaban guardados con `!initialAppointment` y no calculaban nada en ese flujo).
 - Cambiar de categoría limpia el servicio, nombre y precio elegidos, evitando arrastrar un servicio viejo (p. ej. un retiro propio $0) a otra categoría al cobrar un turno.
-- El guardia de datos sin guardar contempla la combinación abierta y el nombre personalizado tipeado.
-- Bump de `CACHE_VERSION` en `public/sw.js` (v55 → v56) para forzar la actualización del service worker en clientes instalados.
+- Inputs numéricos (montos, precios, cantidades) sin flechas incrementales en toda la app; la regla que aplicaba solo en la sección Precios ahora es global (`public/style.css`).
+- Bump de `CACHE_VERSION` en `public/sw.js` (v55 → v57) para forzar la actualización del service worker en clientes instalados.
 
 ### Commits
 - 663ceeb fix(registro): retiro propio $0 sin metodo de pago y personalizado con nombre libre (SW v55 → v56)
+- cff3c33 fix(registro): personalizado es directamente el combo de 10 uñas y inputs monto sin flechas (SW v56 → v57)
 
 ## v1.3.10 — 2026-10-15 (SW v55)
 
