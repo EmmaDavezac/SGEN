@@ -2,6 +2,25 @@
 
 
 
+## v1.3.15 — 2026-10-20 (SW v62)
+
+### Cambios
+- Temas esteticos por negocio y modo (white-label): `src/businessConfig.js` define la paleta `TEMAS` (rosa, azul, blanco, rojo) para los modos claro, oscuro y superoscuro; el tema y el modo se guardan por dispositivo.
+- `src/themeColors.js` (nuevo): resuelve los colores hex del tema y modo activos para el canvas del comprobante, que no puede usar variables CSS.
+- `src/theme.js`: `obtenerTemaGuardado()` y `establecerTema()` gestionan el color del tema, `data-theme="superoscuro"` para el modo superoscuro y una sesion no superadmin vuelve al rosa + modo del dispositivo.
+- `src/components/SettingsPanel.jsx`: selector "Color del tema (superadmin)" y modo "Super oscuro (superadmin)" en Ajustes.
+- `src/components/TicketCanvas.jsx`: el comprobante usa los colores del tema activo (degradado del encabezado, textos, total y peligro) en lugar de hex fijos, y se corrige la generacion del canvas (resuelve el handle imperativo, avisa los errores en vez de fallar en silencio y agrega la nota "No valido como factura").
+- `src/components/VentaDetalleModal.jsx`: la ficha resuelve servicio, metodo de pago y sena desde `servicios` y `pagos`; la seccion Sena standalone se oculta cuando existe "Movimientos del turno" y el compartir nativo queda solo en tactil.
+- `public/style.css`: la navbar y la pantalla de login toman sus colores de las variables del tema (se quitan los fondos hardcodeados), la paleta clara rosa usa blancos rotos calidos en lugar de blanco puro y la lista de deudores queda unificada con el resto de los listados.
+- `src/App.jsx`: se deja de renovar el token dentro de la validacion de sesion (provocaba un bucle infinito de validaciones y recargas de listados) y se restaura el import de React de `TicketCanvas.jsx`.
+- `src/components/ExpensesPanel.jsx`: la carga de gastos depende solo del `authId`, evitando recargas repetidas.
+- `public/manifest-dark.json`: colores de fondo y barra de la PWA actualizados.
+- Bump de `CACHE_VERSION` en `public/sw.js` (v61 → v62) para forzar la actualizacion del service worker en clientes instalados.
+
+### Commits
+- ebe105a feat(temas): implementacion de temas esteticos por negocio y modo (SW v61 → v62)
+
+## v1.3.14 — 2026-10-18 (SW v61)
 ## v1.3.14 — 2026-10-18 (SW v61)
 
 ### Cambios
