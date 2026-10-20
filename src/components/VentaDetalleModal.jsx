@@ -116,6 +116,9 @@ function VentaDetalleModal({
     const pagos = detail?.pagos || [];
     const senas = pagos.filter((pago) => (pago.tipo || '').toLowerCase() === 'sena');
     const cobros = pagos.filter((pago) => (pago.tipo || '').toLowerCase() === 'cobro');
+    // Con más de un pago, "Movimientos del turno" ya lista cada seña con su
+    // fecha y método: la sección Seña standalone se oculta para no repetirla.
+    const hayMovimientos = pagos.length > 1;
     const totalSena = senas.reduce((sum, pago) => sum + Number(pago.monto || 0), 0);
     const estaCancelado = appointment ? estadoBadgeClass(appointment.estado) === 'cancelado' : false;
 
@@ -152,11 +155,26 @@ function VentaDetalleModal({
     const repartoEfectivo = Number(service.montoEfectivo ?? dbServicio?.monto_efectivo) || 0;
     const repartoTransferencia = Number(service.montoTransferencia ?? dbServicio?.monto_transferencia) || 0;
     const estaPago = !esFiado && precio > 0;
-    // En desktop no existe navigator.share: el ticket se descarga, no se comparte.
-    const puedeCompartir = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+    // El share nativo se usa solo en móvil/táctil (igual que en
+    // shareServiceTicketAsImage): en desktop el ticket se descarga,
+    // aunque exista navigator.share.
+    const puedeCompartir = typeof navigator !== 'undefined'
+        && typeof navigator.share === 'function'
+        && typeof navigator.canShare === 'function'
+        && typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(pointer: coarse)').matches;
 
     const compartirTicket = async () => {
-        await shareServiceTicketAsImage(service, ticketCanvasRef, notify);
+        // La ficha resuelve servicio/método/seña desde `servicios` + `pagos`
+        // (desde el calendario `service` llega crudo: metodoPago null, etc.).
+        // El ticket usa esos valores resueltos para no fallar ni salir vacío.
+        await shareServiceTicketAsImage({
+            ...service,
+            servicio: servicioRealizado,
+            metodoPago: metodoPago || service.metodoPago || '—',
+            seña: senaDescontada,
+        }, ticketCanvasRef, notify);
     };
 
     // Secciones de la ficha, compartidas por el modo modal y el modo ventana.
@@ -216,9 +234,7 @@ function VentaDetalleModal({
                     </div>
                 </div>
 
-                {loading && <p className="detail-loading">Cargando los pagos del turno…</p>}
-
-                {!loading && senas.length > 0 && (
+                {!loading && !hayMovimientos && senas.length > 0 && (
                     <div className="detail-block">
                         <h4>Seña</h4>
                         <div className="detail-block-rows">
@@ -241,6 +257,8 @@ function VentaDetalleModal({
                             </Fila>
                         )}
                         <Fila label="Precio total">{formatPrice(precio)}</Fila>
+                        {/* La seña ya se detalla en su sección (pago único) o en
+                            Movimientos (más de un pago): aquí solo su total. */}
                         {senaDescontada > 0 && <Fila label="Seña descontada">{formatPrice(senaDescontada)}</Fila>}
                         {/* Sobrepago: cuánto entregó (resto después de la seña + vuelto)
                             y cuánto se le devolvió. Si no hubo exceso no se muestra,
@@ -253,11 +271,15 @@ function VentaDetalleModal({
                                 <Fila label="Le devolvió">{formatPrice(vuelto)}</Fila>
                             </>
                         )}
+                        {/* El método ya lo lista cada fila de Movimientos cuando hay
+                            más de un pago: aquí solo se muestra sin ese detalle. */}
+                        {!hayMovimientos && (
                         <Fila label="Cómo pagó">
                             {esCombinado
                                 ? `Combinado · Efectivo $${formatPrice(repartoEfectivo)} + Transferencia $${formatPrice(repartoTransferencia)}`
                                 : formatMetodoPago(metodoPago)}
                         </Fila>
+                        )}
                         <Fila label="Estado del pago">
                             {!hayCobro
                                 ? 'Pendiente de cobro'
@@ -270,7 +292,7 @@ function VentaDetalleModal({
                     </div>
                 </div>
 
-                {!loading && pagos.length > 1 && (
+                {!loading && hayMovimientos && (
                     <div className="detail-block">
                         <h4>Movimientos del turno</h4>
                         <ul className="detail-payments">

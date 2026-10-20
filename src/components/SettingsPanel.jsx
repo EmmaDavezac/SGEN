@@ -1,7 +1,24 @@
 import React from 'react';
-import { MODO_SISTEMA } from '../theme.js';
+import { MODO_SISTEMA, MODO_SUPEROSCURO } from '../theme.js';
+import { NOMBRES_TEMAS } from '../businessConfig.js';
+// Colores de tema disponibles solo para superadmin.
+// 'barbie' se muestra como "Rosa" (NOMBRES_TEMAS).
+const TEMAS_SUPERADMIN = ['barbie', 'azul', 'blanco', 'rojo'];
 
-function SettingsPanel({ settings = {}, onChangeSettings, onChangeModo, modo, notify }) {
+function SettingsPanel({
+    settings = {},
+    onChangeSettings,
+    onChangeModo,
+    onChangeTema,
+    onChangeHeaderColor,
+    onChangeNavColor,
+    modo,
+    tema,
+    headerColor = false,
+    navColor = false,
+    isSuperadmin = false,
+    notify,
+}) {
     const { allowFiado, allowCajasTab, allowDaySearch, allowDayFilter } = settings;
 
     const handleToggle = (key, checked) => {
@@ -108,8 +125,63 @@ function SettingsPanel({ settings = {}, onChangeSettings, onChangeModo, modo, no
                         <option value={MODO_SISTEMA}>Seguir el dispositivo (sistema)</option>
                         <option value="claro">Claro</option>
                         <option value="oscuro">Oscuro</option>
+                        {isSuperadmin && (
+                            <option value={MODO_SUPEROSCURO}>Súper oscuro (superadmin)</option>
+                        )}
                     </select>
                 </div>
+
+                {isSuperadmin && (
+                    <>
+                        <div className="setting-row">
+                            <span>
+                                <i className="fa-solid fa-droplet setting-icon"></i>
+                                Color del tema (superadmin)
+                            </span>
+                            <select
+                                className="setting-select"
+                                value={tema || 'barbie'}
+                                onChange={(e) => typeof onChangeTema === 'function' && onChangeTema(e.target.value)}
+                            >
+                                {TEMAS_SUPERADMIN.map((clave) => (
+                                    <option key={clave} value={clave}>
+                                        {NOMBRES_TEMAS[clave] || clave}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="setting-row">
+                            <span>
+                                <i className="fa-solid fa-paint-roller setting-icon"></i>
+                                Header con color principal (superadmin)
+                            </span>
+                            <label className="switch-toggle">
+                                <input
+                                    type="checkbox"
+                                    checked={!!headerColor}
+                                    onChange={(e) => typeof onChangeHeaderColor === 'function' && onChangeHeaderColor(e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+
+                        <div className="setting-row">
+                            <span>
+                                <i className="fa-solid fa-paintbrush setting-icon"></i>
+                                Navbar con color principal (superadmin)
+                            </span>
+                            <label className="switch-toggle">
+                                <input
+                                    type="checkbox"
+                                    checked={!!navColor}
+                                    onChange={(e) => typeof onChangeNavColor === 'function' && onChangeNavColor(e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                    </>
+                )}
             </div>
 
             <div className="card-info-box">

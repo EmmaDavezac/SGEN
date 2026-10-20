@@ -4,8 +4,13 @@ import { BUSINESS, obtenerTema } from './businessConfig.js';
 const TEMA_STORAGE_KEY = 'sgen_tema';
 const MODO_STORAGE_KEY = 'sgen_modo';
 
-// Valores posibles de modo: 'claro' | 'oscuro' | 'sistema'
+// Valores posibles de modo: 'claro' | 'oscuro' | 'superoscuro' | 'sistema'
 const MODO_SISTEMA = 'sistema';
+const MODO_SUPEROSCURO = 'superoscuro';
+const MODOS_OSCUROS = ['oscuro', MODO_SUPEROSCURO];
+
+// Tema de color por defecto (clave de TEMAS en businessConfig).
+const TEMA_POR_DEFECTO = 'barbie';
 
 // Detecta si el dispositivo pide modo oscuro via prefers-color-scheme.
 function modoDelDispositivo() {
@@ -17,9 +22,10 @@ function modoDelDispositivo() {
 
 // Resuelve el modo efectivo a aplicar: localStorage > prefers-color-scheme del dispositivo > BUSINESS.modo.
 function resolverModo(modoGuardado) {
-  if (modoGuardado) {
+  if (modoGuardado === MODO_SISTEMA || modoGuardado === 'claro' || MODOS_OSCUROS.includes(modoGuardado)) {
     return modoGuardado;
   }
+  // Valor viejo o desconocido: se ignora y se cae al default.
   if (modoDelDispositivo() === 'oscuro') {
     return 'oscuro';
   }
@@ -32,6 +38,7 @@ function resolverModo(modoGuardado) {
 // El mismo tema (ej. 'barbie') soporta los modos 'claro' y 'oscuro'.
 export function aplicarTema(nombreTema, modo = 'claro') {
   // Resuelve 'sistema' a claro/oscuro según prefers-color-scheme del dispositivo.
+  // ('sistema' nunca puede dar 'superoscuro': el dispositivo solo distingue claro/oscuro).
   const modoResuelto = modo === MODO_SISTEMA ? modoDelDispositivo() : modo;
   const tema = obtenerTema(nombreTema, modoResuelto);
   const root = document.documentElement;
@@ -53,7 +60,8 @@ export function aplicarTema(nombreTema, modo = 'claro') {
   // En modo oscuro se usa --surface-bg para que la barra se mezcle con el fondo oscuro
   // del modo oscuro en lugar de forzar el rosa de marca en ambos temas.
   try {
-    const esOscuro = modoResuelto === 'oscuro';
+    const esOscuro = MODOS_OSCUROS.includes(modoResuelto);
+    const esSuperoscuro = modoResuelto === MODO_SUPEROSCURO;
     const themeColor = esOscuro
       ? (root.style.getPropertyValue('--surface-bg') || getComputedStyle(root).getPropertyValue('--surface-bg'))
       : (root.style.getPropertyValue('--brand-primary') || getComputedStyle(root).getPropertyValue('--brand-primary'));
@@ -69,7 +77,9 @@ export function aplicarTema(nombreTema, modo = 'claro') {
     // Marca el <html> con data-theme para que el CSS pueda forzar colores oscuros
     // con mayor especificidad que las variables inyectadas (útil para .app-nav,
     // .login-screen, etc. cuando el SW sirve CSS cacheado).
-    root.setAttribute('data-theme', esOscuro ? 'oscuro' : 'claro');
+    // 'superoscuro' comparte el data-theme oscuro salvo que necesites
+    // diferenciarlo (ej. [data-theme="superoscuro"] .login-screen).
+    root.setAttribute('data-theme', esSuperoscuro ? MODO_SUPEROSCURO : (esOscuro ? 'oscuro' : 'claro'));
 
     // Cambia el manifest de la PWA (splash screen y barra de direcciones instalada)
     // para que use colores oscuros en modo oscuro y claros en modo claro.
@@ -87,13 +97,13 @@ export function aplicarTema(nombreTema, modo = 'claro') {
 // Lee el tema y el modo guardados o los defaults del dispositivo / negocio y los aplica.
 // Por defecto respeta prefers-color-scheme del dispositivo.
 export function inicializarTema() {
-  const guardadoTema = localStorage.getItem(TEMA_STORAGE_KEY) || BUSINESS.tema;
+  const guardadoTema = leerTemaGuardado();
   const guardadoModo = localStorage.getItem(MODO_STORAGE_KEY);
   const modo = resolverModo(guardadoModo);
   return aplicarTema(guardadoTema, modo);
 }
 
-// Devuelve el modo actualmente activo ('claro' | 'oscuro' | 'sistema').
+// Devuelve el modo actualmente activo ('claro' | 'oscuro' | 'superoscuro' | 'sistema').
 export function obtenerModo() {
   try {
     const guardado = localStorage.getItem(MODO_STORAGE_KEY);
@@ -103,6 +113,37 @@ export function obtenerModo() {
   }
 }
 
+// Colores de tema válidos (claves de TEMAS en businessConfig).
+const TEMAS_VALIDOS = ['barbie', 'azul', 'blanco', 'rojo'];
+
+// Normaliza el color guardado: desconocido -> rosa de marca.
+function normalizarTema(nombreTema) {
+  if (TEMAS_VALIDOS.includes(nombreTema)) return nombreTema;
+  const negocio = BUSINESS.tema;
+  return TEMAS_VALIDOS.includes(negocio) ? negocio : TEMA_POR_DEFECTO;
+}
+
+// Lee el color guardado sin aplicar nada.
+function leerTemaGuardado() {
+  let guardado = null;
+  try {
+    guardado = localStorage.getItem(TEMA_STORAGE_KEY);
+  } catch (e) {
+    guardado = null;
+  }
+  return normalizarTema(guardado);
+}
+
+// Devuelve el color de tema guardado ('barbie' | 'azul' | 'blanco' | 'rojo').
+export function obtenerTemaGuardado() {
+  return leerTemaGuardado();
+}
+
+// Establece el color de tema ('barbie' | 'azul' | 'blanco' | 'rojo') manteniendo el modo.
+export function establecerTema(nombreTema) {
+  return aplicarTema(normalizarTema(nombreTema), obtenerModo());
+}
+
 // Alterna entre 'claro' y 'oscuro' del tema actual y lo aplica.
 export function alternarModo(nombreTema = BUSINESS.tema) {
   const actual = obtenerModo();
@@ -110,11 +151,11 @@ export function alternarModo(nombreTema = BUSINESS.tema) {
   return aplicarTema(nombreTema, nuevo);
 }
 
-// Establece el modo explícitamente ('claro' | 'oscuro' | 'sistema') y lo aplica.
-export function establecerModo(modo, nombreTema = BUSINESS.tema) {
+// Establece el modo explícitamente ('claro' | 'oscuro' | 'superoscuro' | 'sistema') y lo aplica.
+export function establecerModo(modo, nombreTema = leerTemaGuardado()) {
   return aplicarTema(nombreTema, modo);
 }
 
-export { MODO_SISTEMA };
+export { MODO_SISTEMA, MODO_SUPEROSCURO };
 
 export { obtenerTema };

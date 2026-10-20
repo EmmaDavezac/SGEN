@@ -164,9 +164,9 @@ muestran según lo que haya pasado:
 | Turno | solo con `turnoId` | fecha (ej. `10/10/2026`) y hora de inicio en una sola fila, estado con badge |
 | Cancelación | solo si el turno está cancelado | el motivo cargado, o "Sin motivo registrado" |
 | Servicio realizado | si no está cancelado | cliente (con atajo `Consultar`, icono de ojo, junto al nombre) y qué se hizo; cuándo y quién lo registró **solo para admins** (flag `isAdmin`) |
-| Seña | si hay pagos tipo `sena` | monto total, y por cada pago cuándo se pagó y con qué medio |
-| Cobro | si hay servicio | precio total, seña descontada, si hubo sobrepago **cuánto entregó** y **cuánto se le devolvió**, método de pago (resuelto desde `servicios` o el último cobro cuando el turno no lo trae) y estado del pago (fiado pendiente/saldado, pago completo o **Pendiente de cobro** si todavía no se cobró) |
-| Movimientos del turno | si hay más de un pago | seña, cobro y ajustes en orden cronológico |
+| Seña | un solo pago y es tipo `sena` | monto total, y cuándo se pagó y con qué medio |
+| Cobro | si hay servicio | precio total, seña descontada, si hubo sobrepago **cuánto entregó** y **cuánto se le devolvió**, método de pago (solo sin Movimientos; lo resuelve desde `servicios` o el último cobro cuando el turno no lo trae) y estado del pago (fiado pendiente/saldado, pago completo o **Pendiente de cobro** si todavía no se cobró) |
+| Movimientos del turno | si hay más de un pago | seña, cobro y ajustes en orden cronológico (reemplaza a la sección Seña standalone) |
 
 Acciones: la cabecera queda **solo con `Volver`** (igual que en las otras ventanas de
 ficha); `Compartir comprobante` y `Cobrar` van **al pie** (`.detail-window-footer`),

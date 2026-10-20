@@ -15,11 +15,11 @@
     /* Variante oscura del primario */
     --brand-light: #FFC0CB;
     /* Variante clara del primario */
-    --brand-pale: #FFF0F5;
-    /* Lavanda / Rosa Ultra Claro */
-    --cream-bg: #FCF9F5;
-    /* Crema Cálido de Fondo */
-    --white: #FFFFFF;
+    --brand-pale: #F5E3EB;
+    /* Lavanda / Rosa Ultra Claro (suavizado: ya no blanco puro) */
+    --cream-bg: #F1E8E2;
+    /* Crema Cálido de Fondo (suavizado: ya no blanco puro) */
+    --white: #FAF4EF;
     --gold: #FFD700;
     /* Acento de Brillos */
     --gold-dark: #E6B800;
@@ -34,7 +34,7 @@
     --color-focus: #7A4DFF;
 
     /* Efectos & Bordes */
-    --glass-bg: rgba(255, 255, 255, 0.75);
+    --glass-bg: rgba(250, 244, 239, 0.85);
     --glass-border: rgba(255, 105, 180, 0.25);
     /* Sombras unificadas en tono neutro (marrón chocolate, el mismo del texto)
        para el estilo flat de la app: se mantiene la elevación de cada
@@ -441,9 +441,8 @@ button {
     overflow: hidden;
 }
 
-  [data-theme="oscuro"] .login-screen {
-    background: linear-gradient(155deg, #121016 0%, #1a141a 100%) !important;
-  }
+  /* El fondo del login sale de las variables del tema (--cream-bg y
+     --brand-pale): cada color x modo pinta su degradado sin overrides. */
 
 .login-screen:not(.active) {
     transform: translateY(-100%);
@@ -2013,10 +2012,32 @@ button:disabled {
     z-index: 1000;
 }
 
-  [data-theme="oscuro"] .app-nav {
-    background: #1a141a !important;
-    border-color: #FF69B4 !important;
-  }
+  /* Los colores de .app-nav salen de las variables del tema
+     (--surface-bg y --brand-primary): así cada color x modo (rosa, azul,
+     blanco, rojo) pinta su fondo y su borde sin overrides hardcodeados. */
+
+/* PRUEBA LOCAL (no commitear, solo superadmin): navbar teñida con el color
+   principal del tema. Fondo en degradado brand-dark -> brand-primary e
+   iconos/textos en blanco para mantener contraste. */
+html.nav-tint .app-nav {
+    background: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand-primary) 100%);
+    border-color: var(--brand-dark);
+}
+
+html.nav-tint .nav-item {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+html.nav-tint .nav-item:hover,
+html.nav-tint .nav-item:focus-visible {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.18);
+    box-shadow: none;
+}
+
+html.nav-tint .nav-item.active {
+    color: #ffffff;
+}
 
 .nav-item {
     display: flex;
@@ -3374,11 +3395,29 @@ input[type="number"] {
 
 
 .pending-debtor-card {
-    grid-template-columns: minmax(0, 1fr) auto;
+    /* Misma tarjeta unificada que Clientes/Historial (avatar | texto | precio/acciones).
+       Solo cambia el acento del monto a rojo de peligro. */
+    grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .pending-debtor-card .appointment-info-col {
-    padding-left: 0;
+    min-width: 0;
+}
+
+.pending-debtor-card .pending-debtor-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+/* Encabezado y lista de deudores: mismo espaciado que el resto de listados
+   (la .history-list unificada + título sin margen extra de chart-section). */
+.debtors-list {
+    gap: 12px;
+}
+
+.debtors-list .pending-debtors-header {
+    margin-bottom: 0;
 }
 
 .appointment-card:hover {
@@ -3631,6 +3670,39 @@ input[type="number"] {
 
 .account-menu-wrapper {
     position: relative;
+}
+
+/* PRUEBA LOCAL (no commitear, solo superadmin): header teñido con el color
+   principal del tema. El fondo usa --brand-primary y los textos/iconos pasan
+   a blanco para mantener contraste; el botón de cuenta hereda el teñido. */
+html.header-tint .app-header {
+    background: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand-primary) 100%);
+    border-bottom-color: var(--brand-dark);
+}
+
+html.header-tint .user-name {
+    color: #ffffff;
+}
+
+html.header-tint .header-action-btn {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
+html.header-tint .header-action-btn:active,
+html.header-tint .header-action-btn:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.18);
+}
+
+html.header-tint .header-avatar {
+    border-color: #ffffff;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.18);
+}
+
+html.header-tint .avatar-menu-btn .fa-chevron-down {
+    color: #ffffff;
 }
 
 .account-menu {

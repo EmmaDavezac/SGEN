@@ -76,8 +76,11 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
     const isSearching = useSearching(search);
     const expenseListRef = useRef(null);
 
+    // Depende solo del authId (no del objeto `session` completo): si App
+    // recrea el objeto sesión con los mismos datos, no disparamos otra carga.
+    const authId = session?.authId;
     const loadExpenses = useCallback(async () => {
-        if (!session?.authId || !supabase) return;
+        if (!authId || !supabase) return;
         setLoading(true);
         try {
             const data = await loadExpensesFromDatabase();
@@ -88,7 +91,7 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
         } finally {
             setLoading(false);
         }
-    }, [session, notify]);
+    }, [authId, notify]);
 
     useEffect(() => {
         loadExpenses();

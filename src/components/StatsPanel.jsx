@@ -643,17 +643,16 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                             </div>
                         )}
                     </div>
-                    <div className="chart-section stats-panel list-section-gap">
+                    <div className="history-list unified-list list-scroll list-section-gap debtors-list">
                         <div className="panel-subsection-header pending-debtors-header">
                             <h4 className="panel-subsection-title">Clientes con pagos pendientes</h4>
                         </div>
-                        <div className="day-appointments-container unified-list list-scroll list-section-gap">
                             {(loading || isSearching) && <SkeletonList count={5} />}
                             {!loading && !isSearching && debtorsFiltrados.length === 0 ? (
                                 <div className="list-empty-state"><p>No se encontraron clientes que coincidan con la búsqueda.</p></div>
                             ) : (
                                 !loading && !isSearching && debtorsFiltrados.map((d) => (
-                                    <div key={d.cliente} className="appointment-card client-card pending-debtor-card unified-card">
+                                    <div key={d.cliente} className="client-card unified-card pending-debtor-card">
                                         <div className="client-avatar" aria-hidden="true">
                                             <i className="fa-solid fa-user"></i>
                                         </div>
@@ -680,7 +679,6 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                                 ))
                             )}
                         </div>
-                    </div>
                 </>
             )}
 

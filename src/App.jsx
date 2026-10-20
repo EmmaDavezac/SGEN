@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { signInWithSupabase, supabase } from './supabase.js';
 import AppLayout from './components/AppLayout.jsx';
 import { BUSINESS } from './businessConfig.js';
-import { obtenerModo, establecerModo, MODO_SISTEMA } from './theme.js';
+import { obtenerModo, obtenerTemaGuardado, establecerModo, establecerTema, MODO_SISTEMA, MODO_SUPEROSCURO } from './theme.js';
 import Button, { DetailActionButton, PanelCancelButton, PanelSaveButton } from './components/Button.jsx';
 import WriteProgressOverlay from './components/WriteProgressOverlay.jsx';
 import { runSteps, createSteps } from './progressTask.js';
@@ -145,8 +145,28 @@ function App() {
     const [confirmation, setConfirmation] = useState(null);
     // true cuando algún panel tiene un formulario de creación/edición abierto.
     const [formGuardActive, setFormGuardActive] = useState(false);
-    // Modo de apariencia: 'claro' | 'oscuro' | 'sistema'. Por defecto respeta el dispositivo.
+    // Modo de apariencia: 'claro' | 'oscuro' | 'superoscuro' | 'sistema'. Por defecto respeta el dispositivo.
     const [modo, setModoState] = useState(() => obtenerModo());
+    // Color del tema: 'barbie' | 'azul' | 'blanco' | 'rojo'. Solo el superadmin lo cambia.
+    const [tema, setTemaState] = useState(() => obtenerTemaGuardado());
+    // PRUEBA LOCAL (no commitear): header teñido con el color principal.
+    // Solo superadmin; se recuerda por dispositivo (localStorage).
+    const [headerColor, setHeaderColorState] = useState(() => {
+        try {
+            return localStorage.getItem('sgen_header_color') === '1';
+        } catch (e) {
+            return false;
+        }
+    });
+    // PRUEBA LOCAL (no commitear): navbar teñida con el color principal.
+    // Solo superadmin; se recuerda por dispositivo (localStorage).
+    const [navColor, setNavColorState] = useState(() => {
+        try {
+            return localStorage.getItem('sgen_nav_color') === '1';
+        } catch (e) {
+            return false;
+        }
+    });
     const toastNotifyRef = useRef(null);
 
     const initialSession = readStoredSession();
@@ -315,15 +335,11 @@ function App() {
                     if (isActive) setAuthReady(true);
                     return;
                 }
-                // Tenemos un usuario válido de Supabase. Intentar refresh pero
-                // nunca cerrar la sesión si falla: ya tenemos sesión activa.
-                try {
-                    const refreshed = await supabase.auth.refreshSession();
-                    if (!isActive) return;
-                    // Si refresh falla, seguimos con el authUser de getSession.
-                } catch (refreshError) {
-                    console.warn('No se pudo renovar el token (sesión se conserva):', refreshError);
-                }
+                // Tenemos un usuario válido de Supabase. NO renovamos el token acá:
+                // refreshSession() dispara el evento TOKEN_REFRESHED, que vuelve a
+                // llamar a esta validación -> bucle infinito de validaciones que
+                // recrea `session` y hace recargar los listados sin parar.
+                // El cliente de Supabase ya auto-renueva el token solo.
                 const { data: profile, error: profileError } = await supabase
                     .from('perfiles')
                     .select('id, email, nombre, rol')
@@ -354,7 +370,11 @@ function App() {
                 }
                 return;
             }
-            if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+            // Solo revalidamos ante eventos que cambian la identidad (login/logout).
+            // TOKEN_REFRESHED e INITIAL_SESSION no cambian nada: revalidar acá
+            // recrea el objeto `session` y pone en bucle a los paneles que
+            // recargan al cambiar `session` (Gastos, etc.).
+            if (event === 'SIGNED_IN') {
                 validateStoredSession();
                 return;
             }
@@ -388,6 +408,7 @@ function App() {
     }, [settings]);
 
     const isAdmin = session && (session.rol === 'admin' || session.rol === 'superadmin');
+    const isSuperadmin = session && session.rol === 'superadmin';
     useEffect(() => {
         activeTabRef.current = activeTab;
     }, [activeTab]);
@@ -780,6 +801,69 @@ function App() {
         establecerModo(nuevoModo);
     }, []);
 
+    const handleChangeTema = useCallback((nuevoTema) => {
+        setTemaState(nuevoTema);
+        establecerTema(nuevoTema);
+    }, []);
+
+    // PRUEBA LOCAL (no commitear): tiñe el header con el color principal.
+    const handleChangeHeaderColor = useCallback((activo) => {
+        setHeaderColorState(!!activo);
+        try {
+            localStorage.setItem('sgen_header_color', activo ? '1' : '0');
+        } catch (e) { /* ignore */ }
+        try {
+            document.documentElement.classList.toggle('header-tint', !!activo);
+        } catch (e) { /* ignore */ }
+    }, []);
+
+    // PRUEBA LOCAL (no commitear): tiñe la navbar con el color principal.
+    const handleChangeNavColor = useCallback((activo) => {
+        setNavColorState(!!activo);
+        try {
+            localStorage.setItem('sgen_nav_color', activo ? '1' : '0');
+        } catch (e) { /* ignore */ }
+        try {
+            document.documentElement.classList.toggle('nav-tint', !!activo);
+        } catch (e) { /* ignore */ }
+    }, []);
+
+    // Aplica la clase al montar (respeta lo guardado en este dispositivo).
+    useEffect(() => {
+        if (!headerColor) return undefined;
+        try {
+            document.documentElement.classList.add('header-tint');
+        } catch (e) { /* ignore */ }
+        return undefined;
+    }, []);
+
+    // Aplica la clase de navbar al montar (respeta lo guardado en este dispositivo).
+    useEffect(() => {
+        if (!navColor) return undefined;
+        try {
+            document.documentElement.classList.add('nav-tint');
+        } catch (e) { /* ignore */ }
+        return undefined;
+    }, []);
+
+    // Si una sesión no-superadmin hereda un modo/color exclusivo (ej. comparte
+    // dispositivo con el superadmin), se vuelve al rosa + modo del dispositivo.
+    useEffect(() => {
+        if (session && !isSuperadmin && (modo === MODO_SUPEROSCURO || tema !== 'barbie' || headerColor || navColor)) {
+            setModoState(MODO_SISTEMA);
+            establecerModo(MODO_SISTEMA, 'barbie');
+            setTemaState('barbie');
+            setHeaderColorState(false);
+            setNavColorState(false);
+            try {
+                localStorage.setItem('sgen_header_color', '0');
+                localStorage.setItem('sgen_nav_color', '0');
+                document.documentElement.classList.remove('header-tint');
+                document.documentElement.classList.remove('nav-tint');
+            } catch (e) { /* ignore */ }
+        }
+    }, [session, isSuperadmin, modo, tema, headerColor, navColor]);
+
     return (
         <>
             <ConfirmModal
@@ -1063,7 +1147,14 @@ function App() {
                             settings={settings}
                             onChangeSettings={handleChangeSettings}
                             onChangeModo={handleChangeModo}
+                            onChangeTema={handleChangeTema}
+                            onChangeHeaderColor={handleChangeHeaderColor}
+                            onChangeNavColor={handleChangeNavColor}
                             modo={modo}
+                            tema={tema}
+                            headerColor={headerColor}
+                            navColor={navColor}
+                            isSuperadmin={!!isSuperadmin}
                             notify={notify}
                         />
                     )}

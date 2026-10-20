@@ -1,5 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { BUSINESS } from '../businessConfig.js';
+import { obtenerTemaColores } from '../themeColors.js';
 
 function normalizeDateValue(fechaValue) {
     if (!fechaValue) return null;
@@ -37,7 +38,7 @@ function capitalizeCategoryLabel(cat) {
 }
 
 export function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
-    const words = text.split(' ');
+    const words = String(text ?? '').split(' ');
     let line = '';
     const lines = [];
     for (let n = 0; n < words.length; n++) {
@@ -55,7 +56,7 @@ export function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
 }
 
 export function countWrappedLines(ctx, text, maxWidth) {
-    const words = text.toString().split(' ');
+    const words = String(text ?? '').split(' ');
     let line = '';
     let lines = 1;
     for (let n = 0; n < words.length; n++) {
@@ -71,8 +72,31 @@ export function countWrappedLines(ctx, text, maxWidth) {
 }
 
 export function generateTicketCanvas(item, targetCanvas, logoImg) {
-    const canvas = targetCanvas || document.createElement('canvas');
+    const safeItem = item && typeof item === 'object' ? item : {};
+    item = safeItem;
+    // `targetCanvas` puede ser: un <canvas> real, el handle imperativo de
+    // TicketCanvas ({ getCanvas, generate }) o nada (se crea uno temporal).
+    // Antes se usaba directo y el handle no tiene getContext -> TypeError
+    // silencioso y el botón no hacía nada.
+    let canvas = null;
+    if (targetCanvas) {
+        if (typeof targetCanvas.getCanvas === 'function') {
+            try {
+                canvas = targetCanvas.getCanvas() || null;
+            } catch (e) {
+                canvas = null;
+            }
+        } else if (typeof targetCanvas.getContext === 'function') {
+            canvas = targetCanvas;
+        }
+    }
+    if (!canvas) {
+        canvas = document.createElement('canvas');
+    }
     const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        throw new Error('No se pudo obtener el contexto 2D del canvas.');
+    }
     const W = 640;
     const marginX = 50;
     const contentWidth = W - marginX * 2;
@@ -93,11 +117,11 @@ export function generateTicketCanvas(item, targetCanvas, logoImg) {
     const saldoPendiente = Number(item.saldoPendiente ?? item.saldo_pendiente) || 0;
 
     const rows = [
-        { label: 'CLIENTE', value: item.cliente, big: true },
-        { label: 'SERVICIO', value: item.servicio },
+        { label: 'CLIENTE', value: item.cliente || 'Cliente', big: true },
+        { label: 'SERVICIO', value: item.servicio || '—' },
         { label: 'CATEGORÍA', value: capitalizeCategoryLabel(item.categoria) },
         { label: 'PRECIO TOTAL', value: `$${precio.toLocaleString('es-AR')}` },
-        { label: 'MÉTODO DE PAGO', value: esCombinado ? 'Combinado' : item.metodoPago }
+        { label: 'MÉTODO DE PAGO', value: esCombinado ? 'Combinado' : (item.metodoPago || '—') }
     ];
     if (esCombinado) {
         rows.push({ label: '  · Efectivo', value: `$${montoEfectivo.toLocaleString('es-AR')}` });
@@ -146,9 +170,11 @@ export function generateTicketCanvas(item, targetCanvas, logoImg) {
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, W, H);
 
+    // Header con degradado temático (usa colores reales del tema activo).
+    const tema = obtenerTemaColores(BUSINESS.tema, BUSINESS.modo);
     const headerGradient = ctx.createLinearGradient(0, 0, W, 0);
-    headerGradient.addColorStop(0, '#FF69B4');
-    headerGradient.addColorStop(1, '#FF1493');
+    headerGradient.addColorStop(0, tema.brandPrimary);
+    headerGradient.addColorStop(1, tema.brandDark);
     ctx.fillStyle = headerGradient;
     ctx.fillRect(0, 0, W, headerHeight);
 
@@ -169,7 +195,7 @@ export function generateTicketCanvas(item, targetCanvas, logoImg) {
     } else {
         ctx.fillStyle = '#FFF0F5';
         ctx.fillRect(badgeX - badgeRadius, badgeY - badgeRadius, badgeRadius * 2, badgeRadius * 2);
-        ctx.fillStyle = '#FF1493';
+        ctx.fillStyle = tema.brandDark;
         ctx.font = "bold 26px 'Outfit', Arial";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -178,23 +204,26 @@ export function generateTicketCanvas(item, targetCanvas, logoImg) {
     }
     ctx.restore();
 
+    // Borde invisible del badge (sobrepone el clip para no pintar más de lo
+    // necesario).
     ctx.beginPath();
     ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
     ctx.lineWidth = 3;
-    ctx.strokeStyle = '#FF69B4';
+    ctx.strokeStyle = tema.brandPrimary;
     ctx.stroke();
 
+    // Título de la app.
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#5A3D46';
+    ctx.fillStyle = tema.textColor;
     ctx.font = "bold 26px 'Outfit', Arial";
     ctx.fillText('EVOLET STUDIO', badgeX, badgeY + badgeRadius + 38);
 
-    ctx.fillStyle = '#9E7D86';
+    ctx.fillStyle = tema.textMuted;
     ctx.font = "13px 'Outfit', Arial";
     ctx.fillText('COMPROBANTE DE SERVICIO', badgeX, badgeY + badgeRadius + 58);
 
     function drawDivider(yPos) {
-        ctx.strokeStyle = '#FFC0CB';
+        ctx.strokeStyle = tema.textLight;
         ctx.lineWidth = 2;
         ctx.setLineDash([6, 6]);
         ctx.beginPath();
@@ -210,19 +239,19 @@ export function generateTicketCanvas(item, targetCanvas, logoImg) {
     ctx.textAlign = 'left';
 
     function drawRow(label, value, valueColor, big) {
-        ctx.fillStyle = '#9E7D86';
+        ctx.fillStyle = tema.textMuted;
         ctx.font = rowLabelFont;
         ctx.fillText(label, marginX, cursorY);
 
-        ctx.fillStyle = valueColor || '#5A3D46';
+        ctx.fillStyle = valueColor || tema.textColor;
         ctx.font = big ? rowValueBigFont : rowValueFont;
         const lines = countWrappedLines(ctx, value, contentWidth);
-        wrapCanvasText(ctx, value.toString(), marginX, cursorY + 26, contentWidth, rowLineHeight);
+        wrapCanvasText(ctx, String(value ?? ''), marginX, cursorY + 26, contentWidth, rowLineHeight);
         cursorY += 30 + (lines - 1) * rowLineHeight + 22;
     }
 
     rows.forEach(row => {
-        drawRow(row.label, row.value, row.big ? '#FF1493' : '#5A3D46', row.big);
+        drawRow(row.label, row.value, row.big ? tema.brandDark : tema.textColor, row.big);
     });
 
     cursorY += 8;
@@ -230,14 +259,14 @@ export function generateTicketCanvas(item, targetCanvas, logoImg) {
     cursorY += 30;
 
     if (hasSena) {
-        drawRow('SEÑA DESCONTADA', `-$${sena.toLocaleString('es-AR')}`, '#FF4D4D', false);
+        drawRow('SEÑA DESCONTADA', `-$${sena.toLocaleString('es-AR')}`, tema.colorDanger, false);
     }
 
-    ctx.fillStyle = '#9E7D86';
+    ctx.fillStyle = tema.textMuted;
     ctx.font = "600 14px 'Outfit', Arial";
     ctx.fillText(hasSena ? 'TOTAL COBRADO (NETO)' : 'TOTAL COBRADO', marginX, cursorY);
 
-    ctx.fillStyle = '#FF1493';
+    ctx.fillStyle = tema.brandDark;
     ctx.font = "bold 46px 'Outfit', Arial";
     ctx.textAlign = 'right';
     ctx.fillText(`$${neto.toLocaleString('es-AR')}`, W - marginX, cursorY + 12);
@@ -269,7 +298,7 @@ export function generateTicketCanvas(item, targetCanvas, logoImg) {
     if (iconWidth > 0) {
         try {
             ctx.font = "900 15px 'Font Awesome 6 Free'";
-            ctx.fillStyle = '#FF69B4';
+            ctx.fillStyle = tema.brandPrimary;
             ctx.fillText('\uf004', footerX, footerY);
             footerX += iconWidth + iconGap;
         } catch (e) {
@@ -277,14 +306,22 @@ export function generateTicketCanvas(item, targetCanvas, logoImg) {
         }
     }
 
-    ctx.fillStyle = '#5A3D46';
+    ctx.fillStyle = tema.textColor;
     ctx.font = "600 15px 'Outfit', Arial";
     ctx.fillText(footerText, footerX, footerY);
 
-    ctx.fillStyle = '#CBB2B9';
+    ctx.fillStyle = tema.textLight;
     ctx.font = "11px 'Outfit', Arial";
     ctx.textAlign = 'center';
     ctx.fillText('Comprobante generado automáticamente', W / 2, cursorY + 58);
+
+    // Nota legal / de validez. Se pone aparte para no mezclar con el pie de
+    // página y respetar la guía visual (sin emojis).
+    const invalidNoteY = cursorY + 76;
+    ctx.fillStyle = tema.colorDanger;
+    ctx.font = "600 11px 'Outfit', Arial";
+    ctx.textAlign = 'center';
+    ctx.fillText('No válido como factura', W / 2, invalidNoteY);
 
     ctx.textAlign = 'left';
 
@@ -303,7 +340,13 @@ export function downloadTicketBlob(blob, fileName) {
 }
 
 export async function shareServiceTicketAsImage(item, canvasRef, notify) {
-    const canvas = generateTicketCanvas(item, canvasRef?.current, document.getElementById('logo-img'));
+    // `canvasRef` es el ref React (<TicketCanvas ref={...} />): su .current es
+    // el handle imperativo { getCanvas, generate }, no un <canvas>.
+    // generateTicketCanvas ya sabe resolverlo; acá además se atrapa cualquier
+    // error para que el botón siempre responda (antes fallaba en silencio).
+    try {
+        const target = canvasRef?.current ?? canvasRef ?? null;
+        const canvas = generateTicketCanvas(item, target, document.getElementById('logo-img'));
 
     return new Promise((resolve) => {
         canvas.toBlob(async (blob) => {
@@ -338,10 +381,17 @@ export async function shareServiceTicketAsImage(item, canvasRef, notify) {
             }
         }, 'image/png');
     });
+    } catch (err) {
+        console.error('Error al generar el ticket:', err);
+        if (notify) notify('No se pudo generar el comprobante.', 'error');
+        return { success: false };
+    }
 }
 
 export async function downloadServiceTicketAsPng(item, canvasRef, notify) {
-    const canvas = generateTicketCanvas(item, canvasRef?.current, document.getElementById('logo-img'));
+    try {
+        const target = canvasRef?.current ?? canvasRef ?? null;
+        const canvas = generateTicketCanvas(item, target, document.getElementById('logo-img'));
     return new Promise((resolve) => {
         canvas.toBlob((blob) => {
             if (!blob) {
@@ -355,6 +405,11 @@ export async function downloadServiceTicketAsPng(item, canvasRef, notify) {
             resolve({ success: true });
         }, 'image/png');
     });
+    } catch (err) {
+        console.error('Error al generar el ticket PNG:', err);
+        if (notify) notify('No se pudo generar el comprobante.', 'error');
+        return { success: false };
+    }
 }
 
 const TicketCanvas = forwardRef(function TicketCanvas(_props, ref) {
