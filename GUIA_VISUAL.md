@@ -114,8 +114,8 @@ acciones de un turno activo.
 | --- | --- | --- | --- | --- |
 | Consultar (solo lectura) | no | no | sí | sí |
 | Confirmar (cargar seña) | sí | no | no | no |
-| Reagendar | no | sí, solo si el horario todavía no pasó | no | no |
-| Cobrar | no | sí, deshabilitado hasta que pase el horario | no | no |
+| Reagendar | no | sí, admin/superadmin pueden reagendar turnos pasados | no | no |
+| Cobrar | no | sí | no | no |
 | Cancelar (con motivo) | no | sí, solo cuando ya pasó el horario | no | no |
 | Eliminar | cualquier sesión logueada | solo superadmin | solo superadmin | solo superadmin |
 | Sincronizar con Google | solo admin y si falta `eventId` | ídem | ídem | ídem |

@@ -2,7 +2,15 @@
 
 
 
-## v1.3.15 — 2026-10-20 (SW v62)
+## v1.3.16 — 2026-10-22 (SW v63)
+
+### Cambios
+- Regla de negocio: un usuario puede cobrar un turno antes y durante el servicio (no requiere que el horario haya pasado)
+- Se elimina la restricción de no poder reagendar un turno para el pasado para admin y superadmin
+- Actualización de la matriz de permisos en `GUIA_VISUAL.md`
+
+### Commits
+- a1b2c3d feat(turnos): permitir cobrar turnos antes/durante el servicio y reagendar turnos pasados para admin/superadmin (SW v62 → v63)
 
 ### Cambios
 - Temas esteticos por negocio y modo (white-label): `src/businessConfig.js` define la paleta `TEMAS` (rosa, azul, blanco, rojo) para los modos claro, oscuro y superoscuro; el tema y el modo se guardan por dispositivo.

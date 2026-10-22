@@ -223,12 +223,10 @@ export function getAppointmentActions(apt, { isAdmin = false, isSuperadmin = fal
                     : 'El turno ya fue confirmado con la seña.'
         ),
 
-        // Reagendar: solo reservados que todavía no pasaron.
-        // Un turno cuya hora ya llegó no se mueve: moverlo sería reescribir el
-        // historial. Si la cliente no vino, la salida es cancelarlo con motivo.
+        // Reagendar: solo reservados; admin/superadmin pueden reagendar turnos pasados
         build(
             APPOINTMENT_ACTIONS.REAGENDAR,
-            estado === ESTADO_RESERVADO && !past,
+            estado === ESTADO_RESERVADO && (!past || isAdmin || isSuperadmin),
             false,
             estado !== ESTADO_RESERVADO
                 ? estado === ESTADO_PROVISIONAL
@@ -237,24 +235,24 @@ export function getAppointmentActions(apt, { isAdmin = false, isSuperadmin = fal
                         ? 'El turno está cancelado.'
                         : 'El turno ya está cobrado.'
                 : past
-                    ? 'El horario del turno ya pasó. Si la cliente no vino, cancelalo con el motivo.'
+                    ? !(isAdmin || isSuperadmin)
+                        ? 'El horario del turno ya pasó. Si la cliente no vino, cancelalo con el motivo.'
+                        : null
                     : null
         ),
 
-        // Cobrar: solo reservados, y recién cuando pasó el horario.
+        // Cobrar: solo reservados (ahora también antes/durante el servicio)
         build(
             APPOINTMENT_ACTIONS.COBRAR,
             estado === ESTADO_RESERVADO,
-            !past,
+            false,
             estado !== ESTADO_RESERVADO
                 ? estado === ESTADO_COMPLETADO
                     ? 'El turno ya fue cobrado.'
                     : estado === ESTADO_CANCELADO
                         ? 'El turno está cancelado.'
                         : 'Primero cargá la seña para confirmar el turno.'
-                : past
-                    ? null
-                    : 'El turno todavía no pasó. Se puede cobrar cuando termine.'
+                : null
         ),
 
         // Cancelar: solo reservados cuyo horario ya pasó (la cliente no vino).
