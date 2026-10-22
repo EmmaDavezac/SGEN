@@ -40,7 +40,7 @@ Antes de este sistema, la operación del salón sufría estos dolores:
 | 🏦 **Gestión de Cajas** *(solo admin, flag opcional)* | Consolidado en tiempo real de Efectivo vs Mercado Pago + movimientos manuales (depósitos / extracciones) con trazabilidad. |
 | ⚙️ **Ajustes locales** *(solo admin)* | Toggles: habilitar fiado, habilitar módulo Cajas. Guardados en `localStorage` por dispositivo. |
 | 👤 **Mi Cuenta** | Edición de perfil propio, actualización de email (con re-verificación) y cambio seguro de contraseña con re-autenticación. |
-| 📱 **Progressive Web App** | Instalable como app nativa en Android e iOS. Modo standalone, 8 tamaños de íconos PWA, maskable, splash screen iOS. Service Worker con precache de assets para uso offline. |
+| 📱 **Progressive Web App & Offline** | Instalable como app nativa en Android e iOS. Modo standalone, 8 tamaños de íconos PWA, maskable, splash screen iOS. Service Worker con precache de assets y arquitectura offline-first con IndexedDB y sincronización en segundo plano (ver [Plan Offline](docs/PLAN_OFFLINE.md) y [Walkthrough](docs/WALKTHROUGH_OFFLINE.md)). |
 
 ---
 
@@ -49,8 +49,9 @@ Antes de este sistema, la operación del salón sufría estos dolores:
 | Capa | Tecnología |
 |---|---|
 | **Frontend** | React 19 (hooks estándar, sin librerías de estado) · Vite 5 · CSS global con tokens Y2K Pink |
-| **Autenticación** | Supabase Auth (email + contraseña, perfiles extendidos en `perfiles`) |
+| **Autenticación** | Supabase Auth (email + contraseña, perfiles extendidos en `perfiles`) con tolerancia offline |
 | **Base de datos** | PostgreSQL en **Supabase** · **RLS (Row Level Security)** activado por tabla |
+| **Almacenamiento Local** | IndexedDB nativo (`sgen_offline_db`) con estrategia stale-while-revalidate y outbox queue |
 | **Integraciones** | Supabase **Edge Function** en TypeScript que habla con Google Calendar API (OAuth 2.0 secrets almacenados en Supabase Secrets — nunca expuestos al cliente) |
 | **PWA / Offline** | `vite-plugin-pwa` con estrategia `injectManifest` y Service Worker custom |
 | **Formato / Moneda** | `es-AR` · `ARS` en todos los módulos |

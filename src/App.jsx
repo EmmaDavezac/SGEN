@@ -24,6 +24,7 @@ import UsersPanel from './components/UsersPanel.jsx';
 import AppFooter from './components/AppFooter.jsx';
 import { ConfirmModal } from './components/Modal.jsx';
 import { getPathForTab, getTabFromPath, isKnownPath } from './router.js';
+import { isNetworkError, useNetworkStatus } from './offline/network.js';
 import {
     readLoginRateState,
     registerFailedLoginAttempt,
@@ -130,6 +131,7 @@ function ToastBridge({ notifyRef }) {
 
 function App() {
     const [session, setSession] = useState(() => readStoredSession());
+    const { isOnline } = useNetworkStatus();
     // `false` hasta validar la sesión guardada contra Supabase Auth. Evita que
     // los paneles monten (y pisen el caché con []) con una sesión rancia.
     const [authReady, setAuthReady] = useState(false);
@@ -312,6 +314,13 @@ function App() {
         //   se rehidrata el perfil. Si el perfil ya no es legible (RLS), se
         //   limpia la sesión local para forzar un login fresco.
         const validateStoredSession = async () => {
+            // Si el dispositivo está sin conexión a internet, preservamos la sesión
+            // guardada localmente para permitir el funcionamiento en modo offline.
+            if (typeof navigator !== 'undefined' && !navigator.onLine) {
+                if (isActive) setAuthReady(true);
+                return;
+            }
+
             // Timeout de seguridad: si Supabase no responde en 10s, no dejamos
             // la pantalla atascada en "Ingresando…".
             const timeout = new Promise((_, reject) =>
@@ -320,15 +329,20 @@ function App() {
             let sessionData;
             try {
                 sessionData = await Promise.race([supabase.auth.getSession(), timeout]);
-            } catch {
+            } catch (sessionErr) {
                 // Timeout o error de red: no cerramos la sesión, solo marcamos
                 // authReady para que la app siga funcionando con su caché local.
+                console.warn('Fallo o timeout al consultar sesión en Supabase, preservando sesión local:', sessionErr);
                 if (isActive) setAuthReady(true);
                 return;
             }
             try {
                 const { data, error } = sessionData;
                 if (!isActive) return;
+                if (error && isNetworkError(error)) {
+                    if (isActive) setAuthReady(true);
+                    return;
+                }
                 const authUser = error ? null : data?.session?.user;
                 if (!authUser) {
                     if (readStoredSession()) setSession(null);
@@ -346,7 +360,18 @@ function App() {
                     .eq('id', authUser.id)
                     .maybeSingle();
                 if (!isActive) return;
-                if (profileError || !profile) {
+                if (profileError) {
+                    // Si el fallo fue por problemas de conexión a internet, preservamos la sesión
+                    if (isNetworkError(profileError)) {
+                        console.warn('Fallo de red al consultar perfil, preservando sesión local:', profileError);
+                        if (isActive) setAuthReady(true);
+                        return;
+                    }
+                    setSession(null);
+                    if (isActive) setAuthReady(true);
+                    return;
+                }
+                if (!profile) {
                     setSession(null);
                     if (isActive) setAuthReady(true);
                     return;
@@ -354,6 +379,10 @@ function App() {
                 setSession({ ...profile, authId: authUser.id });
             } catch (err) {
                 console.error('Error validando sesión:', err);
+                if (isNetworkError(err)) {
+                    if (isActive) setAuthReady(true);
+                    return;
+                }
                 if (isActive) setAuthReady(true);
             } finally {
                 if (isActive) setAuthReady(true);
@@ -395,11 +424,16 @@ function App() {
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') validateStoredSession();
         };
+        const handleOnline = () => {
+            if (isActive && readStoredSession()) validateStoredSession();
+        };
         document.addEventListener('visibilitychange', handleVisibility);
+        window.addEventListener('online', handleOnline);
         return () => {
             isActive = false;
             authListener.subscription.unsubscribe();
             document.removeEventListener('visibilitychange', handleVisibility);
+            window.removeEventListener('online', handleOnline);
         };
     }, []);
 
@@ -570,13 +604,7 @@ function App() {
             // Consultamos directamente a Supabase auth para obtener el error y distinguirlos.
             const { error: supaError } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: cleanPassword });
             if (supaError && supaError.message) {
-                const lowerMsg = supaError.message.toLowerCase();
-                // Errores de red/connessione: no sumamos al rate limit
-                // Check for common network error indicators in Supabase messages
-                const networkErrors = ['network', 'offline', 'fetch', 'connect', 'internet', 'connection'];
-                const isNetworkError = networkErrors.some(term => lowerMsg.includes(term));
-
-                if (!isNetworkError) {
+                if (!isNetworkError(supaError)) {
                     // Es error de credenciales, no de red: sumamos al rate limit.
                     setLoginRate(registerFailedLoginAttempt());
                     notify(describeLoginFailure(readLoginRateState()), 'error');
@@ -944,6 +972,13 @@ function App() {
 
                         <h1>{BUSINESS.nombre}</h1>
                         <p className="subtitle">Sistema de Contabilidad</p>
+
+                        {!isOnline && (
+                            <div className="network-status-banner offline" style={{ borderRadius: 'var(--radius-sm)', marginBottom: '16px' }} role="status">
+                                <i className="fa-solid fa-wifi" aria-hidden="true"></i>
+                                <span>Sin conexión a internet (modo offline)</span>
+                            </div>
+                        )}
 
                         {passwordResetMode === true ? (
                             <form className="retro-form" onSubmit={handlePasswordRecoverySave}>

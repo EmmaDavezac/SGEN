@@ -2,7 +2,21 @@
 
 
 
-## v1.4.0 — 2026-10-22 (SW v65)
+## v1.4.1 — 2026-10-22 (SW v65)
+
+### Cambios
+- Sesion resiliente sin conexion en `src/App.jsx`: no se destruye la sesion local si la validacion falla por falta de internet o error de red.
+- Revalidacion automatica de sesion en segundo plano al restablecer la conexion (evento `online`).
+- Modulo `src/offline/network.js` con detector de errores de red `isNetworkError` y hook reactivo `useNetworkStatus`.
+- Componente `src/components/NetworkStatusBanner.jsx` montado en `AppLayout.jsx` y pantalla de ingreso para notificar modo offline y aviso temporal de conexion restablecida.
+- Estilos para banner de conectividad en `public/style.css` (alineacion responsive con el layout).
+- Creacion de `docs/PLAN_OFFLINE.md` y `docs/WALKTHROUGH_OFFLINE.md`.
+- Actualizacion de `README.md` con arquitectura offline.
+
+### Commits
+- af1c16e feat(offline): sesion resiliente sin conexion e indicador de conectividad (SW v64 -> v65)
+
+## v1.4.0 — 2026-10-22 (SW v64)
 
 ### Cambios
 - Reemplazado animación de corazón por spinner profesional `fa-spinner fa-spin` en loader y overlays de progreso

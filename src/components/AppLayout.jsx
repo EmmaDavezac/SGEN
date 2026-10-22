@@ -1,12 +1,15 @@
 import React, { useRef, useState } from 'react';
 import AppFooter from './AppFooter.jsx';
 import AboutModal from './AboutModal.jsx';
+import NetworkStatusBanner from './NetworkStatusBanner.jsx';
+import { useNetworkStatus } from '../offline/network.js';
 import { usePullToRefreshGesture } from '../pullToRefresh.js';
 import { BUSINESS } from '../businessConfig.js';
 
 function AppLayout({ children, session, onLogout, activeTab, setActiveTab, settings = {} }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const { isOnline, justReconnected } = useNetworkStatus();
   const isAdmin = session && (session.rol === 'admin' || session.rol === 'superadmin');
   const isSuperadmin = session && session.rol === 'superadmin';
   const { allowCajasTab = false } = settings;
@@ -91,6 +94,9 @@ function AppLayout({ children, session, onLogout, activeTab, setActiveTab, setti
           </div>
         </div>
       </header>
+
+      {/* BANNER DE ESTADO DE CONECTIVIDAD (OFFLINE / RECONEXION) */}
+      <NetworkStatusBanner isOnline={isOnline} justReconnected={justReconnected} />
 
       {/* CONTENIDO PRINCIPAL SCROLLABLE */}
       <main ref={contentRef} className={`app-content app-content-${activeTab}`}>
