@@ -6,7 +6,7 @@ function Loader({ show = true, text = 'Cargando...' }) {
   return (
     <div className="loader-overlay" aria-live="polite" aria-busy="true">
       <div className="spinner-container">
-        <i className="fa-solid fa-heart heart-spinner" aria-hidden="true"></i>
+        <i className="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
         <p>{text}</p>
       </div>
     </div>

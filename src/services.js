@@ -162,24 +162,47 @@ export async function loadAppointmentsFromDatabase() {
     return data || [];
 }
 
-export async function loadExpensesFromDatabase() {
+export async function loadExpensesFromDatabase(options = {}) {
     if (!supabase) throw new Error('Supabase no está disponible.');
     await requireAuthForRead();
-    const { data, error } = await supabase
+    const opts = typeof options === 'object' && options !== null ? options : { userId: options };
+    let query = supabase
         .from('gastos')
-        .select('id, fecha, concepto, categoria, monto, metodo_pago')
+        .select('id, fecha, concepto, categoria, monto, metodo_pago, usuario_id')
         .order('fecha', { ascending: false });
+    if (opts.userId) {
+        query = query.eq('usuario_id', opts.userId);
+    }
+    // Filtrar por fecha si se proporciona (formato: { gte: fecha_inicio, lte: fecha_fin })
+    // Por defecto, traemos todos los gastos (dateRange opcional para compatibilidad)
+    if (opts.dateRange) {
+        query = query.gte('fecha', opts.dateRange.gte).lte('fecha', opts.dateRange.lte);
+    }
+    const limit = opts.limit || opts.pageSize;
+    if (limit) {
+        const offset = opts.offset || (opts.page ? (opts.page - 1) * limit : 0);
+        query = query.range(offset, offset + limit - 1);
+    }
+    const { data, error } = await query;
     if (error) throw error;
     return data || [];
 }
 
-export async function loadServicesFromDatabase() {
+export async function loadServicesFromDatabase(options = {}) {
     if (!supabase) throw new Error('Supabase no está disponible.');
     await requireAuthForRead();
-    const { data, error } = await supabase
-        .from('servicios')
-        .select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, descuento_pct, descuento_monto, completado, vuelto, clientes(nombre), perfiles(nombre, email)')
-        .order('fecha', { ascending: false });
+    // Solo seleccionar campos necesarios para estadísticas
+    // Nota: removimos 'clientes(nombre), perfiles(nombre, email)' para reducir payload
+    // pero tambien removimos 'costo_actual' que no existe en la tabla servicios
+    let query = supabase.from('servicios').select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, descuento_pct, descuento_monto, completado, vuelto, cliente_id');
+    // Filtrar por fecha si se proporciona (formato: { gte: fecha_inicio, lte: fecha_fin })
+    // Si no hay dateRange, no filtramos (traemos todos los servicios para compatibilidad)
+    if (options && options.dateRange) {
+        query = query.gte('fecha', options.dateRange.gte).lte('fecha', options.dateRange.lte);
+    }
+    // Ordenar por fecha descendente - importante para el cacheo eficiente
+    query = query.order('fecha', { ascending: false });
+    const { data, error } = await query;
     if (error) throw error;
     return data || [];
 }
@@ -268,7 +291,7 @@ export async function saveExpenseToDatabase(payload) {
     const { data, error } = await supabase
         .from('gastos')
         .insert(payload)
-        .select('id, fecha, concepto, categoria, monto, metodo_pago')
+        .select('id, fecha, concepto, categoria, monto, metodo_pago, usuario_id')
         .single();
     if (error) throw error;
     return data;

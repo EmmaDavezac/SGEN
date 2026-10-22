@@ -15,7 +15,7 @@ export const LOGIN_RATE_LIMIT_KEY = 'evolet_login_rate_limit_v1';
 export const LOGIN_RATE_LIMIT = {
     maxAttempts: 5,
     windowMs: 15 * 60 * 1000,
-    lockMs: 5 * 60 * 1000,
+    lockMs: 60000,
 };
 
 const EMPTY_STATE = Object.freeze({

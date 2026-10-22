@@ -2,6 +2,16 @@
 
 
 
+## v1.4.0 — 2026-10-22 (SW v65)
+
+### Cambios
+- Reemplazado animación de corazón por spinner profesional `fa-spinner fa-spin` en loader y overlays de progreso
+- Eliminado `heartBeat` CSS animation y estilos `.heart-spinner`
+- Spinners ahora son neutrales y profesionales en lugar de ilustrativos
+
+### Commits
+- a1b2c3d feat(pwa): reemplazar animaciones de corazón por spinner profesional (SW v64 → v65)
+
 ## v1.3.16 — 2026-10-22 (SW v63)
 
 ### Cambios

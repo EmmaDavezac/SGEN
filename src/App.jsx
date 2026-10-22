@@ -565,11 +565,31 @@ function App() {
                 setPassword('');
                 return;
             }
-            // Credenciales rechazadas: cuenta para el rate limit.
-            setLoginRate(registerFailedLoginAttempt());
-            notify(describeLoginFailure(readLoginRateState()), 'error');
+            // Credenciales rechazadas: cuenta para el rate limit SOLO si no es error de red.
+            // signInWithSupabase retorna null tanto por credenciales inválidas como por error de red.
+            // Consultamos directamente a Supabase auth para obtener el error y distinguirlos.
+            const { error: supaError } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: cleanPassword });
+            if (supaError && supaError.message) {
+                const lowerMsg = supaError.message.toLowerCase();
+                // Errores de red/connessione: no sumamos al rate limit
+                // Check for common network error indicators in Supabase messages
+                const networkErrors = ['network', 'offline', 'fetch', 'connect', 'internet', 'connection'];
+                const isNetworkError = networkErrors.some(term => lowerMsg.includes(term));
+
+                if (!isNetworkError) {
+                    // Es error de credenciales, no de red: sumamos al rate limit.
+                    setLoginRate(registerFailedLoginAttempt());
+                    notify(describeLoginFailure(readLoginRateState()), 'error');
+                } else {
+                    // Error de red o desconocido: no sumamos al bloqueo.
+                    notify('Verificá tu conexión a internet e intentá nuevamente.', 'error');
+                }
+            } else {
+                // No hay mensaje de error: tratamos como error desconocido, no sumamos al bloqueo.
+                notify('No se pudo iniciar sesión. Verificá tus credenciales o la conexión.', 'error');
+            }
         } catch (error) {
-            // Un fallo de red no es un intento de credenciales: no suma al bloqueo.
+            // Error inesperado: no sumamos al bloqueo.
             console.error('Error en login React:', error);
             notify('No se pudo iniciar sesión. Verificá tus credenciales o la conexión.', 'error');
         } finally {

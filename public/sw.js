@@ -8,7 +8,7 @@ import { precacheAndRoute } from 'workbox-precaching';
 // network-first de abajo: un rebuild nunca llegaba al navegador hasta que
 // este service worker se actualizara, y la UI seguía con la versión vieja
 // (p. ej. el overlay de progreso quedaba con z-index bajo los modales).
-const CACHE_VERSION = 'v63'; // Forza update en clientes instalados (temas esteticos, ficha y tickets - actualizacion turnos)
+const CACHE_VERSION = 'v64'; // Forza update en clientes instalados (corrección rate limit password + bloqueo 60s)
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
 // Guardamos el manifest antes de consumirlo para saber qué requests cubre

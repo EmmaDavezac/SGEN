@@ -56,6 +56,7 @@ const todayISO = () => {
 const ExpensesPanel = ({ session, notify, showLoader }) => {
     const [expenses, setExpenses] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [userNames, setUserNames] = useState({}); // cache de nombres de usuario
 
     const [concepto, setConcepto] = useState('');
     const [categoria, setCategoria] = useState('Otro');
@@ -85,6 +86,17 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
         try {
             const data = await loadExpensesFromDatabase();
             setExpenses(data.map(normalizeExpenseRecord));
+
+            // Fetch user names for any expenses
+            const userIds = [...new Set(data.map((e) => e.usuario_id).filter(Boolean))];
+            if (userIds.length > 0) {
+                const { data: profiles } = await supabase.from('perfiles').select('id, nombre').in('id', userIds);
+                if (profiles) {
+                    const updatedNames = {};
+                    profiles.forEach((p) => { updatedNames[p.id] = p.nombre; });
+                    setUserNames(updatedNames);
+                }
+            }
         } catch (err) {
             console.error(err);
             if (notify) notify('No se pudo cargar el listado de gastos.', 'error');
@@ -167,6 +179,9 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                 });
             if (!data) throw new Error('Supabase no devolvió el gasto creado.');
             const newExpense = normalizeExpenseRecord(data);
+            if (session?.nombre && session?.authId) {
+                setUserNames((prev) => ({ ...prev, [session.authId]: session.nombre }));
+            }
             setExpenses((prev) => [newExpense, ...prev]);
             resetForm();
             setFormOpen(false);
@@ -425,7 +440,12 @@ const ExpensesPanel = ({ session, notify, showLoader }) => {
                             <i className={`fa-solid ${categoryIcon(exp.categoria)}`}></i>
                         </div>
                         <div className="card-details">
-                            <div className="card-client expense-name">{exp.concepto}</div>
+                            <div className="card-client expense-name">
+                                {exp.concepto}
+                                {exp.usuario_id && userNames[exp.usuario_id] && (
+                                    <span className="expense-user-name">({userNames[exp.usuario_id]})</span>
+                                )}
+                            </div>
                             <div className="card-service expense-category">{exp.categoria}</div>
                             <div className="card-meta">
                                 <span>

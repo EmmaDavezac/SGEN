@@ -124,7 +124,7 @@ function PricesPanel({ session, notify, showLoader }) {
                 categoryMatches,
                 servicesToShow: normalizedSearch
                     ? (categoryMatches ? activeServices : matchingServices)
-                    : activeServices.slice(0, 4)
+                    : activeServices
             };
         })
         .filter(Boolean);

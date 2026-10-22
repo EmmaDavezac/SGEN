@@ -195,6 +195,7 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
     const [services, setServices] = useState([]);
     const [expenses, setExpenses] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     const [payConfirmOpen, setPayConfirmOpen] = useState(false);
     const [payDetailsOpen, setPayDetailsOpen] = useState(false);
@@ -210,11 +211,13 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
     const [debtOrder, setDebtOrder] = useState('mayor');
     const payInitialRef = React.useRef(null);
 
+    const authId = session?.authId;
     const now = new Date();
 
     const refreshServices = async () => {
-        if (!session?.authId || !supabase) return;
+        if (!authId || !supabase) return;
         setLoading(true);
+        setError('');
         try {
             const [servicesData, expensesData] = await Promise.all([
                 loadServicesFromDatabase(),
@@ -224,6 +227,7 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
             setExpenses(expensesData.map(normalizeExpenseRecord));
         } catch (err) {
             console.error('Error cargando estadísticas:', err);
+            setError('Error cargando estadísticas. Por favor, inténtalo de nuevo.');
         } finally {
             setLoading(false);
         }
@@ -236,8 +240,9 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
         let ignore = false;
 
         const load = async () => {
-            if (!session?.authId || !supabase) return;
+            if (!authId || !supabase) return;
             setLoading(true);
+            setError('');
             try {
                 const [servicesData, expensesData] = await Promise.all([
                     loadServicesFromDatabase(),
@@ -253,6 +258,9 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                 }
             } catch (err) {
                 console.error('Error cargando estadísticas:', err);
+                if (!ignore) {
+                    setError('Error cargando estadísticas. Por favor, inténtalo de nuevo.');
+                }
             } finally {
                 if (!ignore) setLoading(false);
             }
@@ -260,7 +268,7 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
 
         load();
         return () => { ignore = true; };
-    }, [session]);
+    }, [authId]);
 
     const stats = useMemo(() => {
         const recentServices = services.filter((s) => isWithinLast30Days(s.fecha, now));
@@ -591,6 +599,9 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
 
             {debtors.length > 0 && (
                 <>
+                    <div className="panel-subsection-header pending-debtors-header">
+                        <h4 className="panel-subsection-title">Clientes con pagos pendientes</h4>
+                    </div>
                     <div className="filters-container">
                         <div className={`search-box-container${search ? ' has-text' : ''}`}>
                             <i className="fa-solid fa-magnifying-glass search-icon"></i>
@@ -644,9 +655,6 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                         )}
                     </div>
                     <div className="history-list unified-list list-scroll list-section-gap debtors-list">
-                        <div className="panel-subsection-header pending-debtors-header">
-                            <h4 className="panel-subsection-title">Clientes con pagos pendientes</h4>
-                        </div>
                             {(loading || isSearching) && <SkeletonList count={5} />}
                             {!loading && !isSearching && debtorsFiltrados.length === 0 ? (
                                 <div className="list-empty-state"><p>No se encontraron clientes que coincidan con la búsqueda.</p></div>
@@ -794,7 +802,11 @@ const StatsPanel = ({ session, notify, showLoader, runTask }) => {
                 onConfirm={confirmPayDebtor}
                 onCancel={cancelPay}
             />
-        </section>
+        {error && (
+        <div className="alert-error">{error}</div>
+    )}
+
+    </section>
     );
 };
 

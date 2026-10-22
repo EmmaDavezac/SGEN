@@ -171,16 +171,7 @@ button {
     text-align: center;
 }
 
-.heart-spinner {
-    font-size: 60px;
-    animation: heartBeat 1.2s infinite;
-    display: inline-block;
-}
 
-@keyframes heartBeat {
-    0% {
-        transform: scale(1);
-    }
 
     14% {
         transform: scale(1.2);
@@ -227,11 +218,7 @@ button {
     text-align: center;
 }
 
-.write-progress-card .heart-spinner {
-    font-size: 44px;
-}
 
-.write-progress-title {
     margin: 14px 0 18px;
     font-family: 'Comfortaa', sans-serif;
     font-weight: 700;
@@ -2504,14 +2491,7 @@ button:active {
     transform: none !important;
 }
 
-/* Estilo para los spinner de FontAwesome */
-.heart-spinner i {
-    color: var(--brand-primary);
-    font-size: 50px;
-    animation: heartBeat 1.2s infinite;
-}
 
-/* Botón de peligro (Eliminar) */
 .btn-danger {
     background: #dc3f55;
     color: #fff !important;

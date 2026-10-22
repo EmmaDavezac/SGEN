@@ -35,7 +35,7 @@ function WriteProgressOverlay({ task }) {
         return createPortal(
             <div className="loader-overlay" aria-live="polite" aria-busy="true">
                 <div className="spinner-container">
-                    <i className="fa-solid fa-heart heart-spinner" aria-hidden="true"></i>
+                    <i className="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
                     <p>{task.title || 'Cargando...'}</p>
                 </div>
             </div>,
@@ -46,7 +46,7 @@ function WriteProgressOverlay({ task }) {
     return createPortal(
         <div className="loader-overlay write-progress-overlay" aria-live="polite" aria-busy="true">
             <div className="write-progress-card">
-                <i className="fa-solid fa-heart heart-spinner" aria-hidden="true"></i>
+                <i className="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
                 <h3 className="write-progress-title">{task.title || 'Guardando...'}</h3>
                 <ul className="write-progress-steps">
                     {steps.map((step) => (
