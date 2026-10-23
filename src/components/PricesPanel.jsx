@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ensureAuthSession, supabase } from '../supabase.js';
-import { notifySessionExpired } from '../services.js';
+import { supabase } from '../supabase.js';
+import { loadPriceCatalogFromDatabase, notifySessionExpired } from '../services.js';
 import { ListIconButton, PanelCancelButton, PanelSaveButton } from './Button.jsx';
 import { ConfirmModal } from './Modal.jsx';
 import {
@@ -41,29 +41,15 @@ function PricesPanel({ session, notify, showLoader }) {
     const isAdmin = session?.rol === 'admin' || session?.rol === 'superadmin';
 
     const loadCatalog = useCallback(async () => {
-        if (!supabase) return;
         try {
-            // Con el JWT vencido RLS devuelve [] sin error: validar antes para
-            // no mostrar el catálogo por defecto como si fuera el real.
-            try {
-                await ensureAuthSession();
-            } catch (authError) {
-                notifySessionExpired();
-                throw authError;
-            }
-            const [categoryResult, priceResult] = await Promise.all([
-                supabase.from('categorias_servicio').select('clave, nombre, activo').order('nombre'),
-                supabase.from('precios').select('categoria, nombre, precio, activo').order('categoria').order('nombre')
-            ]);
-            if (categoryResult.error) throw categoryResult.error;
-            if (priceResult.error) throw priceResult.error;
+            const { categories: loadedCategories, prices: loadedPrices } = await loadPriceCatalogFromDatabase();
 
-            const loadedCategories = (categoryResult.data || []).length
-                ? categoryResult.data
+            const resolvedCategories = loadedCategories.length
+                ? loadedCategories
                 : DEFAULT_SERVICE_CATEGORIES;
             const loadedCatalog = {};
-            loadedCategories.forEach(category => { loadedCatalog[category.clave || category.key] = []; });
-            (priceResult.data || []).forEach(price => {
+            resolvedCategories.forEach(category => { loadedCatalog[category.clave || category.key] = []; });
+            (loadedPrices || []).forEach(price => {
                 if (!loadedCatalog[price.categoria]) loadedCatalog[price.categoria] = [];
                 loadedCatalog[price.categoria].push({
                     name: price.nombre,
@@ -71,10 +57,10 @@ function PricesPanel({ session, notify, showLoader }) {
                     active: price.activo !== false
                 });
             });
-            if (!(priceResult.data || []).length) {
+            if (!(loadedPrices || []).length) {
                 Object.assign(loadedCatalog, cloneServiceCatalog(DEFAULT_SERVICE_CATALOG));
             }
-            setCategories(loadedCategories.map(category => ({
+            setCategories(resolvedCategories.map(category => ({
                 key: category.clave || category.key,
                 name: category.nombre || category.name,
                 active: category.activo !== false

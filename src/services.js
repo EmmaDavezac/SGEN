@@ -1,4 +1,11 @@
 import { ensureAuthSession, supabase } from './supabase.js';
+import { isNetworkError } from './offline/network.js';
+import {
+    STORES,
+    getAllFromStore,
+    setAllInStore,
+    putInStore
+} from './offline/db.js';
 
 // Aviso global cuando una consulta detecta sesión expirada: App lo escucha
 // para cerrar la sesión local y llevar al login (evita listados vacíos).
@@ -12,9 +19,15 @@ export function notifySessionExpired() {
 // consulta corre como anónima). Validar la sesión antes evita pisar el caché
 // local con vacíos y deja que App fuerce un login fresco.
 async function requireAuthForRead() {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return;
+    }
     try {
         await ensureAuthSession();
     } catch (error) {
+        if (isNetworkError(error)) {
+            return;
+        }
         notifySessionExpired();
         throw error;
     }
@@ -141,88 +154,278 @@ export async function registerServiceDirectly(transaction) {
 }
 
 export async function loadClientsFromDatabase() {
-    if (!supabase) throw new Error('Supabase no está disponible.');
-    await requireAuthForRead();
-    const { data, error } = await supabase
-        .from('clientes')
-        .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
-        .order('nombre', { ascending: true });
-    if (error) throw error;
-    return data || [];
+    const getCached = async () => {
+        const cached = await getAllFromStore(STORES.CLIENTES);
+        cached.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+        return cached;
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return await getCached();
+    }
+    if (!supabase) {
+        return await getCached();
+    }
+    try {
+        await requireAuthForRead();
+        const { data, error } = await supabase
+            .from('clientes')
+            .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
+            .order('nombre', { ascending: true });
+        if (error) throw error;
+        if (Array.isArray(data)) {
+            setAllInStore(STORES.CLIENTES, data);
+        }
+        return data || [];
+    } catch (err) {
+        if (isNetworkError(err)) {
+            console.warn('Cargando clientes desde caché local por fallo de red');
+            return await getCached();
+        }
+        throw err;
+    }
 }
 
 export async function loadAppointmentsFromDatabase() {
-    if (!supabase) throw new Error('Supabase no está disponible.');
-    await requireAuthForRead();
-    const { data, error } = await supabase
-        .from('turnos')
-        .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, motivo_cancelacion, event_id, cliente_id')
-        .order('hora_inicio', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    const getCached = async () => {
+        const cached = await getAllFromStore(STORES.TURNOS);
+        cached.sort((a, b) => (b.hora_inicio || '').localeCompare(a.hora_inicio || ''));
+        return cached;
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return await getCached();
+    }
+    if (!supabase) {
+        return await getCached();
+    }
+    try {
+        await requireAuthForRead();
+        const { data, error } = await supabase
+            .from('turnos')
+            .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, motivo_cancelacion, event_id, cliente_id')
+            .order('hora_inicio', { ascending: false });
+        if (error) throw error;
+        if (Array.isArray(data)) {
+            setAllInStore(STORES.TURNOS, data);
+        }
+        return data || [];
+    } catch (err) {
+        if (isNetworkError(err)) {
+            console.warn('Cargando turnos desde caché local por fallo de red');
+            return await getCached();
+        }
+        throw err;
+    }
 }
 
 export async function loadExpensesFromDatabase(options = {}) {
-    if (!supabase) throw new Error('Supabase no está disponible.');
-    await requireAuthForRead();
     const opts = typeof options === 'object' && options !== null ? options : { userId: options };
-    let query = supabase
-        .from('gastos')
-        .select('id, fecha, concepto, categoria, monto, metodo_pago, usuario_id')
-        .order('fecha', { ascending: false });
-    if (opts.userId) {
-        query = query.eq('usuario_id', opts.userId);
+
+    const getCached = async () => {
+        let cached = await getAllFromStore(STORES.GASTOS);
+        if (opts.userId) {
+            cached = cached.filter((g) => g.usuario_id === opts.userId);
+        }
+        if (opts.dateRange) {
+            cached = cached.filter((g) =>
+                (!opts.dateRange.gte || g.fecha >= opts.dateRange.gte) &&
+                (!opts.dateRange.lte || g.fecha <= opts.dateRange.lte)
+            );
+        }
+        cached.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+        const limit = opts.limit || opts.pageSize;
+        if (limit) {
+            const offset = opts.offset || (opts.page ? (opts.page - 1) * limit : 0);
+            return cached.slice(offset, offset + limit);
+        }
+        return cached;
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return await getCached();
     }
-    // Filtrar por fecha si se proporciona (formato: { gte: fecha_inicio, lte: fecha_fin })
-    // Por defecto, traemos todos los gastos (dateRange opcional para compatibilidad)
-    if (opts.dateRange) {
-        query = query.gte('fecha', opts.dateRange.gte).lte('fecha', opts.dateRange.lte);
+    if (!supabase) {
+        return await getCached();
     }
-    const limit = opts.limit || opts.pageSize;
-    if (limit) {
-        const offset = opts.offset || (opts.page ? (opts.page - 1) * limit : 0);
-        query = query.range(offset, offset + limit - 1);
+    try {
+        await requireAuthForRead();
+        let query = supabase
+            .from('gastos')
+            .select('id, fecha, concepto, categoria, monto, metodo_pago, usuario_id')
+            .order('fecha', { ascending: false });
+        if (opts.userId) {
+            query = query.eq('usuario_id', opts.userId);
+        }
+        if (opts.dateRange) {
+            query = query.gte('fecha', opts.dateRange.gte).lte('fecha', opts.dateRange.lte);
+        }
+        const limit = opts.limit || opts.pageSize;
+        if (limit) {
+            const offset = opts.offset || (opts.page ? (opts.page - 1) * limit : 0);
+            query = query.range(offset, offset + limit - 1);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        if (Array.isArray(data) && !opts.userId && !opts.dateRange && !limit) {
+            setAllInStore(STORES.GASTOS, data);
+        } else if (Array.isArray(data)) {
+            data.forEach((item) => putInStore(STORES.GASTOS, item));
+        }
+        return data || [];
+    } catch (err) {
+        if (isNetworkError(err)) {
+            console.warn('Cargando gastos desde caché local por fallo de red');
+            return await getCached();
+        }
+        throw err;
     }
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
 }
 
 export async function loadServicesFromDatabase(options = {}) {
-    if (!supabase) throw new Error('Supabase no está disponible.');
-    await requireAuthForRead();
-    // Solo seleccionar campos necesarios para estadísticas
-    // Nota: removimos 'clientes(nombre), perfiles(nombre, email)' para reducir payload
-    // pero tambien removimos 'costo_actual' que no existe en la tabla servicios
-    let query = supabase.from('servicios').select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, descuento_pct, descuento_monto, completado, vuelto, cliente_id');
-    // Filtrar por fecha si se proporciona (formato: { gte: fecha_inicio, lte: fecha_fin })
-    // Si no hay dateRange, no filtramos (traemos todos los servicios para compatibilidad)
-    if (options && options.dateRange) {
-        query = query.gte('fecha', options.dateRange.gte).lte('fecha', options.dateRange.lte);
+    const getCached = async () => {
+        let cached = await getAllFromStore(STORES.SERVICIOS);
+        if (options?.dateRange) {
+            cached = cached.filter((s) =>
+                (!options.dateRange.gte || s.fecha >= options.dateRange.gte) &&
+                (!options.dateRange.lte || s.fecha <= options.dateRange.lte)
+            );
+        }
+        cached.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+        return cached;
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return await getCached();
     }
-    // Ordenar por fecha descendente - importante para el cacheo eficiente
-    query = query.order('fecha', { ascending: false });
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
+    if (!supabase) {
+        return await getCached();
+    }
+    try {
+        await requireAuthForRead();
+        let query = supabase.from('servicios').select('id, legacy_id, turno_id, cliente_id, fecha, servicio, categoria, precio, sena, metodo_pago, monto_efectivo, monto_transferencia, saldo_pendiente, descuento_pct, descuento_monto, completado, vuelto, cliente_id');
+        if (options && options.dateRange) {
+            query = query.gte('fecha', options.dateRange.gte).lte('fecha', options.dateRange.lte);
+        }
+        query = query.order('fecha', { ascending: false });
+        const { data, error } = await query;
+        if (error) throw error;
+        if (Array.isArray(data) && !options?.dateRange) {
+            setAllInStore(STORES.SERVICIOS, data);
+        } else if (Array.isArray(data)) {
+            data.forEach((item) => putInStore(STORES.SERVICIOS, item));
+        }
+        return data || [];
+    } catch (err) {
+        if (isNetworkError(err)) {
+            console.warn('Cargando servicios desde caché local por fallo de red');
+            return await getCached();
+        }
+        throw err;
+    }
 }
 
 export async function loadCashboxDataFromDatabase() {
-    if (!supabase) throw new Error('Supabase no está disponible.');
-    await requireAuthForRead();
-    const [servicesResult, movementsResult, expensesResult] = await Promise.all([
-        supabase.from('servicios').select('precio, sena, metodo_pago, monto_efectivo, monto_transferencia, completado'),
-        supabase.from('movimientos_caja').select('*').order('fecha', { ascending: false }).limit(50),
-        supabase.from('gastos').select('monto, metodo_pago')
-    ]);
-    if (servicesResult.error) throw servicesResult.error;
-    if (movementsResult.error) throw movementsResult.error;
-    if (expensesResult.error) throw expensesResult.error;
-    return {
-        services: servicesResult.data || [],
-        movements: movementsResult.data || [],
-        expenses: expensesResult.data || []
+    const getCached = async () => {
+        const [services, movements, expenses] = await Promise.all([
+            getAllFromStore(STORES.SERVICIOS),
+            getAllFromStore(STORES.MOVIMIENTOS_CAJA),
+            getAllFromStore(STORES.GASTOS)
+        ]);
+        return {
+            services: services || [],
+            movements: movements || [],
+            expenses: expenses || []
+        };
     };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return await getCached();
+    }
+    if (!supabase) {
+        return await getCached();
+    }
+    try {
+        await requireAuthForRead();
+        const [servicesResult, movementsResult, expensesResult] = await Promise.all([
+            supabase.from('servicios').select('precio, sena, metodo_pago, monto_efectivo, monto_transferencia, completado'),
+            supabase.from('movimientos_caja').select('*').order('fecha', { ascending: false }).limit(50),
+            supabase.from('gastos').select('monto, metodo_pago')
+        ]);
+        if (servicesResult.error) throw servicesResult.error;
+        if (movementsResult.error) throw movementsResult.error;
+        if (expensesResult.error) throw expensesResult.error;
+
+        if (Array.isArray(movementsResult.data)) {
+            setAllInStore(STORES.MOVIMIENTOS_CAJA, movementsResult.data);
+        }
+
+        return {
+            services: servicesResult.data || [],
+            movements: movementsResult.data || [],
+            expenses: expensesResult.data || []
+        };
+    } catch (err) {
+        if (isNetworkError(err)) {
+            console.warn('Cargando datos de caja desde caché local por fallo de red');
+            return await getCached();
+        }
+        throw err;
+    }
+}
+
+export async function loadPriceCatalogFromDatabase({ activeOnly = false } = {}) {
+    const getCached = async () => {
+        let [categories, prices] = await Promise.all([
+            getAllFromStore(STORES.CATEGORIAS),
+            getAllFromStore(STORES.PRECIOS)
+        ]);
+        if (activeOnly) {
+            categories = categories.filter((c) => c.activo !== false);
+            prices = prices.filter((p) => p.activo !== false);
+        }
+        return {
+            categories: categories || [],
+            prices: prices || []
+        };
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        return await getCached();
+    }
+    if (!supabase) {
+        return await getCached();
+    }
+    try {
+        await requireAuthForRead();
+        let catQuery = supabase.from('categorias_servicio').select('clave, nombre, activo').order('nombre');
+        let priceQuery = supabase.from('precios').select('id, categoria, nombre, precio, activo').order('categoria').order('nombre');
+        if (activeOnly) {
+            catQuery = catQuery.eq('activo', true);
+            priceQuery = priceQuery.eq('activo', true);
+        }
+        const [catRes, priceRes] = await Promise.all([catQuery, priceQuery]);
+        if (catRes.error) throw catRes.error;
+        if (priceRes.error) throw priceRes.error;
+
+        if (Array.isArray(catRes.data) && !activeOnly) {
+            setAllInStore(STORES.CATEGORIAS, catRes.data.map((c) => ({ ...c, id: c.clave })));
+        }
+        if (Array.isArray(priceRes.data) && !activeOnly) {
+            setAllInStore(STORES.PRECIOS, priceRes.data.map((p) => ({ ...p, id: p.id || `${p.categoria}_${p.nombre}` })));
+        }
+
+        return {
+            categories: catRes.data || [],
+            prices: priceRes.data || []
+        };
+    } catch (err) {
+        if (isNetworkError(err)) {
+            console.warn('Cargando catálogo de precios desde caché local por fallo de red');
+            return await getCached();
+        }
+        throw err;
+    }
 }
 
 export async function saveClientToDatabase(payload, { usuarioId = null } = {}) {

@@ -2,6 +2,18 @@
 
 
 
+## v1.5.0 — 2026-10-22 (SW v66)
+
+### Cambios
+- Motor de almacenamiento local en IndexedDB (`src/offline/db.js`): stores para clientes, turnos, servicios, precios, categorias, gastos, movimientos_caja, sync_queue y meta.
+- Estrategia stale-while-revalidate en `loadClientsFromDatabase`, `loadAppointmentsFromDatabase`, `loadExpensesFromDatabase`, `loadServicesFromDatabase`, `loadCashboxDataFromDatabase`: devuelven datos de IndexedDB si no hay red y actualizan el cache cuando hay conexion.
+- Nueva funcion `loadPriceCatalogFromDatabase` en `src/services.js` que cachea categorias y precios en IndexedDB con fallback offline.
+- `PricesPanel.jsx` y `RegisterServiceForm.jsx` usan `loadPriceCatalogFromDatabase` con soporte offline.
+- `requireAuthForRead()` ahora tolera falta de conexion: si no hay red omite la verificacion de sesion en lugar de lanzar error.
+
+### Commits
+- 626d35c feat(offline): IndexedDB + stale-while-revalidate para lecturas offline (SW v65 -> v66)
+
 ## v1.4.1 — 2026-10-22 (SW v65)
 
 ### Cambios

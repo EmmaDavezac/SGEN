@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { ensureAuthSession, supabase } from '../supabase.js';
-import { finalizeRegisteredService, notifySessionExpired, registerServiceDirectly, saveExpenseToDatabase } from '../services.js';
+import { supabase } from '../supabase.js';
+import { finalizeRegisteredService, loadPriceCatalogFromDatabase, notifySessionExpired, registerServiceDirectly, saveExpenseToDatabase } from '../services.js';
 import { cloneServiceCatalog, DEFAULT_SERVICE_CATEGORIES, DEFAULT_SERVICE_CATALOG, sortCategoriesForDisplay } from '../serviceCatalog.js';
 import { computeCombinedSplit } from '../paymentSplit.js';
 import Button from './Button.jsx';
@@ -102,26 +102,16 @@ function RegisterServiceForm({ session, onBack, initialAppointment = null, onReg
     useEffect(() => {
         async function fetchPrices() {
             try {
-                // Evita catálogo por defecto por JWT vencido (RLS -> []).
-                await ensureAuthSession().catch((authError) => {
-                    notifySessionExpired();
-                    throw authError;
-                });
-                const [categoryResult, priceResult] = await Promise.all([
-                    supabase.from('categorias_servicio').select('clave, nombre, activo').eq('activo', true).order('nombre'),
-                    supabase.from('precios').select('categoria, nombre, precio, activo').eq('activo', true).order('categoria').order('nombre')
-                ]);
-                if (categoryResult.error) throw categoryResult.error;
-                if (priceResult.error) throw priceResult.error;
+                const { categories: loadedCategories, prices: loadedPrices } = await loadPriceCatalogFromDatabase({ activeOnly: true });
 
-                const loadedCategories = categoryResult.data?.length ? categoryResult.data : DEFAULT_SERVICE_CATEGORIES;
-                const newCatalog = Object.fromEntries(loadedCategories.map(category => [category.clave || category.key, []]));
-                (priceResult.data || []).forEach(price => {
+                const resolvedCategories = loadedCategories?.length ? loadedCategories : DEFAULT_SERVICE_CATEGORIES;
+                const newCatalog = Object.fromEntries(resolvedCategories.map(category => [category.clave || category.key, []]));
+                (loadedPrices || []).forEach(price => {
                     if (!newCatalog[price.categoria]) return;
                     newCatalog[price.categoria].push({ name: price.nombre, price: Number(price.precio) || 0, active: true });
                 });
-                if (!(priceResult.data || []).length) Object.assign(newCatalog, cloneServiceCatalog(DEFAULT_SERVICE_CATALOG));
-                setCategories(sortCategoriesForDisplay(loadedCategories.map(category => ({
+                if (!(loadedPrices || []).length) Object.assign(newCatalog, cloneServiceCatalog(DEFAULT_SERVICE_CATALOG));
+                setCategories(sortCategoriesForDisplay(resolvedCategories.map(category => ({
                     key: category.clave || category.key,
                     name: category.nombre || category.name,
                     active: category.activo !== false

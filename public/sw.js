@@ -8,7 +8,7 @@ import { precacheAndRoute } from 'workbox-precaching';
 // network-first de abajo: un rebuild nunca llegaba al navegador hasta que
 // este service worker se actualizara, y la UI seguía con la versión vieja
 // (p. ej. el overlay de progreso quedaba con z-index bajo los modales).
-const CACHE_VERSION = 'v65'; // Soporte offline etapa 1: resiliencia de sesion e indicador de conectividad
+const CACHE_VERSION = 'v66'; // Soporte offline etapa 2: IndexedDB stale-while-revalidate para lecturas offline
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
 // Guardamos el manifest antes de consumirlo para saber qué requests cubre
