@@ -25,6 +25,7 @@ import AppFooter from './components/AppFooter.jsx';
 import { ConfirmModal } from './components/Modal.jsx';
 import { getPathForTab, getTabFromPath, isKnownPath } from './router.js';
 import { isNetworkError, useNetworkStatus } from './offline/network.js';
+import { processSyncQueue, getPendingCount } from './offline/syncQueue.js';
 import {
     readLoginRateState,
     registerFailedLoginAttempt,
@@ -132,6 +133,8 @@ function ToastBridge({ notifyRef }) {
 function App() {
     const [session, setSession] = useState(() => readStoredSession());
     const { isOnline } = useNetworkStatus();
+    // Operaciones encoladas offline pendientes de sincronizar.
+    const [pendingCount, setPendingCount] = useState(0);
     // `false` hasta validar la sesión guardada contra Supabase Auth. Evita que
     // los paneles monten (y pisen el caché con []) con una sesión rancia.
     const [authReady, setAuthReady] = useState(false);
@@ -425,7 +428,17 @@ function App() {
             if (document.visibilityState === 'visible') validateStoredSession();
         };
         const handleOnline = () => {
-            if (isActive && readStoredSession()) validateStoredSession();
+            if (!isActive) return;
+            if (readStoredSession()) validateStoredSession();
+            // Procesar cola de escrituras offline en cuanto hay red
+            processSyncQueue(supabase).then(({ applied, failed }) => {
+                if (applied > 0 || failed > 0) {
+                    console.info(`[SyncQueue] Sincronizadas ${applied} operaciones. Fallidas: ${failed}.`);
+                }
+                getPendingCount().then(n => setPendingCount(n));
+            }).catch(err => {
+                console.warn('[SyncQueue] Error al procesar cola:', err);
+            });
         };
         document.addEventListener('visibilitychange', handleVisibility);
         window.addEventListener('online', handleOnline);

@@ -4,8 +4,10 @@ import {
     STORES,
     getAllFromStore,
     setAllInStore,
-    putInStore
+    putInStore,
+    deleteFromStore,
 } from './offline/db.js';
+import { enqueueOperation } from './offline/syncQueue.js';
 
 // Aviso global cuando una consulta detecta sesión expirada: App lo escucha
 // para cerrar la sesión local y llevar al login (evita listados vacíos).
@@ -429,13 +431,30 @@ export async function loadPriceCatalogFromDatabase({ activeOnly = false } = {}) 
 }
 
 export async function saveClientToDatabase(payload, { usuarioId = null } = {}) {
-    if (!supabase) throw new Error('Supabase no está disponible.');
+    // Offline: encolar y devolver objeto local provisional
+    if (!navigator.onLine) {
+        const localId = crypto.randomUUID ? crypto.randomUUID() : `local-${Date.now()}`;
+        const localRecord = {
+            ...payload,
+            id: localId,
+            _localId: localId,
+            _pendingSync: true,
+            creado_en: new Date().toISOString(),
+            actualizado_en: new Date().toISOString(),
+        };
+        await putInStore(STORES.CLIENTES, localRecord);
+        await enqueueOperation({ table: 'clientes', action: 'insert', payload: localRecord });
+        return localRecord;
+    }
+    if (!supabase) throw new Error('Supabase no esta disponible.');
     const { data, error } = await supabase
         .from('clientes')
         .insert(payload)
         .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
         .single();
     if (error) throw error;
+    // Actualizar cache local con el registro real (reemplaza el provisional si existia)
+    await putInStore(STORES.CLIENTES, data);
     return data;
 }
 
@@ -451,7 +470,15 @@ export async function findClientByNormalizedName(name) {
 }
 
 export async function updateClientInDatabase(id, updates) {
-    if (!supabase) throw new Error('Supabase no está disponible.');
+    // Offline: encolar update y actualizar cache local
+    if (!navigator.onLine) {
+        const cached = (await getAllFromStore(STORES.CLIENTES)).find(c => c.id === id);
+        const merged = { ...(cached || {}), ...updates, id, actualizado_en: new Date().toISOString(), _pendingSync: true };
+        await putInStore(STORES.CLIENTES, merged);
+        await enqueueOperation({ table: 'clientes', action: 'update', payload: { id, ...updates } });
+        return merged;
+    }
+    if (!supabase) throw new Error('Supabase no esta disponible.');
     const { data, error } = await supabase
         .from('clientes')
         .update(updates)
@@ -459,6 +486,7 @@ export async function updateClientInDatabase(id, updates) {
         .select('id, nombre, telefono, email, notas, activo, creado_en, actualizado_en')
         .single();
     if (error) throw error;
+    await putInStore(STORES.CLIENTES, data);
     return data;
 }
 
@@ -470,7 +498,13 @@ export async function updateClientInDatabase(id, updates) {
  * borrado que nunca ocurrió y la cliente reaparecía al recargar.
  */
 export async function deleteClientFromDatabase(id) {
-    if (!supabase) throw new Error('Supabase no está disponible.');
+    // Offline: encolar delete y quitar del cache local
+    if (!navigator.onLine) {
+        await deleteFromStore(STORES.CLIENTES, id);
+        await enqueueOperation({ table: 'clientes', action: 'delete', payload: { id } });
+        return { success: true };
+    }
+    if (!supabase) throw new Error('Supabase no esta disponible.');
     const { data, error } = await supabase
         .from('clientes')
         .delete()
@@ -486,33 +520,77 @@ export async function deleteClientFromDatabase(id) {
     if (!data || data.length === 0) {
         throw new Error('No se pudo eliminar la cliente: no hay permisos (RLS) o ya no existe en el sistema.');
     }
+    await deleteFromStore(STORES.CLIENTES, id);
     return { success: true };
 }
 
 export async function saveExpenseToDatabase(payload) {
-    if (!supabase) throw new Error('Supabase no está disponible.');
+    // Offline: encolar y guardar localmente
+    if (!navigator.onLine) {
+        const localId = crypto.randomUUID ? crypto.randomUUID() : `local-${Date.now()}`;
+        const localRecord = {
+            ...payload,
+            id: localId,
+            _localId: localId,
+            _pendingSync: true,
+        };
+        await putInStore(STORES.GASTOS, localRecord);
+        await enqueueOperation({ table: 'gastos', action: 'insert', payload: localRecord });
+        return localRecord;
+    }
+    if (!supabase) throw new Error('Supabase no esta disponible.');
     const { data, error } = await supabase
         .from('gastos')
         .insert(payload)
         .select('id, fecha, concepto, categoria, monto, metodo_pago, usuario_id')
         .single();
     if (error) throw error;
+    await putInStore(STORES.GASTOS, data);
     return data;
 }
 
 export async function saveCashMovementToDatabase(payload) {
-    if (!supabase) throw new Error('Supabase no está disponible.');
+    // Offline: encolar y guardar localmente
+    if (!navigator.onLine) {
+        const localId = crypto.randomUUID ? crypto.randomUUID() : `local-${Date.now()}`;
+        const localRecord = {
+            ...payload,
+            id: localId,
+            _localId: localId,
+            _pendingSync: true,
+        };
+        await putInStore(STORES.MOVIMIENTOS_CAJA, localRecord);
+        await enqueueOperation({ table: 'movimientos_caja', action: 'insert', payload: localRecord });
+        return localRecord;
+    }
+    if (!supabase) throw new Error('Supabase no esta disponible.');
     const { data, error } = await supabase
         .from('movimientos_caja')
         .insert(payload)
         .select('*')
         .single();
     if (error) throw error;
+    await putInStore(STORES.MOVIMIENTOS_CAJA, data);
     return data;
 }
 
 export async function saveAppointmentToDatabase(payload) {
-    if (!supabase) throw new Error('Supabase no está disponible.');
+    // Offline: no podemos verificar solapamiento sin DB, encolamos directo
+    if (!navigator.onLine) {
+        const localId = crypto.randomUUID ? crypto.randomUUID() : `local-${Date.now()}`;
+        const localRecord = {
+            ...payload,
+            id: localId,
+            _localId: localId,
+            _pendingSync: true,
+            estado: payload.estado || 'pendiente',
+        };
+        await putInStore(STORES.TURNOS, localRecord);
+        await enqueueOperation({ table: 'turnos', action: 'insert', payload: localRecord });
+        return localRecord;
+    }
+
+    if (!supabase) throw new Error('Supabase no esta disponible.');
 
     const usuarioId = payload.usuario_id;
     const fecha = payload.fecha;
@@ -543,7 +621,7 @@ export async function saveAppointmentToDatabase(payload) {
                 hour: '2-digit', minute: '2-digit', hour12: false
             });
             throw new Error(
-                `Ya tenés un turno agendado para el ${fecha} de ${hi} a ${hf} (${conflicto.servicio}). No se pueden crear dos turnos al mismo tiempo.`
+                `Ya tenes un turno agendado para el ${fecha} de ${hi} a ${hf} (${conflicto.servicio}). No se pueden crear dos turnos al mismo tiempo.`
             );
         }
     }
@@ -554,11 +632,20 @@ export async function saveAppointmentToDatabase(payload) {
         .select('id, legacy_id, fecha, hora_inicio, hora_fin, servicio, precio, estado, motivo_cancelacion, event_id, cliente_id, usuario_id')
         .single();
     if (error) throw error;
+    await putInStore(STORES.TURNOS, data);
     return data;
 }
 
 export async function updateAppointmentStatusInDatabase(id, updates) {
-    if (!supabase) throw new Error('Supabase no está disponible.');
+    // Offline: encolar update de estado y actualizar cache local
+    if (!navigator.onLine) {
+        const cached = (await getAllFromStore(STORES.TURNOS)).find(t => t.id === id);
+        const merged = { ...(cached || {}), ...updates, id, _pendingSync: true };
+        await putInStore(STORES.TURNOS, merged);
+        await enqueueOperation({ table: 'turnos', action: 'update', payload: { id, ...updates } });
+        return merged;
+    }
+    if (!supabase) throw new Error('Supabase no esta disponible.');
     const { data, error } = await supabase
         .from('turnos')
         .update(updates)
@@ -566,7 +653,8 @@ export async function updateAppointmentStatusInDatabase(id, updates) {
         .select('id, estado, precio')
         .maybeSingle();
     if (error) throw error;
-    if (!data) throw new Error('No se encontró el turno para actualizar. Puede que tu rol no tenga permiso (RLS) o que el turno ya no exista.');
+    if (!data) throw new Error('No se encontro el turno para actualizar. Puede que tu rol no tenga permiso (RLS) o que el turno ya no exista.');
+    await putInStore(STORES.TURNOS, data);
     return data;
 }
 
@@ -738,7 +826,13 @@ export async function cancelAppointmentInDatabase({ id = null, legacyId = null, 
 }
 
 export async function deleteAppointmentFromDatabase(id) {
-    if (!supabase) throw new Error('Supabase no está disponible.');
+    // Offline: encolar delete y quitar del cache local
+    if (!navigator.onLine) {
+        await deleteFromStore(STORES.TURNOS, id);
+        await enqueueOperation({ table: 'turnos', action: 'delete', payload: { id } });
+        return { success: true };
+    }
+    if (!supabase) throw new Error('Supabase no esta disponible.');
     if (!id) throw new Error('Falta el ID del turno.');
     const uuid = await resolveTurnoUuid(id).catch(() => null);
     // Intentar por UUID y por legacy_id para cubrir caché vieja.
@@ -754,11 +848,14 @@ export async function deleteAppointmentFromDatabase(id) {
             .eq(attempt.col, attempt.val)
             .select('id')
             .maybeSingle();
-        if (!error && data) return { success: true };
+        if (!error && data) {
+            await deleteFromStore(STORES.TURNOS, data.id || id);
+            return { success: true };
+        }
         if (error) lastError = error;
     }
     if (lastError) throw lastError;
-    throw new Error('No se encontró el turno para eliminar. Puede que tu rol no tenga permiso (solo admin puede borrar) o la sesión expiró.');
+    throw new Error('No se encontro el turno para eliminar. Puede que tu rol no tenga permiso (solo admin puede borrar) o la sesion expiro.');
 }
 
 /**
